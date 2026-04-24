@@ -25,3 +25,26 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## MFK — Smart Vehicle Diagnostics
+
+Arabic-first RTL platform for KSA. Dark theme with orange (#F35D19) accent.
+
+### Artifacts
+- `artifacts/api-server` — Express 5 backend, mounted at `/api`
+- `artifacts/mfk-web` — React + Vite frontend, mounted at `/`
+
+### App areas
+- `/` marketing landing, `/features`, `/how`, `/pricing`, `/workshops`, `/login`
+- `/app/*` user dashboard: overview, vehicles, diagnostics, dtc, maintenance, workshops, bookings, assistant, recommendations, subscription
+- `/admin/*` admin: overview, users, vehicles, diagnostics, issues, workshops, revenue
+
+### Demo data
+Seeded via `cd artifacts/api-server && ../mfk-web/node_modules/.bin/tsx src/seed.ts`. Demo user عبدالله السلمي (`DEMO_USER_ID` in `artifacts/api-server/src/lib/demo.ts`) has 3 vehicles + 24 other Arabic users, 10 workshops, sessions, telemetry, DTCs, maintenance, bookings, recommendations, health history, activity, revenue.
+
+### Routing notes
+- Wouter base set to `BASE_URL`; nested `AppRoutes`/`AdminRoutes` use absolute paths because parent wildcard does not strip prefix.
+- Parent uses both `path="/app"` and `path="/app/*?"` so the bare URL also matches.
+
+### DB query convention
+Use drizzle `inArray(col, arr)` instead of `sql\`... = ANY(${arr})\`` — the sql template tag expands arrays as separate placeholders and produces invalid SQL.

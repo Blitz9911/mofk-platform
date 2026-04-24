@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "Ap1L-ruqiXTsCCBVao8RK"
+uri = "file://artifacts/mfk-web/public/hero-adapter.png"
+type = "image"
+title = "OBD adapter hero"
+
+[[generated]]
+id = "bkjcerufjU9AcDQHU1_VD"
+uri = "file://artifacts/mfk-web/public/in-car-experience.png"
+type = "image"
+title = "In-car diagnostic experience"

@@ -2,21 +2,29 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: MFK — Smart Vehicle Diagnostics Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: vehicles
+  - name: diagnostics
+  - name: dtc
+  - name: maintenance
+  - name: workshops
+  - name: bookings
+  - name: ai
+  - name: subscriptions
+  - name: admin
+  - name: dashboard
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +32,1246 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ========== DASHBOARD (wow endpoints) ==========
+  /dashboard/overview:
+    get:
+      operationId: getDashboardOverview
+      tags: [dashboard]
+      summary: Top-level KPIs for the user dashboard
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverview"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Recent diagnostic / maintenance / booking activity feed
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10, maximum: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/health-trend:
+    get:
+      operationId: getHealthTrend
+      tags: [dashboard]
+      summary: Aggregated daily health score across user's vehicles for last 30 days
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HealthTrendPoint"
+
+  # ========== VEHICLES ==========
+  /vehicles:
+    get:
+      operationId: listVehicles
+      tags: [vehicles]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vehicle"
+    post:
+      operationId: createVehicle
+      tags: [vehicles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVehicleBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  /vehicles/{vehicleId}:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getVehicle
+      tags: [vehicles]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleDetail"
+    patch:
+      operationId: updateVehicle
+      tags: [vehicles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVehicleBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+    delete:
+      operationId: deleteVehicle
+      tags: [vehicles]
+      responses:
+        "204":
+          description: Deleted
+
+  /vehicles/{vehicleId}/health-history:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getVehicleHealthHistory
+      tags: [vehicles]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HealthTrendPoint"
+
+  /vehicles/{vehicleId}/pair:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    post:
+      operationId: pairAdapter
+      tags: [vehicles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairAdapterBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vehicle"
+
+  # ========== DIAGNOSTICS ==========
+  /diagnostics/sessions:
+    get:
+      operationId: listDiagnosticSessions
+      tags: [diagnostics]
+      parameters:
+        - in: query
+          name: vehicleId
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiagnosticSession"
+    post:
+      operationId: startDiagnosticSession
+      tags: [diagnostics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSessionBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticSession"
+
+  /diagnostics/sessions/{sessionId}:
+    parameters:
+      - in: path
+        name: sessionId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getDiagnosticSession
+      tags: [diagnostics]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticSessionDetail"
+
+  /diagnostics/sessions/{sessionId}/close:
+    parameters:
+      - in: path
+        name: sessionId
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: closeDiagnosticSession
+      tags: [diagnostics]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticSession"
+
+  /diagnostics/sessions/{sessionId}/telemetry:
+    parameters:
+      - in: path
+        name: sessionId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getSessionTelemetry
+      tags: [diagnostics]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TelemetryPoint"
+
+  /diagnostics/live/{vehicleId}:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getLiveTelemetry
+      tags: [diagnostics]
+      summary: Latest snapshot of live telemetry (RPM, speed, temp, battery)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveTelemetry"
+
+  # ========== DTC ==========
+  /dtc:
+    get:
+      operationId: listDtcCodes
+      tags: [dtc]
+      parameters:
+        - in: query
+          name: vehicleId
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, cleared, pending]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DtcCode"
+
+  /dtc/{dtcId}:
+    parameters:
+      - in: path
+        name: dtcId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getDtcCode
+      tags: [dtc]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DtcCode"
+
+  /dtc/{dtcId}/clear:
+    parameters:
+      - in: path
+        name: dtcId
+        required: true
+        schema: { type: string }
+    post:
+      operationId: clearDtcCode
+      tags: [dtc]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DtcCode"
+
+  /dtc/trending:
+    get:
+      operationId: getTrendingDtcCodes
+      tags: [dtc]
+      summary: Most-frequent DTC codes across the platform (last 30d)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrendingDtc"
+
+  # ========== MAINTENANCE ==========
+  /maintenance/{vehicleId}/schedule:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getMaintenanceSchedule
+      tags: [maintenance]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaintenanceItem"
+
+  /maintenance/{vehicleId}/log:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    post:
+      operationId: logMaintenance
+      tags: [maintenance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogMaintenanceBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceItem"
+
+  /maintenance/upcoming:
+    get:
+      operationId: getUpcomingMaintenance
+      tags: [maintenance]
+      summary: Upcoming maintenance items across all of the user's vehicles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UpcomingMaintenanceItem"
+
+  # ========== WORKSHOPS ==========
+  /workshops:
+    get:
+      operationId: listWorkshops
+      tags: [workshops]
+      parameters:
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: service
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Workshop"
+
+  /workshops/{workshopId}:
+    parameters:
+      - in: path
+        name: workshopId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getWorkshop
+      tags: [workshops]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkshopDetail"
+
+  # ========== BOOKINGS ==========
+  /bookings:
+    get:
+      operationId: listBookings
+      tags: [bookings]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Booking"
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  /bookings/{bookingId}:
+    parameters:
+      - in: path
+        name: bookingId
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateBooking
+      tags: [bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBookingBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+
+  # ========== AI ASSISTANT ==========
+  /ai/chat:
+    post:
+      operationId: aiChat
+      tags: [ai]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiChatBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiChatResponse"
+
+  /ai/recommendations/{vehicleId}:
+    parameters:
+      - in: path
+        name: vehicleId
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getAiRecommendations
+      tags: [ai]
+      summary: Predicted issues + suggested maintenance for a vehicle
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recommendation"
+
+  /ai/interpret-dtc:
+    post:
+      operationId: interpretDtc
+      tags: [ai]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InterpretDtcBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DtcInterpretation"
+
+  # ========== SUBSCRIPTIONS ==========
+  /subscriptions/plans:
+    get:
+      operationId: listSubscriptionPlans
+      tags: [subscriptions]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubscriptionPlan"
+
+  /subscriptions/me:
+    get:
+      operationId: getMySubscription
+      tags: [subscriptions]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSubscription"
+
+  # ========== ADMIN ==========
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Platform-wide KPIs for admin dashboard
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+
+  /admin/vehicles:
+    get:
+      operationId: listAdminVehicles
+      tags: [admin]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminVehicle"
+
+  /admin/diagnostics/live:
+    get:
+      operationId: listLiveDiagnostics
+      tags: [admin]
+      summary: Live feed of recent diagnostic sessions across the platform
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminLiveSession"
+
+  /admin/issues/common:
+    get:
+      operationId: getCommonIssues
+      tags: [admin]
+      summary: Aggregated DTC frequency, severity & cost
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommonIssue"
+
+  /admin/workshops/pipeline:
+    get:
+      operationId: getWorkshopPipeline
+      tags: [admin]
+      summary: Workshop bookings pipeline + commission tracking
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkshopPipeline"
+
+  /admin/revenue:
+    get:
+      operationId: getRevenueBreakdown
+      tags: [admin]
+      summary: Subscription + booking revenue, last 12 months
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RevenuePoint"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    # ===== Vehicles =====
+    Vehicle:
+      type: object
+      required: [id, make, model, year, healthScore]
+      properties:
+        id: { type: string }
+        vin: { type: string, nullable: true }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plateNumber: { type: string, nullable: true }
+        nickname: { type: string, nullable: true }
+        odometerKm: { type: integer }
+        fuelType:
+          type: string
+          enum: [petrol, diesel, hybrid, ev]
+        engineCc: { type: integer, nullable: true }
+        adapterMac: { type: string, nullable: true }
+        healthScore: { type: integer }
+        imageUrl: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    VehicleDetail:
+      allOf:
+        - $ref: "#/components/schemas/Vehicle"
+        - type: object
+          properties:
+            activeDtcCount: { type: integer }
+            upcomingMaintenanceCount: { type: integer }
+            lastSessionAt: { type: string, format: date-time, nullable: true }
+            totalSessions: { type: integer }
+            isPaired: { type: boolean }
+
+    CreateVehicleBody:
+      type: object
+      required: [make, model, year, fuelType]
+      properties:
+        vin: { type: string }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plateNumber: { type: string }
+        nickname: { type: string }
+        odometerKm: { type: integer }
+        fuelType:
+          type: string
+          enum: [petrol, diesel, hybrid, ev]
+        engineCc: { type: integer }
+
+    UpdateVehicleBody:
+      type: object
+      properties:
+        nickname: { type: string }
+        plateNumber: { type: string }
+        odometerKm: { type: integer }
+
+    PairAdapterBody:
+      type: object
+      required: [adapterMac]
+      properties:
+        adapterMac: { type: string }
+
+    # ===== Diagnostics =====
+    DiagnosticSession:
+      type: object
+      required: [id, vehicleId, startedAt, status]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        vehicleNickname: { type: string, nullable: true }
+        vehicleMake: { type: string }
+        vehicleModel: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time, nullable: true }
+        durationSec: { type: integer, nullable: true }
+        odometerKm: { type: integer, nullable: true }
+        dtcCount: { type: integer }
+        healthBefore: { type: integer, nullable: true }
+        healthAfter: { type: integer, nullable: true }
+        status:
+          type: string
+          enum: [active, completed]
+
+    DiagnosticSessionDetail:
+      allOf:
+        - $ref: "#/components/schemas/DiagnosticSession"
+        - type: object
+          properties:
+            dtcCodes:
+              type: array
+              items:
+                $ref: "#/components/schemas/DtcCode"
+            telemetrySummary:
+              $ref: "#/components/schemas/TelemetrySummary"
+
+    StartSessionBody:
+      type: object
+      required: [vehicleId]
+      properties:
+        vehicleId: { type: string }
+        odometerKm: { type: integer }
+
+    TelemetryPoint:
+      type: object
+      required: [time]
+      properties:
+        time: { type: string, format: date-time }
+        rpm: { type: integer, nullable: true }
+        speedKmh: { type: integer, nullable: true }
+        coolantTemp: { type: integer, nullable: true }
+        intakeTemp: { type: integer, nullable: true }
+        batteryV: { type: number, nullable: true }
+        fuelLevelPct: { type: integer, nullable: true }
+        engineLoad: { type: integer, nullable: true }
+        throttlePos: { type: integer, nullable: true }
+
+    LiveTelemetry:
+      type: object
+      required: [vehicleId, isConnected, latest]
+      properties:
+        vehicleId: { type: string }
+        isConnected: { type: boolean }
+        latest:
+          $ref: "#/components/schemas/TelemetryPoint"
+        recent:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryPoint"
+
+    TelemetrySummary:
+      type: object
+      properties:
+        avgRpm: { type: number, nullable: true }
+        maxSpeed: { type: integer, nullable: true }
+        avgCoolantTemp: { type: number, nullable: true }
+        minBatteryV: { type: number, nullable: true }
+        sampleCount: { type: integer }
+
+    # ===== DTC =====
+    DtcCode:
+      type: object
+      required: [id, code, status, severity, vehicleId]
+      properties:
+        id: { type: string }
+        sessionId: { type: string, nullable: true }
+        vehicleId: { type: string }
+        vehicleMake: { type: string, nullable: true }
+        vehicleModel: { type: string, nullable: true }
+        code: { type: string }
+        status:
+          type: string
+          enum: [active, cleared, pending]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        descriptionEn: { type: string, nullable: true }
+        descriptionAr: { type: string, nullable: true }
+        possibleCauses:
+          type: array
+          items: { type: string }
+        estimatedCostMin: { type: integer, nullable: true }
+        estimatedCostMax: { type: integer, nullable: true }
+        recommendedAction:
+          type: string
+          nullable: true
+          enum: [drive_now, schedule_week, monitor]
+        actionReasonAr: { type: string, nullable: true }
+        detectedAt: { type: string, format: date-time }
+        clearedAt: { type: string, format: date-time, nullable: true }
+
+    TrendingDtc:
+      type: object
+      required: [code, count]
+      properties:
+        code: { type: string }
+        descriptionAr: { type: string, nullable: true }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        count: { type: integer }
+        trendPct: { type: number }
+
+    # ===== Maintenance =====
+    MaintenanceItem:
+      type: object
+      required: [id, vehicleId, serviceType, status]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        serviceType: { type: string }
+        serviceTypeAr: { type: string }
+        intervalKm: { type: integer, nullable: true }
+        intervalDays: { type: integer, nullable: true }
+        lastDoneKm: { type: integer, nullable: true }
+        lastDoneAt: { type: string, format: date-time, nullable: true }
+        nextDueKm: { type: integer, nullable: true }
+        nextDueAt: { type: string, format: date-time, nullable: true }
+        status:
+          type: string
+          enum: [scheduled, upcoming, overdue, done]
+        estimatedCost: { type: integer, nullable: true }
+
+    UpcomingMaintenanceItem:
+      allOf:
+        - $ref: "#/components/schemas/MaintenanceItem"
+        - type: object
+          properties:
+            vehicleNickname: { type: string, nullable: true }
+            vehicleMake: { type: string }
+            vehicleModel: { type: string }
+            daysUntilDue: { type: integer, nullable: true }
+
+    LogMaintenanceBody:
+      type: object
+      required: [serviceType, doneAt, doneAtKm]
+      properties:
+        serviceType: { type: string }
+        doneAt: { type: string, format: date-time }
+        doneAtKm: { type: integer }
+        cost: { type: integer }
+        workshopId: { type: string }
+        notes: { type: string }
+
+    # ===== Workshops & bookings =====
+    Workshop:
+      type: object
+      required: [id, name, nameAr, city, rating]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        nameAr: { type: string }
+        phone: { type: string, nullable: true }
+        city: { type: string }
+        district: { type: string, nullable: true }
+        rating: { type: number }
+        reviewsCount: { type: integer }
+        services:
+          type: array
+          items: { type: string }
+        servicesAr:
+          type: array
+          items: { type: string }
+        isVerified: { type: boolean }
+        imageUrl: { type: string, nullable: true }
+        priceLevel:
+          type: string
+          enum: [budget, standard, premium]
+
+    WorkshopDetail:
+      allOf:
+        - $ref: "#/components/schemas/Workshop"
+        - type: object
+          properties:
+            description: { type: string, nullable: true }
+            descriptionAr: { type: string, nullable: true }
+            openingHours: { type: string, nullable: true }
+            address: { type: string, nullable: true }
+            addressAr: { type: string, nullable: true }
+            recentBookingsCount: { type: integer }
+
+    Booking:
+      type: object
+      required: [id, vehicleId, workshopId, scheduledAt, status]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        vehicleMake: { type: string }
+        vehicleModel: { type: string }
+        workshopId: { type: string }
+        workshopName: { type: string }
+        workshopNameAr: { type: string }
+        serviceType: { type: string }
+        serviceTypeAr: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, confirmed, in_progress, completed, cancelled]
+        estimatedCost: { type: integer, nullable: true }
+        finalCost: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    CreateBookingBody:
+      type: object
+      required: [vehicleId, workshopId, serviceType, scheduledAt]
+      properties:
+        vehicleId: { type: string }
+        workshopId: { type: string }
+        serviceType: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        notes: { type: string }
+
+    UpdateBookingBody:
+      type: object
       properties:
         status:
           type: string
-      required:
-        - status
+          enum: [pending, confirmed, in_progress, completed, cancelled]
+        scheduledAt: { type: string, format: date-time }
 
+    # ===== AI =====
+    AiChatBody:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        vehicleId: { type: string }
+
+    AiChatResponse:
+      type: object
+      required: [reply]
+      properties:
+        reply: { type: string }
+        suggestedActions:
+          type: array
+          items:
+            type: object
+            properties:
+              labelAr: { type: string }
+              kind:
+                type: string
+                enum: [book_workshop, view_dtc, schedule_maintenance, view_vehicle]
+              targetId: { type: string }
+
+    Recommendation:
+      type: object
+      required: [id, vehicleId, kind, severity, titleAr]
+      properties:
+        id: { type: string }
+        vehicleId: { type: string }
+        kind:
+          type: string
+          enum: [predictive_failure, maintenance_due, telemetry_anomaly, behavioral]
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        titleAr: { type: string }
+        descriptionAr: { type: string }
+        confidencePct: { type: integer }
+        suggestedAction: { type: string, nullable: true }
+        suggestedCostSar: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    InterpretDtcBody:
+      type: object
+      required: [code, vehicleId]
+      properties:
+        code: { type: string }
+        vehicleId: { type: string }
+
+    DtcInterpretation:
+      type: object
+      required: [descriptionAr, severity, action]
+      properties:
+        code: { type: string }
+        descriptionAr: { type: string }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        causes:
+          type: array
+          items: { type: string }
+        estimatedCostMin: { type: integer }
+        estimatedCostMax: { type: integer }
+        action:
+          type: string
+          enum: [drive_now, schedule_week, monitor]
+        actionReasonAr: { type: string }
+
+    # ===== Subscriptions =====
+    SubscriptionPlan:
+      type: object
+      required: [id, name, nameAr, priceMonthlySar, features]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        nameAr: { type: string }
+        descriptionAr: { type: string }
+        priceMonthlySar: { type: integer }
+        priceYearlySar: { type: integer }
+        tier:
+          type: string
+          enum: [free, premium, fleet]
+        features:
+          type: array
+          items: { type: string }
+        featuresAr:
+          type: array
+          items: { type: string }
+        isPopular: { type: boolean }
+
+    UserSubscription:
+      type: object
+      required: [tier, status]
+      properties:
+        tier:
+          type: string
+          enum: [free, premium, fleet]
+        status:
+          type: string
+          enum: [active, expired, cancelled]
+        startedAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        autoRenew: { type: boolean }
+
+    # ===== Dashboard =====
+    DashboardOverview:
+      type: object
+      required: [vehicleCount, activeDtcCount, upcomingMaintenanceCount, avgHealthScore]
+      properties:
+        vehicleCount: { type: integer }
+        activeDtcCount: { type: integer }
+        criticalDtcCount: { type: integer }
+        upcomingMaintenanceCount: { type: integer }
+        overdueMaintenanceCount: { type: integer }
+        avgHealthScore: { type: integer }
+        upcomingBookingCount: { type: integer }
+        totalSessionsLast30d: { type: integer }
+        kmDrivenLast30d: { type: integer }
+        estimatedSavingsSar: { type: integer }
+
+    ActivityItem:
+      type: object
+      required: [id, kind, titleAr, occurredAt]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum: [diagnostic_session, dtc_detected, dtc_cleared, maintenance_done, booking_created, booking_completed, ai_recommendation]
+        titleAr: { type: string }
+        subtitleAr: { type: string, nullable: true }
+        vehicleId: { type: string, nullable: true }
+        severity:
+          type: string
+          nullable: true
+          enum: [info, warning, critical, success]
+        occurredAt: { type: string, format: date-time }
+
+    HealthTrendPoint:
+      type: object
+      required: [date, score]
+      properties:
+        date: { type: string, format: date }
+        score: { type: integer }
+
+    # ===== Admin =====
+    AdminOverview:
+      type: object
+      required: [totalUsers, activeVehiclesToday, dtcsLast24h, revenueMtd]
+      properties:
+        totalUsers: { type: integer }
+        usersTrendPct: { type: number }
+        activeVehiclesToday: { type: integer }
+        dtcsLast24h: { type: integer }
+        criticalDtcsLast24h: { type: integer }
+        revenueMtd: { type: integer }
+        revenueTrendPct: { type: number }
+        nps: { type: number }
+        premiumSubscribers: { type: integer }
+        bookingsLast7d: { type: integer }
+        avgHealthScore: { type: integer }
+
+    AdminUser:
+      type: object
+      required: [id, name, phone, subscriptionTier, vehicleCount, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        subscriptionTier:
+          type: string
+          enum: [free, premium, fleet]
+        vehicleCount: { type: integer }
+        sessionsCount: { type: integer }
+        lastActiveAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        isActive: { type: boolean }
+        city: { type: string, nullable: true }
+
+    AdminVehicle:
+      type: object
+      required: [id, make, model, year, healthScore, ownerName]
+      properties:
+        id: { type: string }
+        ownerName: { type: string }
+        ownerPhone: { type: string }
+        make: { type: string }
+        model: { type: string }
+        year: { type: integer }
+        plateNumber: { type: string, nullable: true }
+        odometerKm: { type: integer }
+        healthScore: { type: integer }
+        activeDtcCount: { type: integer }
+        lastSeenAt: { type: string, format: date-time, nullable: true }
+
+    AdminLiveSession:
+      type: object
+      required: [id, vehicleMake, vehicleModel, ownerName, startedAt]
+      properties:
+        id: { type: string }
+        vehicleMake: { type: string }
+        vehicleModel: { type: string }
+        vehicleYear: { type: integer }
+        plateNumber: { type: string, nullable: true }
+        ownerName: { type: string }
+        city: { type: string, nullable: true }
+        startedAt: { type: string, format: date-time }
+        dtcCount: { type: integer }
+        criticalDtcCount: { type: integer }
+        status:
+          type: string
+          enum: [active, completed]
+
+    CommonIssue:
+      type: object
+      required: [code, count, severity]
+      properties:
+        code: { type: string }
+        descriptionAr: { type: string, nullable: true }
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        count: { type: integer }
+        affectedVehicles: { type: integer }
+        topMakeModel: { type: string, nullable: true }
+        avgEstimatedCost: { type: integer, nullable: true }
+        trendPct: { type: number }
+
+    WorkshopPipeline:
+      type: object
+      required: [workshopId, name, nameAr]
+      properties:
+        workshopId: { type: string }
+        name: { type: string }
+        nameAr: { type: string }
+        city: { type: string }
+        pendingBookings: { type: integer }
+        confirmedBookings: { type: integer }
+        completedBookings: { type: integer }
+        revenue30d: { type: integer }
+        commission30d: { type: integer }
+        rating: { type: number }
+
+    RevenuePoint:
+      type: object
+      required: [month, subscriptionRevenue, commissionRevenue]
+      properties:
+        month: { type: string }
+        subscriptionRevenue: { type: integer }
+        commissionRevenue: { type: integer }
+        newSubscribers: { type: integer }
