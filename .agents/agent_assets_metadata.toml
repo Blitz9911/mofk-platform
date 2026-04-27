@@ -12,3 +12,9 @@ id = "bkjcerufjU9AcDQHU1_VD"
 uri = "file://artifacts/mfk-web/public/in-car-experience.png"
 type = "image"
 title = "In-car diagnostic experience"
+
+[[generated]]
+id = "9h07uDn84zeJk9Wl27zUy"
+uri = "file://artifacts/mfk-mobile/assets/images/icon.png"
+type = "image"
+title = "mfk app icon dark orange"

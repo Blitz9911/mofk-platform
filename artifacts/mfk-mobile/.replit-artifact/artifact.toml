@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/mfk-mobile/"
+title = "MFK — تطبيق الجوال"
+version = "1.0.0"
+id = "artifacts/mfk-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/mfk-mobile/" ]
+localPort = 24053
+
+[services.development]
+run = "pnpm --filter @workspace/mfk-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mfk-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/mfk-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24053"
+BASE_PATH = "/mfk-mobile/"
