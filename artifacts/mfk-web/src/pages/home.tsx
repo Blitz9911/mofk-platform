@@ -45,16 +45,17 @@ export default function Home() {
             >
               <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
                 <span className="flex h-2 w-2 rounded-full bg-primary mr-2 animate-pulse"></span>
-                الجيل الجديد من تشخيص السيارات
+                مفك — سيارتك أذكى مما تتخيل
               </div>
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
-                سيارتك، <br />
+                سيارتك،<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-l from-primary to-orange-400">
                   أذكى مما تتخيل
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
-                حوّل سيارتك إلى مركبة ذكية تتحدث لغتك. افهم الأعطال قبل تفاقمها، وتتبع صحة المحرك، واحجز صيانتك بضغطة زر مع منصة MFK.
+                سيارتك تحتوي على كل المعلومات التي تحتاجها — لكن لا أحد يشرحها لك بطريقة تفهمها.
+                مفك يغيّر هذا، ويخليك تعرف وش في سيارتك قبل لا يخبرك أحد.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/register">
