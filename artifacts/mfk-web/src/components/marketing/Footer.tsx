@@ -34,7 +34,6 @@ export function Footer() {
               <li><Link href="/#features"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">المميزات</span></Link></li>
               <li><Link href="/#how-it-works"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">كيف تعمل</span></Link></li>
               <li><Link href="/pricing"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">الباقات</span></Link></li>
-              <li><Link href="/workshops"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">دليل الورش</span></Link></li>
             </ul>
           </div>
           

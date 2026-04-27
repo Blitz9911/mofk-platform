@@ -7,7 +7,6 @@ import {
   Activity, 
   Wrench, 
   CalendarCheck, 
-  MapPin, 
   CheckCircle2, 
   ShieldCheck, 
   Smartphone, 
@@ -266,9 +265,9 @@ export default function Home() {
                   desc: "نظام ذكي يذكرك بمواعيد الصيانة الدورية بناءً على ممشى سيارتك واستخدامك الفعلي.",
                 },
                 {
-                  icon: MapPin,
-                  title: "حجز بثقة",
-                  desc: "وصول مباشر لأفضل الورش المعتمدة في مدينتك مع تقييمات حقيقية وحجز فوري.",
+                  icon: Smartphone,
+                  title: "تقارير ذكية",
+                  desc: "تقارير شاملة بالعربية عن صحة سيارتك، تكاليف الصيانة المتوقعة، وتاريخ الأعطال.",
                 }
               ].map((feat, i) => (
                 <div key={i} className="bg-card border border-border rounded-3xl p-8 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
@@ -382,8 +381,8 @@ export default function Home() {
                 <div className="text-primary-foreground/80 font-medium">توفير في وقت الصيانة</div>
               </div>
               <div>
-                <div className="text-4xl md:text-5xl font-black mb-2 tracking-tighter">12</div>
-                <div className="text-primary-foreground/80 font-medium">مدينة مدعومة للورش</div>
+                <div className="text-4xl md:text-5xl font-black mb-2 tracking-tighter">+500</div>
+                <div className="text-primary-foreground/80 font-medium">عطل تم تشخيصه يومياً</div>
               </div>
             </div>
           </div>

@@ -54,11 +54,6 @@ export function Header() {
               الباقات
             </span>
           </Link>
-          <Link href="/workshops">
-            <span className={cn("cursor-pointer transition-colors hover:text-foreground", location.startsWith("/workshops") ? "text-foreground" : "text-muted-foreground")}>
-              الورش
-            </span>
-          </Link>
         </nav>
         
         <div className="hidden md:flex items-center gap-4">
@@ -84,7 +79,6 @@ export function Header() {
           <Link href="/#features"><span className="block py-2 text-foreground font-medium">المميزات</span></Link>
           <Link href="/#how-it-works"><span className="block py-2 text-foreground font-medium">كيف تعمل</span></Link>
           <Link href="/pricing"><span className="block py-2 text-foreground font-medium">الباقات</span></Link>
-          <Link href="/workshops"><span className="block py-2 text-foreground font-medium">الورش</span></Link>
           <div className="h-px bg-border my-2"></div>
           <Link href="/login">
             <Button variant="outline" className="w-full justify-center">تسجيل الدخول</Button>
