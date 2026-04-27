@@ -57,7 +57,7 @@ export default function Home() {
                 حوّل سيارتك إلى مركبة ذكية تتحدث لغتك. افهم الأعطال قبل تفاقمها، وتتبع صحة المحرك، واحجز صيانتك بضغطة زر مع منصة MFK.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link href="/login">
+                <Link href="/register">
                   <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full font-bold shadow-lg shadow-primary/20">
                     اطلب الجهاز الآن
                   </Button>
@@ -311,43 +311,85 @@ export default function Home() {
                   desc: "تقارير شاملة بالعربية عن صحة سيارتك، تكاليف الصيانة المتوقعة، وتاريخ الأعطال.",
                 }
               ].map((feat, i) => (
-                <div key={i} className="bg-card border border-border rounded-3xl p-8 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
-                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6">
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.1 }}
+                  className="bg-card border border-border rounded-3xl p-8 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group"
+                >
+                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors duration-300">
                     <feat.icon size={28} />
                   </div>
                   <h3 className="text-xl font-bold mb-3">{feat.title}</h3>
                   <p className="text-muted-foreground leading-relaxed">{feat.desc}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
         </section>
 
         {/* HOW IT WORKS */}
-        <section id="how-it-works" className="py-24 bg-muted/30">
+        <section id="how-it-works" className="py-24 bg-muted/30 overflow-hidden">
           <div className="container mx-auto px-4">
-            <div className="text-center max-w-2xl mx-auto mb-20">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.55 }}
+              className="text-center max-w-2xl mx-auto mb-20"
+            >
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary mb-5">
+                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                طريقة عمل MFK
+              </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">3 خطوات بسيطة فقط</h2>
               <p className="text-lg text-muted-foreground">لا تحتاج لخبرة فنية لتبدأ مع MFK</p>
-            </div>
+            </motion.div>
 
             <div className="grid md:grid-cols-3 gap-12 relative">
               {/* Connector line */}
-              <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-border/50 border-t border-dashed border-border" />
+              <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-px bg-gradient-to-l from-primary/40 via-primary/20 to-primary/40" />
 
               {[
-                { num: "01", title: "اربط الجهاز", desc: "ركب جهاز MFK الصغير في منفذ OBD أسفل مقود سيارتك." },
-                { num: "02", title: "شغّل التطبيق", desc: "حمل تطبيق MFK واربطه بالجهاز عبر البلوتوث بضغطة زر." },
-                { num: "03", title: "احصل على تشخيصك", desc: "اقرأ بيانات سيارتك الحية وافحص الأعطال وافهمها بلغتك." },
+                {
+                  num: "01",
+                  title: "اربط الجهاز",
+                  desc: "ركّب جهاز MFK الصغير في منفذ OBD أسفل مقود سيارتك — يأخذ ثوانٍ ولا يحتاج أدوات.",
+                  icon: "🔌"
+                },
+                {
+                  num: "02",
+                  title: "شغّل التطبيق",
+                  desc: "حمّل تطبيق MFK وارتبط بالجهاز عبر البلوتوث بضغطة زر واحدة.",
+                  icon: "📱"
+                },
+                {
+                  num: "03",
+                  title: "احصل على تشخيصك",
+                  desc: "اقرأ بيانات سيارتك الحية، افحص الأعطال، وافهمها بلغتك العربية فوراً.",
+                  icon: "✅"
+                },
               ].map((step, i) => (
-                <div key={i} className="relative z-10 text-center flex flex-col items-center">
-                  <div className="w-24 h-24 rounded-full bg-card border-4 border-background shadow-xl flex items-center justify-center mb-8 relative">
-                    <span className="text-3xl font-black text-primary">{step.num}</span>
-                    <div className="absolute inset-0 rounded-full border border-primary/20 scale-110" />
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.55, delay: i * 0.15 }}
+                  className="relative z-10 text-center flex flex-col items-center group"
+                >
+                  {/* Glow on hover */}
+                  <div className="relative mb-8">
+                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 scale-150" />
+                    <div className="relative w-24 h-24 rounded-full bg-card border-2 border-primary/20 shadow-xl flex items-center justify-center group-hover:border-primary/60 transition-colors duration-300">
+                      <span className="text-3xl font-black text-primary">{step.num}</span>
+                    </div>
                   </div>
-                  <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
+                  <h3 className="text-2xl font-bold mb-3 group-hover:text-primary transition-colors duration-300">{step.title}</h3>
                   <p className="text-muted-foreground leading-relaxed max-w-xs mx-auto">{step.desc}</p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -442,7 +484,14 @@ export default function Home() {
                 { name: "سارة خالد", role: "جدة", quote: "كنت أخاف أروح الورش ويستغلون عدم معرفتي بالسيارات. الآن مع MFK أفتح التطبيق ويعطيني وش المشكلة وكم تكلفتها التقريبية، ارتحت جداً." },
                 { name: "محمد العتيبي", role: "الدمام", quote: "ميزة تذكير الصيانة ومتابعة حرارة القير والماكينة في الخطوط الطويلة ممتازة جداً. تطبيق متعوب عليه صراحة." },
               ].map((t, i) => (
-                <div key={i} className="bg-muted/30 p-8 rounded-3xl border border-border relative">
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.5, delay: i * 0.12 }}
+                  className="bg-muted/30 p-8 rounded-3xl border border-border relative hover:border-primary/30 transition-colors duration-300"
+                >
                   <div className="text-primary text-5xl font-serif absolute top-6 right-6 opacity-20">"</div>
                   <p className="text-lg leading-relaxed mb-8 relative z-10">"{t.quote}"</p>
                   <div className="flex items-center gap-4">
@@ -454,7 +503,7 @@ export default function Home() {
                       <div className="text-sm text-muted-foreground">{t.role}</div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
