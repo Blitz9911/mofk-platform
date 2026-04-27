@@ -51,44 +51,42 @@ const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
 
 const YEARS = Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i);
 
-const ARABIC_LETTERS = ["أ","ب","ح","د","ر","س","ص","ط","ع","ق","ك","ل","م","ن","ه","و","ي"];
-
 /* ─── Saudi Plate Input ───────────────────────────────────── */
 function PlateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // Format: "أبج 1234" → letters[3] + digits[4]
   const parseValue = (v: string) => {
     const clean = v.replace(/\s/g, "");
-    // Separate Arabic letters from digits
     const letters = clean.split("").filter(c => /[\u0600-\u06FF]/.test(c)).slice(0, 3);
     const digits = clean.split("").filter(c => /[0-9]/.test(c)).slice(0, 4);
     return { letters, digits };
   };
 
   const { letters, digits } = parseValue(value || "");
-  const letterRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
-  const digitRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  // Letter refs: l0 = rightmost (first typed), l1, l2 = leftmost letter
+  const l0 = useRef<HTMLInputElement>(null);
+  const l1 = useRef<HTMLInputElement>(null);
+  const l2 = useRef<HTMLInputElement>(null);
+  const d0 = useRef<HTMLInputElement>(null);
+  const d1 = useRef<HTMLInputElement>(null);
+  const d2 = useRef<HTMLInputElement>(null);
+  const d3 = useRef<HTMLInputElement>(null);
+  const letterRefs = [l0, l1, l2];
+  const digitRefs = [d0, d1, d2, d3];
 
-  const buildValue = (ltrs: string[], dgts: string[]) => {
-    const l = ltrs.join("").padEnd(3, " ").trim();
-    const d = dgts.join("");
-    return (l + " " + d).trim();
-  };
+  const buildValue = (ltrs: string[], dgts: string[]) =>
+    ([...ltrs].join("") + " " + dgts.join("")).trim();
 
   const handleLetter = (idx: number, char: string) => {
-    const isArabic = /[\u0600-\u06FF]/.test(char);
-    if (!isArabic && char !== "") return;
-    const newLetters = [...letters];
-    newLetters[idx] = char.slice(-1);
-    onChange(buildValue(newLetters, digits));
+    if (char !== "" && !/[\u0600-\u06FF]/.test(char)) return;
+    const n = [...letters]; n[idx] = char.slice(-1);
+    onChange(buildValue(n, digits));
     if (char && idx < 2) letterRefs[idx + 1].current?.focus();
     if (char && idx === 2) digitRefs[0].current?.focus();
   };
 
   const handleDigit = (idx: number, char: string) => {
     if (!/^[0-9]?$/.test(char)) return;
-    const newDigits = [...digits];
-    newDigits[idx] = char.slice(-1);
-    onChange(buildValue(letters, newDigits));
+    const n = [...digits]; n[idx] = char.slice(-1);
+    onChange(buildValue(letters, n));
     if (char && idx < 3) digitRefs[idx + 1].current?.focus();
   };
 
@@ -101,80 +99,72 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
     if (e.key === "Backspace" && !digits[idx] && idx === 0) letterRefs[2].current?.focus();
   };
 
-  const Box = ({ val, inputRef, onInput, onKey, hint }: {
+  const Box = ({ val, inputRef, onInput, onKey, hint, isLetter }: {
     val: string; inputRef: React.RefObject<HTMLInputElement>;
-    onInput: (v: string) => void; onKey: (e: React.KeyboardEvent<HTMLInputElement>) => void; hint?: string;
+    onInput: (v: string) => void; onKey: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+    hint?: string; isLetter?: boolean;
   }) => (
-    <div className="relative">
-      <input
-        ref={inputRef}
-        value={val}
-        maxLength={1}
-        onChange={e => onInput(e.target.value)}
-        onKeyDown={onKey}
-        className={cn(
-          "w-11 h-12 text-center text-xl font-bold rounded-lg border-2 bg-background transition-all outline-none",
-          val ? "border-primary text-foreground" : "border-border text-muted-foreground",
-          "focus:border-primary focus:ring-2 focus:ring-primary/20"
-        )}
-        placeholder={hint}
-      />
-    </div>
+    <input
+      ref={inputRef}
+      value={val}
+      maxLength={1}
+      dir={isLetter ? "rtl" : "ltr"}
+      onChange={e => onInput(e.target.value)}
+      onKeyDown={onKey}
+      className={cn(
+        "w-11 h-12 text-center text-xl font-bold rounded-lg border-2 bg-background transition-all outline-none",
+        val ? "border-primary text-foreground" : "border-border text-muted-foreground",
+        "focus:border-primary focus:ring-2 focus:ring-primary/20"
+      )}
+      placeholder={hint}
+    />
   );
+
+  const hasContent = letters.length > 0 || digits.length > 0;
 
   return (
     <div className="space-y-4">
-      {/* Input Boxes */}
-      <div className="flex items-center gap-2 flex-row-reverse justify-start">
-        {/* Arabic letter boxes (rightmost, RTL order 0→1→2) */}
+      {/* Boxes: RTL layout — letters on right, numbers on left */}
+      <div className="flex items-center gap-2" dir="rtl">
+        {/* Letter boxes: index 0 is rightmost (first to type) */}
         {[0, 1, 2].map(i => (
-          <Box
-            key={`l${i}`}
-            val={letters[i] || ""}
-            inputRef={letterRefs[i]}
-            onInput={v => handleLetter(i, v)}
-            onKey={e => handleLetterKey(i, e)}
-            hint="ب"
-          />
+          <Box key={`l${i}`} val={letters[i] || ""} inputRef={letterRefs[i]}
+            onInput={v => handleLetter(i, v)} onKey={e => handleLetterKey(i, e)}
+            hint="أ" isLetter />
         ))}
-        <div className="w-px h-10 bg-border mx-1" />
-        {/* Digit boxes */}
+        <div className="w-px h-10 bg-border" />
+        {/* Digit boxes: 0 is rightmost digit */}
         {[0, 1, 2, 3].map(i => (
-          <Box
-            key={`d${i}`}
-            val={digits[i] || ""}
-            inputRef={digitRefs[i]}
-            onInput={v => handleDigit(i, v)}
-            onKey={e => handleDigitKey(i, e)}
-            hint={String(i + 1)}
-          />
+          <Box key={`d${i}`} val={digits[i] || ""} inputRef={digitRefs[i]}
+            onInput={v => handleDigit(i, v)} onKey={e => handleDigitKey(i, e)}
+            hint={String(i + 1)} />
         ))}
       </div>
 
       {/* KSA Plate Preview */}
-      {(letters.length > 0 || digits.length > 0) && (
-        <div className="inline-flex rounded-xl overflow-hidden border-2 border-border shadow-md text-foreground" dir="ltr">
-          {/* Left: Numbers */}
-          <div className="bg-white text-black px-5 py-2 text-center border-r border-gray-300">
+      {hasContent && (
+        <div className="inline-flex rounded-xl overflow-hidden border-2 border-border shadow-md" dir="ltr">
+          {/* Numbers left */}
+          <div className="bg-white text-black px-5 py-2 text-center border-r border-gray-300 min-w-[80px]">
             <div className="text-xl font-black tracking-widest font-mono">
-              {digits.join("") || "----"}
+              {digits.join("") || "- - -"}
             </div>
-            <div className="text-sm font-bold tracking-widest">
-              {digits.join("") || "----"}
+            <div className="text-sm font-bold tracking-widest text-gray-600">
+              {digits.join("") || ""}
             </div>
           </div>
-          {/* Right: Letters + KSA */}
+          {/* Letters + KSA badge right */}
           <div className="bg-white text-black flex items-stretch">
-            <div className="px-5 py-2 text-center">
+            <div className="px-5 py-2 text-center min-w-[70px]">
               <div className="text-xl font-black tracking-widest" dir="rtl">
                 {letters.join(" ") || "- - -"}
               </div>
-              <div className="text-sm font-bold tracking-widest">
-                {letters.map(l => l).join(" ") || "- - -"}
+              <div className="text-sm font-bold tracking-widest text-gray-600" dir="ltr">
+                {letters.join(" ") || ""}
               </div>
             </div>
             <div className="bg-[#006c35] flex flex-col items-center justify-center px-2 text-white min-w-[36px]">
-              <div className="text-[8px] font-bold">السعودية</div>
+              <div className="text-[8px] font-bold leading-tight">السعودية</div>
               <div className="text-xs font-black">KSA</div>
             </div>
           </div>
@@ -211,6 +201,7 @@ export default function Vehicles() {
   const [createOpen, setCreateOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState<{ open: boolean; vehicleId: string | null }>({ open: false, vehicleId: null });
   const [selectedMake, setSelectedMake] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
 
   const form = useForm<z.infer<typeof createVehicleSchema>>({
     resolver: zodResolver(createVehicleSchema),
@@ -227,6 +218,7 @@ export default function Vehicles() {
         setCreateOpen(false);
         form.reset();
         setSelectedMake("");
+        setSelectedModel("");
       },
     });
   };
@@ -267,7 +259,7 @@ export default function Vehicles() {
           </p>
         </div>
 
-        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { form.reset(); setSelectedMake(""); } }}>
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { form.reset(); setSelectedMake(""); setSelectedModel(""); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2 shrink-0"><Plus className="w-4 h-4" /> إضافة مركبة</Button>
           </DialogTrigger>
@@ -279,15 +271,32 @@ export default function Vehicles() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 
-                {/* Brand + Model */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="make" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>الشركة المصنعة <span className="text-destructive">*</span></FormLabel>
+                {/* Brand */}
+                <FormField control={form.control} name="make" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الشركة المصنعة <span className="text-destructive">*</span></FormLabel>
+                    {selectedMake === "other" ? (
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="اكتب اسم الشركة" {...field}
+                            onChange={e => { field.onChange(e.target.value); }} />
+                        </FormControl>
+                        <Button type="button" variant="outline" size="sm"
+                          onClick={() => { setSelectedMake(""); field.onChange(""); form.setValue("model", ""); setSelectedModel(""); }}>
+                          تغيير
+                        </Button>
+                      </div>
+                    ) : (
                       <Select onValueChange={(v) => {
-                        field.onChange(CAR_BRANDS[v]?.label || v);
-                        setSelectedMake(v);
+                        if (v === "other") {
+                          setSelectedMake("other");
+                          field.onChange("");
+                        } else {
+                          field.onChange(CAR_BRANDS[v]?.label || v);
+                          setSelectedMake(v);
+                        }
                         form.setValue("model", "");
+                        setSelectedModel("");
                       }} value={Object.keys(CAR_BRANDS).find(k => CAR_BRANDS[k].label === field.value) || ""}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="اختر الشركة" /></SelectTrigger>
@@ -298,31 +307,57 @@ export default function Vehicles() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-                  <FormField control={form.control} name="model" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>الموديل <span className="text-destructive">*</span></FormLabel>
-                      {selectedMake === "other" || currentModels.length === 0 ? (
-                        <FormControl><Input placeholder="اكتب الموديل" {...field} /></FormControl>
-                      ) : (
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedMake}>
-                          <FormControl>
-                            <SelectTrigger><SelectValue placeholder={selectedMake ? "اختر الموديل" : "اختر الشركة أولاً"} /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-60">
-                            {currentModels.map(m => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
+                {/* Model */}
+                <FormField control={form.control} name="model" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الموديل <span className="text-destructive">*</span></FormLabel>
+                    {(selectedMake === "other" || selectedModel === "other") ? (
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="اكتب اسم الموديل" {...field} />
+                        </FormControl>
+                        {selectedModel === "other" && (
+                          <Button type="button" variant="outline" size="sm"
+                            onClick={() => { setSelectedModel(""); field.onChange(""); }}>
+                            تغيير
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <Select
+                        onValueChange={(v) => {
+                          if (v === "__other__") {
+                            setSelectedModel("other");
+                            field.onChange("");
+                          } else {
+                            field.onChange(v);
+                            setSelectedModel(v);
+                          }
+                        }}
+                        value={field.value}
+                        disabled={!selectedMake || selectedMake === "other"}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={selectedMake ? "اختر الموديل" : "اختر الشركة أولاً"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-60">
+                          {currentModels.map(m => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                          <SelectItem value="__other__">أخرى (اكتب يدوياً)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 {/* Year + Fuel */}
                 <div className="grid grid-cols-2 gap-4">
