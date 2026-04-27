@@ -100,7 +100,7 @@ export default function Login() {
                   </div>
                   <h2 className="text-3xl font-bold mb-3">تسجيل الدخول</h2>
                   <p className="text-muted-foreground">
-                    أدخل رقم جوالك للمتابعة. سنرسل لك رمز تحقق للوصول إلى حسابك.
+                    أدخل رقم جوالك وسنرسل لك رمز تحقق.
                   </p>
                 </div>
 
@@ -131,6 +131,13 @@ export default function Login() {
                     {isLoading ? "جاري الإرسال..." : "أرسل رمز التحقق"}
                     {!isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
                   </Button>
+
+                  <p className="text-center text-sm text-muted-foreground pt-2">
+                    ليس لديك حساب؟{" "}
+                    <Link href="/register">
+                      <span className="text-primary font-semibold cursor-pointer hover:underline">إنشاء حساب جديد</span>
+                    </Link>
+                  </p>
                 </form>
               </motion.div>
             )}

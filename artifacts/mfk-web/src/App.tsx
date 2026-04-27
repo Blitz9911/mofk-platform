@@ -11,6 +11,7 @@ import Pricing from "@/pages/pricing";
 import WorkshopsPublic from "@/pages/workshops";
 import WorkshopDetailPublic from "@/pages/workshop-detail";
 import Login from "@/pages/login";
+import Register from "@/pages/register";
 
 // Company Pages
 import About from "@/pages/about";
@@ -111,6 +112,7 @@ function AnimatedSwitch() {
           <Route path="/workshops" component={WorkshopsPublic} />
           <Route path="/workshops/:id" component={WorkshopDetailPublic} />
           <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
           <Route path="/about" component={About} />
           <Route path="/careers" component={Careers} />
           <Route path="/blog" component={Blog} />
