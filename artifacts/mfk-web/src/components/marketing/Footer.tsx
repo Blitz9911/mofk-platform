@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MfkLogo } from "@/components/MfkLogo";
 
 export function Footer() {
   return (
@@ -9,7 +10,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-16">
           <div className="lg:col-span-2">
             <Link href="/">
-              <span className="text-3xl font-bold text-primary tracking-tighter mb-4 inline-block">MFK</span>
+              <MfkLogo size="lg" className="mb-4 cursor-pointer" />
             </Link>
             <p className="text-muted-foreground mb-6 max-w-sm leading-relaxed">
               منصة تشخيص السيارات الذكية الأولى في المملكة. حوّل سيارتك إلى مركبة ذكية، افهم الأعطال قبل تفاقمها، واحجز صيانتك بثقة وسهولة.

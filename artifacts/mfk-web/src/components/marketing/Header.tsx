@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MfkLogo } from "@/components/MfkLogo";
 
 export function Header() {
   const [location] = useLocation();
@@ -33,7 +34,7 @@ export function Header() {
       <div className="container mx-auto px-4 h-full flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/">
-            <span className="text-3xl font-bold text-primary tracking-tighter cursor-pointer">MFK</span>
+            <MfkLogo size="md" className="cursor-pointer" />
           </Link>
         </div>
         

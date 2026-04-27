@@ -17,6 +17,7 @@ import {
   Users,
   Settings
 } from "lucide-react";
+import { MfkLogo } from "@/components/MfkLogo";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -81,7 +82,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
       <aside className="hidden md:flex w-64 flex-col border-l border-border bg-card">
         <div className="h-16 flex items-center px-6 border-b border-border">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-primary tracking-tighter">MFK</span>
+            <MfkLogo size="sm" />
             {isAdmin && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">لوحة الإدارة</span>}
           </Link>
         </div>
@@ -107,16 +108,16 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-64 p-0">
-                <div className="h-16 flex items-center px-6 border-b border-border">
-                  <span className="text-2xl font-bold text-primary tracking-tighter">MFK</span>
-                  {isAdmin && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full mr-2">إدارة</span>}
+                <div className="h-16 flex items-center px-6 border-b border-border gap-2">
+                  <MfkLogo size="sm" />
+                  {isAdmin && <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">إدارة</span>}
                 </div>
                 <ScrollArea className="h-[calc(100vh-4rem)] px-4 py-6">
                   <NavLinks />
                 </ScrollArea>
               </SheetContent>
             </Sheet>
-            <span className="text-xl font-bold text-primary tracking-tighter mr-4">MFK</span>
+            <MfkLogo size="sm" className="mr-4" />
           </div>
           
           <div className="flex items-center gap-4 mr-auto">

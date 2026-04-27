@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { Image } from "expo-image";
 import {
   useGetDashboardOverview,
   useGetRecentActivity,
@@ -78,8 +79,11 @@ export default function DashboardScreen() {
           </Pressable>
         </View>
         <View style={styles.headerRight}>
-          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>أهلاً،</Text>
-          <Text style={[styles.userName, { color: colors.foreground }]}>عبدالله</Text>
+          <Image
+            source={require("@/assets/images/logo.png")}
+            style={styles.headerLogo}
+            contentFit="contain"
+          />
         </View>
       </View>
 
@@ -199,6 +203,7 @@ const styles = StyleSheet.create({
   },
   headerRight: { alignItems: "flex-end" },
   headerLeft: {},
+  headerLogo: { height: 36, width: 100 },
   greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
   userName: { fontSize: 20, fontWeight: "700", fontFamily: "Inter_700Bold" },
   notifBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", borderWidth: 1 },
