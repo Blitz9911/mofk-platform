@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Smartphone, ArrowRight, ChevronRight, CheckCircle2, ShieldCheck } from "lucide-react";
+import { User, Smartphone, ArrowRight, ChevronRight, CheckCircle2, ShieldCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,36 +10,62 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { MfkLogo } from "@/components/MfkLogo";
+import { useAuth, authApi } from "@/contexts/AuthContext";
+
+const TEST_HINTS = [
+  { phone: "501234567", label: "تجريبي ١", otp: "123456" },
+  { phone: "502345678", label: "تجريبي ٢", otp: "123456" },
+];
 
 type Step = "info" | "otp" | "done";
 
 export default function Register() {
   const [, setLocation] = useLocation();
+  const { login } = useAuth();
   const [step, setStep] = useState<Step>("info");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [otpHint, setOtpHint] = useState<string | null>(null);
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || phone.length < 9) return;
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setError("");
+    try {
+      const res = await authApi.sendOtp(phone, name);
+      if (res.isTest && res.code) setOtpHint(res.code);
       setStep("otp");
-    }, 1000);
+    } catch {
+      setError("حدث خطأ أثناء إرسال الرمز. حاول مجدداً.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 6) return;
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    setError("");
+    try {
+      const user = await authApi.verifyOtp(phone, otp, name);
+      login(user);
       setStep("done");
-      setTimeout(() => setLocation("/app"), 2000);
-    }, 1200);
+      setTimeout(() => setLocation("/app"), 1800);
+    } catch (err: any) {
+      setError(err.message || "الرمز غير صحيح");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fillTest = (p: string) => {
+    setPhone(p);
+    setName(name || "مستخدم تجريبي");
   };
 
   return (
@@ -56,12 +82,12 @@ export default function Register() {
             انضم إلى أكثر من <span className="text-primary">20,000</span> سائق ذكي
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed mb-10">
-            أنشئ حسابك مجاناً واستكشف قدرات MFK — تشخيص سيارتك، تتبع صحتها، وتنبيهات الصيانة كلها في مكان واحد.
+            أنشئ حسابك مجاناً واستكشف قدرات مفك — تشخيص سيارتك، تتبع حالتها، وتنبيهات الصيانة كلها في مكان واحد.
           </p>
           <div className="space-y-4">
             {[
               "قراءة أكواد الأعطال بالعربية",
-              "تتبع صحة سيارتك لحظة بلحظة",
+              "تتبع حالة سيارتك لحظة بلحظة",
               "تنبيهات الصيانة الاستباقية",
               "المساعد الذكي لتفسير الأعطال",
             ].map((f, i) => (
@@ -69,6 +95,20 @@ export default function Register() {
                 <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
                 <span className="font-medium">{f}</span>
               </div>
+            ))}
+          </div>
+
+          {/* Test accounts hint */}
+          <div className="mt-10 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
+            <div className="flex items-center gap-2 text-xs text-primary font-semibold mb-3">
+              <Info className="w-3.5 h-3.5" /> حسابات تجريبية للمعاينة
+            </div>
+            {TEST_HINTS.map(t => (
+              <button key={t.phone} onClick={() => fillTest(t.phone)}
+                className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground py-1.5 transition-colors">
+                <span dir="ltr">+966 {t.phone.slice(0,2)} {t.phone.slice(2,5)} {t.phone.slice(5)}</span>
+                <span className="font-mono bg-muted px-2 py-0.5 rounded">{t.otp}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -115,7 +155,7 @@ export default function Register() {
                     <User size={28} />
                   </div>
                   <h2 className="text-3xl font-bold mb-2">إنشاء حساب جديد</h2>
-                  <p className="text-muted-foreground">أدخل معلوماتك لإنشاء حسابك في MFK.</p>
+                  <p className="text-muted-foreground">أدخل معلوماتك لإنشاء حسابك في مفك.</p>
                 </div>
 
                 <form onSubmit={handleSendOtp} className="space-y-5">
@@ -149,6 +189,8 @@ export default function Register() {
                     </div>
                   </div>
 
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+
                   <Button
                     type="submit"
                     className="w-full h-12 text-base font-semibold"
@@ -175,7 +217,7 @@ export default function Register() {
                 exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
                 <div className="mb-8">
                   <button
-                    onClick={() => setStep("info")}
+                    onClick={() => { setStep("info"); setOtpHint(null); }}
                     className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-5 transition-colors"
                   >
                     <ChevronRight size={16} className="ml-1" /> رجوع
@@ -190,6 +232,11 @@ export default function Register() {
                   <div className="font-mono font-bold text-foreground mt-1" dir="ltr">
                     +966 {phone.slice(0, 2)} {phone.slice(2, 5)} {phone.slice(5)}
                   </div>
+                  {otpHint && (
+                    <div className="mt-3 inline-flex items-center gap-2 text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                      <Info className="w-3.5 h-3.5" /> رمز التجربة: <span className="font-mono font-bold tracking-widest">{otpHint}</span>
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleVerifyOtp} className="space-y-7">
@@ -204,6 +251,8 @@ export default function Register() {
                     </InputOTP>
                   </div>
 
+                  {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
                   <div className="space-y-3">
                     <Button
                       type="submit"
@@ -214,7 +263,8 @@ export default function Register() {
                     </Button>
                     <div className="text-center text-sm text-muted-foreground">
                       لم يصلك الرمز؟{" "}
-                      <button type="button" onClick={() => setOtp("")} className="text-primary font-semibold hover:underline">
+                      <button type="button" onClick={() => { setOtp(""); authApi.sendOtp(phone, name); }}
+                        className="text-primary font-semibold hover:underline">
                         إعادة إرسال
                       </button>
                     </div>
@@ -246,7 +296,6 @@ export default function Register() {
 
           </AnimatePresence>
 
-          {/* Trust note */}
           {step !== "done" && (
             <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground pt-4">
               <ShieldCheck className="w-3.5 h-3.5" />

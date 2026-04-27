@@ -16,7 +16,6 @@ import {
   InterpretDtcBody,
   InterpretDtcResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
@@ -26,7 +25,7 @@ router.get("/dtc", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const conditions = [eq(vehiclesTable.userId, DEMO_USER_ID)];
+  const conditions = [eq(vehiclesTable.userId, req.userId)];
   if (params.data.vehicleId) {
     conditions.push(eq(dtcCodesTable.vehicleId, params.data.vehicleId));
   }
@@ -60,7 +59,7 @@ router.get("/dtc", async (req, res): Promise<void> => {
   res.json(ListDtcCodesResponse.parse(rows));
 });
 
-router.get("/dtc/trending", async (_req, res): Promise<void> => {
+router.get("/dtc/trending", async (req, res): Promise<void> => {
   const since = new Date();
   since.setDate(since.getDate() - 30);
   const rows = await db
@@ -116,7 +115,7 @@ router.get("/dtc/:dtcId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(dtcCodesTable.id, params.data.dtcId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     );
   if (!d) {
@@ -139,7 +138,7 @@ router.post("/dtc/:dtcId/clear", async (req, res): Promise<void> => {
     .where(
       and(
         eq(dtcCodesTable.id, params.data.dtcId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     );
   if (!existing) {

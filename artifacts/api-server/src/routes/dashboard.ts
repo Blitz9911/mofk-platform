@@ -16,12 +16,11 @@ import {
   GetRecentActivityQueryParams,
   GetHealthTrendResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/overview", async (_req, res): Promise<void> => {
-  const userId = DEMO_USER_ID;
+router.get("/dashboard/overview", async (req, res): Promise<void> => {
+  const userId = req.userId;
   const vehicles = await db
     .select()
     .from(vehiclesTable)
@@ -125,7 +124,7 @@ router.get("/dashboard/recent-activity", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(activityTable)
-    .where(eq(activityTable.userId, DEMO_USER_ID))
+    .where(eq(activityTable.userId, req.userId))
     .orderBy(desc(activityTable.occurredAt))
     .limit(params.data.limit);
 
@@ -144,8 +143,8 @@ router.get("/dashboard/recent-activity", async (req, res): Promise<void> => {
   );
 });
 
-router.get("/dashboard/health-trend", async (_req, res): Promise<void> => {
-  const userId = DEMO_USER_ID;
+router.get("/dashboard/health-trend", async (req, res): Promise<void> => {
+  const userId = req.userId;
   const since = new Date();
   since.setDate(since.getDate() - 30);
 

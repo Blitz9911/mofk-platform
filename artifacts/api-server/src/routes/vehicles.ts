@@ -23,15 +23,14 @@ import {
   PairAdapterBody,
   PairAdapterResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
-router.get("/vehicles", async (_req, res): Promise<void> => {
+router.get("/vehicles", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(vehiclesTable)
-    .where(eq(vehiclesTable.userId, DEMO_USER_ID))
+    .where(eq(vehiclesTable.userId, req.userId))
     .orderBy(desc(vehiclesTable.createdAt));
   res.json(ListVehiclesResponse.parse(rows));
 });
@@ -42,10 +41,47 @@ router.post("/vehicles", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+
+  // Prevent duplicate plate number for this user
+  if (parsed.data.plateNumber) {
+    const [existing] = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(
+        and(
+          eq(vehiclesTable.userId, req.userId),
+          eq(vehiclesTable.plateNumber, parsed.data.plateNumber),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      res.status(409).json({ error: "لوحة الترخيص هذه مسجلة مسبقاً في حسابك" });
+      return;
+    }
+  }
+
+  // Prevent duplicate VIN for this user
+  if (parsed.data.vin) {
+    const [existingVin] = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(
+        and(
+          eq(vehiclesTable.userId, req.userId),
+          eq(vehiclesTable.vin, parsed.data.vin),
+        ),
+      )
+      .limit(1);
+    if (existingVin) {
+      res.status(409).json({ error: "هذه السيارة مسجلة مسبقاً في حسابك" });
+      return;
+    }
+  }
+
   const [v] = await db
     .insert(vehiclesTable)
     .values({
-      userId: DEMO_USER_ID,
+      userId: req.userId,
       vin: parsed.data.vin,
       make: parsed.data.make,
       model: parsed.data.model,
@@ -82,7 +118,7 @@ router.get("/vehicles/:vehicleId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(vehiclesTable.id, params.data.vehicleId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     );
   if (!v) {
@@ -155,7 +191,7 @@ router.patch("/vehicles/:vehicleId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(vehiclesTable.id, params.data.vehicleId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     )
     .returning();
@@ -177,7 +213,7 @@ router.delete("/vehicles/:vehicleId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(vehiclesTable.id, params.data.vehicleId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     )
     .returning();
@@ -228,7 +264,7 @@ router.post(
       .where(
         and(
           eq(vehiclesTable.id, params.data.vehicleId),
-          eq(vehiclesTable.userId, DEMO_USER_ID),
+          eq(vehiclesTable.userId, req.userId),
         ),
       )
       .returning();

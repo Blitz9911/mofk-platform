@@ -8,7 +8,6 @@ import {
   LogMaintenanceBody,
   GetUpcomingMaintenanceResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
@@ -49,7 +48,7 @@ router.post(
       .where(
         and(
           eq(vehiclesTable.id, params.data.vehicleId),
-          eq(vehiclesTable.userId, DEMO_USER_ID),
+          eq(vehiclesTable.userId, req.userId),
         ),
       );
     if (!v) {
@@ -76,7 +75,7 @@ router.post(
   },
 );
 
-router.get("/maintenance/upcoming", async (_req, res): Promise<void> => {
+router.get("/maintenance/upcoming", async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: maintenanceTable.id,
@@ -100,7 +99,7 @@ router.get("/maintenance/upcoming", async (_req, res): Promise<void> => {
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, maintenanceTable.vehicleId))
     .where(
       and(
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
         sql`${maintenanceTable.status} IN ('upcoming','overdue','scheduled')`,
       ),
     )

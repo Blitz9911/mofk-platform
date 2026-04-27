@@ -5,11 +5,10 @@ import {
   ListSubscriptionPlansResponse,
   GetMySubscriptionResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
-router.get("/subscriptions/plans", async (_req, res): Promise<void> => {
+router.get("/subscriptions/plans", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(subscriptionPlansTable)
@@ -17,11 +16,11 @@ router.get("/subscriptions/plans", async (_req, res): Promise<void> => {
   res.json(ListSubscriptionPlansResponse.parse(rows));
 });
 
-router.get("/subscriptions/me", async (_req, res): Promise<void> => {
+router.get("/subscriptions/me", async (req, res): Promise<void> => {
   const [u] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.id, DEMO_USER_ID));
+    .where(eq(usersTable.id, req.userId));
   if (!u) {
     res.status(404).json({ error: "User not found" });
     return;

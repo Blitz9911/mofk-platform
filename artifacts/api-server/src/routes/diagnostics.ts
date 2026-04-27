@@ -20,7 +20,6 @@ import {
   GetLiveTelemetryParams,
   GetLiveTelemetryResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
@@ -30,7 +29,7 @@ router.get("/diagnostics/sessions", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const conditions = [eq(diagnosticSessionsTable.userId, DEMO_USER_ID)];
+  const conditions = [eq(diagnosticSessionsTable.userId, req.userId)];
   if (params.data.vehicleId) {
     conditions.push(eq(diagnosticSessionsTable.vehicleId, params.data.vehicleId));
   }
@@ -73,7 +72,7 @@ router.post("/diagnostics/sessions", async (req, res): Promise<void> => {
     .where(
       and(
         eq(vehiclesTable.id, body.data.vehicleId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     );
   if (!v) {
@@ -84,7 +83,7 @@ router.post("/diagnostics/sessions", async (req, res): Promise<void> => {
     .insert(diagnosticSessionsTable)
     .values({
       vehicleId: body.data.vehicleId,
-      userId: DEMO_USER_ID,
+      userId: req.userId,
       odometerKm: body.data.odometerKm ?? v.odometerKm,
       healthBefore: v.healthScore,
       status: "active",
@@ -139,7 +138,7 @@ router.get(
       .where(
         and(
           eq(diagnosticSessionsTable.id, params.data.sessionId),
-          eq(diagnosticSessionsTable.userId, DEMO_USER_ID),
+          eq(diagnosticSessionsTable.userId, req.userId),
         ),
       );
     if (!s) {
@@ -192,7 +191,7 @@ router.post(
       .where(
         and(
           eq(diagnosticSessionsTable.id, params.data.sessionId),
-          eq(diagnosticSessionsTable.userId, DEMO_USER_ID),
+          eq(diagnosticSessionsTable.userId, req.userId),
         ),
       );
     if (!existing) {
@@ -265,7 +264,7 @@ router.get(
       .where(
         and(
           eq(vehiclesTable.id, params.data.vehicleId),
-          eq(vehiclesTable.userId, DEMO_USER_ID),
+          eq(vehiclesTable.userId, req.userId),
         ),
       );
     if (!v) {

@@ -6,6 +6,7 @@ import {
   Car, Activity, Wrench, Calendar, 
   AlertTriangle, CheckCircle2, Info, Zap
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   useListVehicles, 
   useGetDashboardOverview, 
@@ -25,6 +26,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
 
   const { data: vehicles, isLoading: loadingVehicles } = useListVehicles();
@@ -63,7 +65,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">مرحباً عبدالله</h1>
+          <h1 className="text-3xl font-bold tracking-tight">مرحباً {user?.name?.split(" ")[0] || "بك"}</h1>
           <p className="text-muted-foreground">{format(new Date(), "EEEE، d MMMM yyyy", { locale: ar })}</p>
         </div>
       </div>
@@ -95,7 +97,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="text-xl font-bold" style={{ color: getHealthColor(v.healthScore) }}>{v.healthScore}</span>
-                    <span className="text-[10px] text-muted-foreground">الصحة</span>
+                    <span className="text-[10px] text-muted-foreground">الحالة</span>
                   </div>
                 </CardContent>
               </Card>
@@ -121,7 +123,7 @@ export default function Dashboard() {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">متوسط الصحة</CardTitle>
+            <CardTitle className="text-sm font-medium">متوسط الحالة</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -198,7 +200,7 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>مؤشر الصحة (30 يوم)</CardTitle>
+            <CardTitle>مؤشر الحالة (30 يوم)</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
             {loadingTrend ? <Skeleton className="h-full w-full" /> : (

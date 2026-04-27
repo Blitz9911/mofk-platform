@@ -13,11 +13,10 @@ import {
   UpdateBookingBody,
   UpdateBookingResponse,
 } from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
 
 const router: IRouter = Router();
 
-router.get("/bookings", async (_req, res): Promise<void> => {
+router.get("/bookings", async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: bookingsTable.id,
@@ -38,7 +37,7 @@ router.get("/bookings", async (_req, res): Promise<void> => {
     .from(bookingsTable)
     .innerJoin(vehiclesTable, eq(vehiclesTable.id, bookingsTable.vehicleId))
     .innerJoin(workshopsTable, eq(workshopsTable.id, bookingsTable.workshopId))
-    .where(eq(bookingsTable.userId, DEMO_USER_ID))
+    .where(eq(bookingsTable.userId, req.userId))
     .orderBy(desc(bookingsTable.scheduledAt));
   res.json(ListBookingsResponse.parse(rows));
 });
@@ -55,7 +54,7 @@ router.post("/bookings", async (req, res): Promise<void> => {
     .where(
       and(
         eq(vehiclesTable.id, body.data.vehicleId),
-        eq(vehiclesTable.userId, DEMO_USER_ID),
+        eq(vehiclesTable.userId, req.userId),
       ),
     );
   if (!v) {
@@ -74,7 +73,7 @@ router.post("/bookings", async (req, res): Promise<void> => {
   const [b] = await db
     .insert(bookingsTable)
     .values({
-      userId: DEMO_USER_ID,
+      userId: req.userId,
       vehicleId: body.data.vehicleId,
       workshopId: body.data.workshopId,
       serviceType: body.data.serviceType,
@@ -113,7 +112,7 @@ router.patch("/bookings/:bookingId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(bookingsTable.id, params.data.bookingId),
-        eq(bookingsTable.userId, DEMO_USER_ID),
+        eq(bookingsTable.userId, req.userId),
       ),
     )
     .returning();
