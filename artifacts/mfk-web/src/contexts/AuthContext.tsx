@@ -4,6 +4,7 @@ import { setAuthTokenGetter } from "@workspace/api-client-react";
 export interface AuthUser {
   userId: string;
   name: string;
+  email?: string;
   phone: string;
   role: string;
 }
@@ -63,26 +64,23 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-/** Helper: call auth API */
+const API_BASE = "/api";
+
+async function apiPost<T>(path: string, body: object): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "حدث خطأ");
+  return data as T;
+}
+
 export const authApi = {
-  sendOtp: async (phone: string, name?: string) => {
-    const res = await fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, name }),
-    });
-    return res.json() as Promise<{ sent: boolean; isTest: boolean; code?: string }>;
-  },
-  verifyOtp: async (phone: string, code: string, name?: string) => {
-    const res = await fetch("/api/auth/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, code, name }),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "خطأ في التحقق");
-    }
-    return res.json() as Promise<AuthUser>;
-  },
+  register: (name: string, phone: string, email: string, password: string) =>
+    apiPost<AuthUser>("/auth/register", { name, phone, email, password }),
+
+  login: (email: string, password: string) =>
+    apiPost<AuthUser>("/auth/login", { email, password }),
 };

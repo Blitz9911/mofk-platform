@@ -1,75 +1,48 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Smartphone, ArrowRight, ChevronRight, CheckCircle2, ShieldCheck, Info } from "lucide-react";
+import { User, Mail, Lock, Phone, CheckCircle2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
 import { MfkLogo } from "@/components/MfkLogo";
 import { useAuth, authApi } from "@/contexts/AuthContext";
-
-const TEST_HINTS = [
-  { phone: "501234567", label: "تجريبي ١", otp: "123456" },
-  { phone: "502345678", label: "تجريبي ٢", otp: "123456" },
-];
-
-type Step = "info" | "otp" | "done";
 
 export default function Register() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
-  const [step, setStep] = useState<Step>("info");
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [otpHint, setOtpHint] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || phone.length < 9) return;
-    setIsLoading(true);
     setError("");
-    try {
-      const res = await authApi.sendOtp(phone, name);
-      if (res.isTest && res.code) setOtpHint(res.code);
-      setStep("otp");
-    } catch {
-      setError("حدث خطأ أثناء إرسال الرمز. حاول مجدداً.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (!name.trim()) { setError("الاسم الكامل مطلوب"); return; }
+    if (phone.length < 9) { setError("رقم الجوال غير مكتمل"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("البريد الإلكتروني غير صحيح"); return; }
+    if (password.length < 8) { setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل"); return; }
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp.length < 6) return;
     setIsLoading(true);
-    setError("");
     try {
-      const user = await authApi.verifyOtp(phone, otp, name);
+      const user = await authApi.register(name.trim(), phone, email.trim(), password);
       login(user);
-      setStep("done");
+      setDone(true);
       setTimeout(() => setLocation("/app"), 1800);
     } catch (err: any) {
-      setError(err.message || "الرمز غير صحيح");
+      setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const fillTest = (p: string) => {
-    setPhone(p);
-    setName(name || "مستخدم تجريبي");
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row" dir="rtl">
 
       {/* Left visual panel */}
       <div className="hidden md:flex md:w-[45%] bg-card border-l border-border relative overflow-hidden items-center justify-center p-12">
@@ -79,7 +52,7 @@ export default function Register() {
             <MfkLogo size="lg" className="mb-10 cursor-pointer" />
           </Link>
           <h1 className="text-4xl font-bold mb-5 leading-tight">
-            انضم إلى أكثر من <span className="text-primary">20,000</span> سائق ذكي
+            انضم إلى أكثر من <span className="text-primary">20,000</span><br />سائق ذكي
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed mb-10">
             أنشئ حسابك مجاناً واستكشف قدرات مفك — تشخيص سيارتك، تتبع حالتها، وتنبيهات الصيانة كلها في مكان واحد.
@@ -97,20 +70,6 @@ export default function Register() {
               </div>
             ))}
           </div>
-
-          {/* Test accounts hint */}
-          <div className="mt-10 p-4 bg-primary/5 border border-primary/20 rounded-2xl">
-            <div className="flex items-center gap-2 text-xs text-primary font-semibold mb-3">
-              <Info className="w-3.5 h-3.5" /> حسابات تجريبية للمعاينة
-            </div>
-            {TEST_HINTS.map(t => (
-              <button key={t.phone} onClick={() => fillTest(t.phone)}
-                className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground py-1.5 transition-colors">
-                <span dir="ltr">+966 {t.phone.slice(0,2)} {t.phone.slice(2,5)} {t.phone.slice(5)}</span>
-                <span className="font-mono bg-muted px-2 py-0.5 rounded">{t.otp}</span>
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -120,61 +79,46 @@ export default function Register() {
           <Link href="/"><MfkLogo size="md" className="cursor-pointer" /></Link>
         </div>
 
-        <div className="w-full max-w-md space-y-6">
-
-          {/* Step indicator */}
-          {step !== "done" && (
-            <div className="flex items-center gap-2 mb-2">
-              {(["info", "otp"] as Step[]).map((s, i) => (
-                <div key={s} className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                    step === s ? "bg-primary text-primary-foreground" :
-                    (step === "otp" && s === "info") ? "bg-green-500 text-white" :
-                    "bg-muted text-muted-foreground"
-                  }`}>
-                    {step === "otp" && s === "info" ? "✓" : i + 1}
-                  </div>
-                  {i < 1 && <div className={`flex-1 h-0.5 w-8 rounded ${step === "otp" ? "bg-primary" : "bg-muted"}`} />}
-                </div>
-              ))}
-              <span className="text-xs text-muted-foreground mr-2">
-                {step === "info" ? "معلوماتك" : "التحقق"}
-              </span>
-            </div>
-          )}
-
+        <div className="w-full max-w-md">
           <AnimatePresence mode="wait">
 
-            {/* Step 1: Name + Phone */}
-            {step === "info" && (
-              <motion.div key="info"
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
+            {!done ? (
+              <motion.div key="form"
+                initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.25 }}>
+
                 <div className="mb-8">
                   <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-5">
                     <User size={28} />
                   </div>
                   <h2 className="text-3xl font-bold mb-2">إنشاء حساب جديد</h2>
-                  <p className="text-muted-foreground">أدخل معلوماتك لإنشاء حسابك في مفك.</p>
+                  <p className="text-muted-foreground">أدخل بياناتك لإنشاء حسابك في مفك.</p>
                 </div>
 
-                <form onSubmit={handleSendOtp} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Name */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium block">الاسم الكامل</label>
-                    <Input
-                      type="text"
-                      placeholder="محمد العمري"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      className="h-12 text-base"
-                      required
-                    />
+                    <div className="relative">
+                      <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="text"
+                        placeholder="محمد العمري"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        className="h-12 text-base pr-10"
+                        required
+                        autoComplete="name"
+                      />
+                    </div>
                   </div>
 
+                  {/* Phone */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium block">رقم الجوال</label>
                     <div className="flex" dir="ltr">
-                      <div className="flex items-center justify-center px-4 border border-r-0 border-border bg-muted rounded-l-md text-muted-foreground font-medium text-sm shrink-0">
+                      <div className="flex items-center justify-center px-4 border border-r-0 border-border bg-muted rounded-l-md text-muted-foreground font-medium text-sm shrink-0 gap-1">
+                        <Phone className="w-3.5 h-3.5" />
                         +966
                       </div>
                       <Input
@@ -185,19 +129,69 @@ export default function Register() {
                         onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                         required
                         dir="ltr"
+                        autoComplete="tel"
                       />
                     </div>
                   </div>
 
-                  {error && <p className="text-sm text-destructive">{error}</p>}
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">البريد الإلكتروني</label>
+                    <div className="relative">
+                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="email"
+                        placeholder="example@email.com"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="h-12 text-base pr-10"
+                        required
+                        dir="ltr"
+                        autoComplete="email"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium block">كلمة المرور</label>
+                    <div className="relative">
+                      <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="8 أحرف على الأقل"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        className="h-12 text-base pr-10 pl-10"
+                        required
+                        dir="ltr"
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {password.length > 0 && password.length < 8 && (
+                      <p className="text-xs text-amber-500">كلمة المرور قصيرة ({password.length}/8)</p>
+                    )}
+                  </div>
+
+                  {error && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+                      {error}
+                    </div>
+                  )}
 
                   <Button
                     type="submit"
                     className="w-full h-12 text-base font-semibold"
-                    disabled={!name.trim() || phone.length < 9 || isLoading}
+                    disabled={isLoading}
                   >
-                    {isLoading ? "جاري الإرسال..." : "إرسال رمز التحقق"}
-                    {!isLoading && <ArrowRight className="mr-2 h-4 w-4 rotate-180" />}
+                    {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
                   </Button>
 
                   <p className="text-center text-sm text-muted-foreground">
@@ -207,74 +201,13 @@ export default function Register() {
                     </Link>
                   </p>
                 </form>
-              </motion.div>
-            )}
 
-            {/* Step 2: OTP */}
-            {step === "otp" && (
-              <motion.div key="otp"
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }}>
-                <div className="mb-8">
-                  <button
-                    onClick={() => { setStep("info"); setOtpHint(null); }}
-                    className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-5 transition-colors"
-                  >
-                    <ChevronRight size={16} className="ml-1" /> رجوع
-                  </button>
-                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-5">
-                    <Smartphone size={28} />
-                  </div>
-                  <h2 className="text-3xl font-bold mb-2">تحقق من رقمك</h2>
-                  <p className="text-muted-foreground">
-                    أرسلنا رمزاً مكوناً من 6 أرقام إلى
-                  </p>
-                  <div className="font-mono font-bold text-foreground mt-1" dir="ltr">
-                    +966 {phone.slice(0, 2)} {phone.slice(2, 5)} {phone.slice(5)}
-                  </div>
-                  {otpHint && (
-                    <div className="mt-3 inline-flex items-center gap-2 text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-full">
-                      <Info className="w-3.5 h-3.5" /> رمز التجربة: <span className="font-mono font-bold tracking-widest">{otpHint}</span>
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground mt-6">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  بياناتك محمية ومشفرة تماماً
                 </div>
-
-                <form onSubmit={handleVerifyOtp} className="space-y-7">
-                  <div className="flex justify-center" dir="ltr">
-                    <InputOTP maxLength={6} value={otp} onChange={setOtp} containerClassName="gap-2">
-                      <InputOTPGroup className="gap-2">
-                        {[0, 1, 2, 3, 4, 5].map(i => (
-                          <InputOTPSlot key={i} index={i}
-                            className="w-12 h-14 text-xl font-bold rounded-xl border-border bg-card" />
-                        ))}
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-
-                  {error && <p className="text-sm text-destructive text-center">{error}</p>}
-
-                  <div className="space-y-3">
-                    <Button
-                      type="submit"
-                      className="w-full h-12 text-base font-semibold"
-                      disabled={otp.length < 6 || isLoading}
-                    >
-                      {isLoading ? "جاري إنشاء حسابك..." : "تأكيد وإنشاء الحساب"}
-                    </Button>
-                    <div className="text-center text-sm text-muted-foreground">
-                      لم يصلك الرمز؟{" "}
-                      <button type="button" onClick={() => { setOtp(""); authApi.sendOtp(phone, name); }}
-                        className="text-primary font-semibold hover:underline">
-                        إعادة إرسال
-                      </button>
-                    </div>
-                  </div>
-                </form>
               </motion.div>
-            )}
-
-            {/* Step 3: Done */}
-            {step === "done" && (
+            ) : (
               <motion.div key="done"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, type: "spring" }}
@@ -295,13 +228,6 @@ export default function Register() {
             )}
 
           </AnimatePresence>
-
-          {step !== "done" && (
-            <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground pt-4">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              بياناتك محمية ومشفرة تماماً
-            </div>
-          )}
         </div>
       </div>
     </div>
