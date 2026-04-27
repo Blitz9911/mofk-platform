@@ -110,26 +110,26 @@
 
 /* ─── LIGHT MODE ──────────────────────────────────── */
 :root {
-  --button-outline: rgba(0,0,0,.10);
-  --badge-outline:  rgba(0,0,0,.05);
-  --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0,.03);
-  --elevate-2: rgba(0,0,0,.08);
+  --button-outline: rgba(0,0,0,.14);
+  --badge-outline:  rgba(0,0,0,.08);
+  --opaque-button-border-intensity: -10;
+  --elevate-1: rgba(0,0,0,.04);
+  --elevate-2: rgba(0,0,0,.10);
 
   /* Surface */
-  --background:         0 0% 98%;       /* #FAFAFA */
-  --foreground:         0 0%  4%;       /* #0B0B0B */
+  --background:         0 0% 96%;       /* #F5F5F5 — off-white with contrast */
+  --foreground:         0 0%  7%;       /* #121212 — near-black for crisp text */
 
   --card:               0 0% 100%;      /* #FFFFFF */
-  --card-foreground:    0 0%  4%;
-  --card-border:        0 0% 90%;       /* #E5E5E5 */
+  --card-foreground:    0 0%  7%;
+  --card-border:        0 0% 82%;       /* #D1D1D1 — visible borders */
 
   --popover:            0 0% 100%;
-  --popover-foreground: 0 0%  4%;
-  --popover-border:     0 0% 90%;
+  --popover-foreground: 0 0%  7%;
+  --popover-border:     0 0% 82%;
 
-  --border:             0 0% 88%;       /* #E0E0E0 */
-  --input:              0 0% 88%;
+  --border:             0 0% 82%;       /* #D1D1D1 — clear border lines */
+  --input:              0 0% 86%;       /* #DBDBDB */
   --ring:               25 100% 50%;
 
   /* Brand */
@@ -137,26 +137,26 @@
   --primary-foreground: 0 0% 100%;
 
   /* Neutrals */
-  --secondary:          0 0% 94%;       /* #EDEDED */
-  --secondary-foreground: 0 0% 4%;
+  --secondary:          0 0% 90%;       /* #E5E5E5 — distinct from bg */
+  --secondary-foreground: 0 0% 7%;
 
-  --muted:              0 0% 94%;       /* #EDEDED */
-  --muted-foreground:   210 4% 56%;     /* #8A8F94 */
+  --muted:              0 0% 90%;       /* #E5E5E5 */
+  --muted-foreground:   0 0% 35%;       /* #595959 — much darker, clearly readable */
 
-  --accent:             0 0% 94%;
-  --accent-foreground:  0 0% 4%;
+  --accent:             0 0% 90%;
+  --accent-foreground:  0 0% 7%;
 
-  --destructive:        0 84% 60%;
+  --destructive:        0 84% 55%;
   --destructive-foreground: 0 0% 100%;
 
   /* Sidebar */
-  --sidebar:               0 0% 96%;
-  --sidebar-foreground:    0 0%  4%;
-  --sidebar-border:        0 0% 90%;
+  --sidebar:               0 0% 94%;
+  --sidebar-foreground:    0 0%  7%;
+  --sidebar-border:        0 0% 82%;
   --sidebar-primary:       25 100% 50%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent:        0 0% 92%;
-  --sidebar-accent-foreground: 0 0% 4%;
+  --sidebar-accent:        0 0% 88%;
+  --sidebar-accent-foreground: 0 0% 7%;
   --sidebar-ring:          25 100% 50%;
 
   /* Charts */
