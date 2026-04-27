@@ -1,7 +1,8 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnimatePresence, motion } from "framer-motion";
 import NotFound from "@/pages/not-found";
 
 // Public Pages
@@ -15,6 +16,7 @@ import Login from "@/pages/login";
 import About from "@/pages/about";
 import Careers from "@/pages/careers";
 import Blog from "@/pages/blog";
+import BlogPost from "@/pages/blog-post";
 import Contact from "@/pages/contact";
 import Help from "@/pages/help";
 import Terms from "@/pages/terms";
@@ -88,29 +90,49 @@ function AdminRoutes() {
   );
 }
 
-function Router() {
+function AnimatedSwitch() {
+  const [location] = useLocation();
+  const pageKey = location.startsWith("/app") ? "app"
+    : location.startsWith("/admin") ? "admin"
+    : location.split("?")[0];
+
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/workshops" component={WorkshopsPublic} />
-      <Route path="/workshops/:id" component={WorkshopDetailPublic} />
-      <Route path="/login" component={Login} />
-      <Route path="/about" component={About} />
-      <Route path="/careers" component={Careers} />
-      <Route path="/blog" component={Blog} />
-      <Route path="/contact" component={Contact} />
-      <Route path="/help" component={Help} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/refunds" component={Refunds} />
-      <Route path="/app" component={AppRoutes} />
-      <Route path="/app/*?" component={AppRoutes} />
-      <Route path="/admin" component={AdminRoutes} />
-      <Route path="/admin/*?" component={AdminRoutes} />
-      <Route component={NotFound} />
-    </Switch>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={pageKey}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
+      >
+        <Switch>
+          <Route path="/" component={Home} />
+          <Route path="/pricing" component={Pricing} />
+          <Route path="/workshops" component={WorkshopsPublic} />
+          <Route path="/workshops/:id" component={WorkshopDetailPublic} />
+          <Route path="/login" component={Login} />
+          <Route path="/about" component={About} />
+          <Route path="/careers" component={Careers} />
+          <Route path="/blog" component={Blog} />
+          <Route path="/blog/:slug" component={BlogPost} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/help" component={Help} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/refunds" component={Refunds} />
+          <Route path="/app" component={AppRoutes} />
+          <Route path="/app/*?" component={AppRoutes} />
+          <Route path="/admin" component={AdminRoutes} />
+          <Route path="/admin/*?" component={AdminRoutes} />
+          <Route component={NotFound} />
+        </Switch>
+      </motion.div>
+    </AnimatePresence>
   );
+}
+
+function Router() {
+  return <AnimatedSwitch />;
 }
 
 function App() {
