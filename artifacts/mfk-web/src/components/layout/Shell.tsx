@@ -38,7 +38,6 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/app/diagnostics", label: "التشخيص المباشر", icon: Activity },
     { href: "/app/dtc", label: "سجل الأعطال", icon: Wrench },
     { href: "/app/maintenance", label: "الصيانة", icon: Calendar },
-    { href: "/app/bookings", label: "حجوزاتي", icon: Calendar },
     { href: "/app/assistant", label: "المساعد الذكي", icon: MessageSquare },
     { href: "/app/recommendations", label: "التوصيات", icon: Lightbulb },
     { href: "/app/subscription", label: "الاشتراك", icon: CreditCard },
