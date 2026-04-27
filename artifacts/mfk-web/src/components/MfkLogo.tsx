@@ -13,7 +13,7 @@ export function MfkLogo({ size = "md", className = "" }: MfkLogoProps) {
   const { height } = SIZES[size];
   return (
     <img
-      src="/mfk-logo-ar.png"
+      src="/mfk-logo-ar-nobg.png"
       alt="لمفك"
       height={height}
       className={className}
