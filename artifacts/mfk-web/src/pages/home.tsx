@@ -54,8 +54,7 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
-                سيارتك تحتوي على كل المعلومات التي تحتاجها — لكن لا أحد يشرحها لك بطريقة تفهمها.
-                مفك يغيّر هذا، ويخليك تعرف وش في سيارتك قبل لا يخبرك أحد.
+                سيارتك تعطيك لمبات كثير… بس قليل يفهمها صح. مع مفك تعرف وش فيها قبل لا تدخل الورشة، ويفهمك المشكلة ولا احد يلعب عليك
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/register">
@@ -137,7 +136,7 @@ export default function Home() {
                 <h2 className="text-xl md:text-2xl font-black text-foreground">
                   الخيار الموثوق لأكثر من 20,000 سائق في المملكة
                 </h2>
-                <p className="text-muted-foreground mt-1 text-sm">يثقون بنا يومياً لحماية سياراتهم وتوفير المال</p>
+                <p className="text-muted-foreground mt-1 text-sm">يثقون بنا يومياً لحماية سياراتهم</p>
               </div>
 
               {/* Divider */}
@@ -205,7 +204,7 @@ export default function Home() {
                 </div>
                 <h3 className="text-3xl font-bold mb-4 text-foreground">MFK تتنبأ قبل أن يحدث</h3>
                 <p className="text-lg text-muted-foreground mb-6">
-                  نوفر لك جهاز قراءة ذكي يوصل بسيارتك، وتطبيق يحلل مئات البيانات في الثانية ليعطيك تقريراً مفهوماً باللغة العربية.
+                  نوفر لك جهاز قراءة ذكي يوصل بسيارتك، وتطبيق يحلل مئات البيانات في الثانية ليعطيك تقريراً يفهمك
                 </p>
                 <ul className="space-y-3">
                   <li className="flex items-center gap-3 text-foreground font-medium">
@@ -218,7 +217,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-3 text-foreground font-medium">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
-                    <span>ترجمة الأعطال المعقدة إلى لغة بسيطة</span>
+                    <span>ترجمة الأعطال المعقدة إلى لغة تفهمك</span>
                   </li>
                 </ul>
               </motion.div>
@@ -229,7 +228,7 @@ export default function Home() {
         {/* LIVE DEMO STRIP */}
         <section id="demo" className="py-24 bg-card border-y border-border">
           <div className="container mx-auto px-4 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">راقب نبض سيارتك في الوقت الفعلي</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">راقب نبض سيارتك في كل لحظة</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto mb-16">
               بيانات حية ومباشرة من قلب محرك سيارتك إلى هاتفك في أجزاء من الثانية.
             </p>
@@ -299,7 +298,7 @@ export default function Home() {
                 {
                   icon: Wrench,
                   title: "فهم بسيط",
-                  desc: "نترجم الأعطال المعقدة إلى لغة عربية بسيطة مع تحديد درجة الخطورة وتكلفة الإصلاح.",
+                  desc: "نترجم الأعطال المعقدة إلى لغة تفهمك، بسيطة مع تحديد درجة الخطورة وتكلفة الإصلاح التقريبية",
                 },
                 {
                   icon: CalendarCheck,
