@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import {
   useGetDashboardOverview,
   useGetRecentActivity,
+  useGetUpcomingMaintenance,
   useListVehicles,
 } from "@workspace/api-client-react";
 import React, { useState } from "react";
@@ -46,10 +47,23 @@ function HealthBar({ score }: { score: number }) {
 }
 
 const ACTIVITY_ICONS: Record<string, string> = {
-  session: "play-circle-outline",
-  dtc: "warning-outline",
-  maintenance: "construct-outline",
-  booking: "calendar-outline",
+  diagnostic_session: "play-circle-outline",
+  dtc_detected: "warning-outline",
+  dtc_cleared: "checkmark-circle-outline",
+  maintenance_done: "construct-outline",
+  booking_created: "calendar-outline",
+};
+
+const MAINTENANCE_STATUS_COLOR: Record<string, string> = {
+  overdue: "#ef4444",
+  upcoming: "#f59e0b",
+  scheduled: "#3b82f6",
+};
+
+const MAINTENANCE_STATUS_LABEL: Record<string, string> = {
+  overdue: "متأخرة",
+  upcoming: "قريباً",
+  scheduled: "مجدولة",
 };
 
 export default function DashboardScreen() {
@@ -61,11 +75,12 @@ export default function DashboardScreen() {
 
   const { data: overview, isLoading: ovLoading, refetch: refetchOv } = useGetDashboardOverview();
   const { data: vehicles, refetch: refetchV } = useListVehicles();
-  const { data: activity, refetch: refetchA } = useGetRecentActivity({ limit: 8 });
+  const { data: activity, refetch: refetchA } = useGetRecentActivity({ limit: 6 });
+  const { data: maintenance, refetch: refetchM } = useGetUpcomingMaintenance();
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchOv(), refetchV(), refetchA()]);
+    await Promise.all([refetchOv(), refetchV(), refetchA(), refetchM()]);
     setRefreshing(false);
   };
 
@@ -131,8 +146,8 @@ export default function DashboardScreen() {
               <StatCard label="كم مقطوعة (30 يوم)" value={(overview.kmDrivenLast30d ?? 0).toLocaleString("ar-SA")} icon="speedometer-outline" />
               <StatCard label="توفير متوقع" value={`${(overview.estimatedSavingsSar ?? 0).toLocaleString("ar-SA")} ر.س`} icon="wallet-outline" color="#22c55e" />
               <StatCard label="حجوزات قادمة" value={overview.upcomingBookingCount ?? 0} icon="calendar-outline" />
-              {overview.criticalDtcCount > 0 && (
-                <StatCard label="أعطال حرجة" value={overview.criticalDtcCount} icon="warning-outline" color="#ef4444" />
+              {(overview.criticalDtcCount ?? 0) > 0 && (
+                <StatCard label="أعطال حرجة" value={overview.criticalDtcCount ?? 0} icon="warning-outline" color="#ef4444" />
               )}
             </ScrollView>
           </>
@@ -169,6 +184,46 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {maintenance && maintenance.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Pressable onPress={() => router.push("/maintenance")}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>عرض الكل</Text>
+              </Pressable>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>الصيانة القادمة</Text>
+            </View>
+            {maintenance.slice(0, 4).map((m, i) => {
+              const color = MAINTENANCE_STATUS_COLOR[m.status] ?? colors.mutedForeground;
+              return (
+                <Animated.View key={m.id} entering={FadeInDown.delay(i * 60).springify()}>
+                  <View style={[styles.maintenanceRow, { backgroundColor: colors.card, borderColor: colors.border, borderRightColor: color }]}>
+                    <View style={styles.maintenanceRight}>
+                      <Text style={[styles.maintenanceName, { color: colors.foreground }]}>
+                        {m.serviceTypeAr || m.serviceType}
+                      </Text>
+                      <Text style={[styles.maintenanceVehicle, { color: colors.mutedForeground }]}>
+                        {m.vehicleNickname || m.vehicleMake}
+                      </Text>
+                    </View>
+                    <View style={styles.maintenanceLeft}>
+                      <View style={[styles.maintenanceBadge, { backgroundColor: color + "20" }]}>
+                        <Text style={[styles.maintenanceBadgeText, { color }]}>
+                          {MAINTENANCE_STATUS_LABEL[m.status] ?? m.status}
+                        </Text>
+                      </View>
+                      {m.nextDueKm && (
+                        <Text style={[styles.maintenanceKm, { color: colors.mutedForeground }]}>
+                          {m.nextDueKm.toLocaleString("ar-SA")} كم
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </Animated.View>
+              );
+            })}
+          </View>
+        )}
+
         {activity && activity.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: "right" }]}>آخر النشاطات</Text>
@@ -177,17 +232,17 @@ export default function DashboardScreen() {
                 <View style={[styles.activityItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.activityMeta}>
                     <Text style={[styles.activityTime, { color: colors.mutedForeground }]}>
-                      {new Date(a.timestamp).toLocaleDateString("ar-SA")}
+                      {new Date(a.occurredAt).toLocaleDateString("ar-SA")}
                     </Text>
                   </View>
                   <View style={styles.activityContent}>
                     <Text style={[styles.activityTitle, { color: colors.foreground }]}>{a.titleAr}</Text>
-                    {a.descriptionAr && (
-                      <Text style={[styles.activityDesc, { color: colors.mutedForeground }]}>{a.descriptionAr}</Text>
+                    {a.subtitleAr && (
+                      <Text style={[styles.activityDesc, { color: colors.mutedForeground }]}>{a.subtitleAr}</Text>
                     )}
                   </View>
                   <View style={[styles.activityIcon, { backgroundColor: colors.primary + "22" }]}>
-                    <Ionicons name={ACTIVITY_ICONS[a.type] as any ?? "ellipse-outline"} size={18} color={colors.primary} />
+                    <Ionicons name={(ACTIVITY_ICONS[a.kind] ?? "ellipse-outline") as any} size={18} color={colors.primary} />
                   </View>
                 </View>
               </Animated.View>
@@ -274,4 +329,21 @@ const styles = StyleSheet.create({
   activityDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
   activityMeta: {},
   activityTime: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  maintenanceRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: 4,
+    gap: 10,
+  },
+  maintenanceRight: { flex: 1, gap: 3 },
+  maintenanceName: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  maintenanceVehicle: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  maintenanceLeft: { alignItems: "flex-end", gap: 4 },
+  maintenanceBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  maintenanceBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  maintenanceKm: { fontSize: 11, fontFamily: "Inter_400Regular" },
 });

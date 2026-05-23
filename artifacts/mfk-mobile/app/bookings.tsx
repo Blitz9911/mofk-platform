@@ -82,10 +82,10 @@ export default function BookingsScreen() {
                     {new Date(item.scheduledAt).toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                   </Text>
                 </View>
-                {item.notes && (
+                {item.serviceTypeAr && (
                   <View style={styles.infoRow}>
-                    <Ionicons name="document-text-outline" size={14} color={colors.mutedForeground} />
-                    <Text style={[styles.infoText, { color: colors.mutedForeground }]}>{item.notes}</Text>
+                    <Ionicons name="construct-outline" size={14} color={colors.mutedForeground} />
+                    <Text style={[styles.infoText, { color: colors.mutedForeground }]}>{item.serviceTypeAr}</Text>
                   </View>
                 )}
               </View>

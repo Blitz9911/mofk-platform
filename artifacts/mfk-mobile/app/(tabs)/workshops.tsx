@@ -95,14 +95,14 @@ export default function WorkshopsScreen() {
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={14} color="#f59e0b" />
                     <Text style={[styles.rating, { color: colors.foreground }]}>{item.rating?.toFixed(1) ?? "—"}</Text>
-                    <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>({item.reviewCount ?? 0})</Text>
+                    <Text style={[styles.ratingCount, { color: colors.mutedForeground }]}>({item.reviewsCount ?? 0})</Text>
                   </View>
                 </View>
 
                 <View style={styles.cardMeta}>
                   <View style={styles.metaRow}>
                     <Ionicons name="location-outline" size={13} color={colors.mutedForeground} />
-                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.city} • {item.neighborhood}</Text>
+                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{item.city}</Text>
                   </View>
                 </View>
 

@@ -36,12 +36,12 @@ export default function DiagnosticsScreen() {
 
   const { data: telemetry, isLoading: telLoading } = useGetLiveTelemetry(
     activeId ?? "",
-    { query: { enabled: !!activeId, refetchInterval: 5000 } }
+    { query: { enabled: !!activeId, refetchInterval: 5000 } as any }
   );
 
   const { data: sessions } = useListDiagnosticSessions(
     { vehicleId: activeId ?? "", limit: 5 },
-    { query: { enabled: !!activeId } }
+    { query: { enabled: !!activeId } as any }
   );
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -94,16 +94,16 @@ export default function DiagnosticsScreen() {
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        ) : telemetry ? (
+        ) : telemetry?.isConnected ? (
           <>
             <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>بيانات حية</Text>
             <View style={styles.gaugeGrid}>
-              <GaugeCard label="السرعة" value={telemetry.speedKmh ?? 0} unit="كم/س" color={colors.primary} />
-              <GaugeCard label="سرعة المحرك" value={telemetry.rpm ?? 0} unit="RPM" color="#06b6d4" />
-              <GaugeCard label="حرارة المبرد" value={telemetry.engineTempC ?? 0} unit="°م" color="#f59e0b" />
-              <GaugeCard label="البطارية" value={(telemetry.batteryV ?? 0).toFixed(1)} unit="V" color="#22c55e" />
-              <GaugeCard label="مستوى الوقود" value={telemetry.fuelLevelPct ?? 0} unit="%" color="#8b5cf6" />
-              <GaugeCard label="حمل المحرك" value={telemetry.engineLoadPct ?? 0} unit="%" color="#ec4899" />
+              <GaugeCard label="السرعة" value={telemetry.latest?.speedKmh ?? 0} unit="كم/س" color={colors.primary} />
+              <GaugeCard label="سرعة المحرك" value={telemetry.latest?.rpm ?? 0} unit="RPM" color="#06b6d4" />
+              <GaugeCard label="حرارة المبرد" value={telemetry.latest?.coolantTemp ?? 0} unit="°م" color="#f59e0b" />
+              <GaugeCard label="البطارية" value={((telemetry.latest?.batteryV ?? 0) as number).toFixed(1)} unit="V" color="#22c55e" />
+              <GaugeCard label="مستوى الوقود" value={telemetry.latest?.fuelLevelPct ?? 0} unit="%" color="#8b5cf6" />
+              <GaugeCard label="حمل المحرك" value={telemetry.latest?.engineLoad ?? 0} unit="%" color="#ec4899" />
             </View>
           </>
         ) : activeId ? (

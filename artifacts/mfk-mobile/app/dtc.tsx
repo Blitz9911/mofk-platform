@@ -108,13 +108,13 @@ export default function DtcScreen() {
                 </View>
                 <Text style={[styles.dtcCode, { color: colors.foreground }]}>{item.code}</Text>
               </View>
-              <Text style={[styles.dtcDesc, { color: colors.foreground }]}>{item.descriptionAr ?? item.description}</Text>
+              <Text style={[styles.dtcDesc, { color: colors.foreground }]}>{item.descriptionAr ?? item.descriptionEn}</Text>
               {item.possibleCauses && (
                 <Text style={[styles.dtcCauses, { color: colors.mutedForeground }]}>{item.possibleCauses}</Text>
               )}
               <View style={styles.dtcFooter}>
                 <Text style={[styles.dtcDate, { color: colors.mutedForeground }]}>
-                  {new Date(item.detectedAt).toLocaleDateString("ar-SA")}
+                  {item.detectedAt ? new Date(item.detectedAt).toLocaleDateString("ar-SA") : "—"}
                 </Text>
                 {item.vehicleMake && (
                   <Text style={[styles.dtcVehicle, { color: colors.mutedForeground }]}>{item.vehicleMake} {item.vehicleModel}</Text>

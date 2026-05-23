@@ -89,17 +89,17 @@ export default function WorkshopDetailScreen() {
               <View style={styles.workshopMeta}>
                 <View style={styles.metaItem}>
                   <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
-                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{workshop.addressAr ?? `${workshop.city} - ${workshop.neighborhood}`}</Text>
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{workshop.addressAr ?? workshop.city}</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <Ionicons name="star" size={14} color="#f59e0b" />
                   <Text style={[styles.metaText, { color: colors.foreground }]}>{workshop.rating?.toFixed(1) ?? "—"}</Text>
-                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>({workshop.reviewCount ?? 0} تقييم)</Text>
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>({workshop.reviewsCount ?? 0} تقييم)</Text>
                 </View>
-                {workshop.openHours && (
+                {workshop.openingHours && (
                   <View style={styles.metaItem}>
                     <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
-                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{workshop.openHours}</Text>
+                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{workshop.openingHours}</Text>
                   </View>
                 )}
               </View>

@@ -51,7 +51,7 @@ export default function VehiclesScreen() {
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>مركباتي</Text>
         <Pressable
           style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          onPress={() => router.push("/add-vehicle")}
+          onPress={() => router.push("/add-vehicle" as any)}
         >
           <Ionicons name="add" size={22} color="#fff" />
         </Pressable>

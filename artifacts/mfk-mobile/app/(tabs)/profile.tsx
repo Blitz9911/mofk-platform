@@ -93,16 +93,10 @@ export default function ProfileScreen() {
             {currentPlan && (
               <Text style={[styles.subDesc, { color: colors.foreground }]}>{currentPlan.nameAr}</Text>
             )}
-            {sub.validUntil && (
+            {sub.endsAt && (
               <Text style={[styles.subExp, { color: colors.mutedForeground }]}>
-                صالح حتى {new Date(sub.validUntil).toLocaleDateString("ar-SA")}
+                صالح حتى {new Date(sub.endsAt).toLocaleDateString("ar-SA")}
               </Text>
-            )}
-            {sub.vehicleLimit && (
-              <View style={[styles.subStat, { borderTopColor: colors.border }]}>
-                <Text style={[styles.subStatVal, { color: colors.foreground }]}>{sub.vehicleLimit}</Text>
-                <Text style={[styles.subStatLabel, { color: colors.mutedForeground }]}>مركبات كحد أقصى</Text>
-              </View>
             )}
           </View>
         )}
@@ -114,6 +108,8 @@ export default function ProfileScreen() {
             <MenuItem icon="car-outline" label="مركباتي" onPress={() => router.push("/(tabs)/vehicles")} />
             <MenuItem icon="calendar-outline" label="حجوزاتي" onPress={() => router.push("/bookings")} />
             <MenuItem icon="construct-outline" label="سجل الأعطال" onPress={() => router.push("/dtc")} />
+            <MenuItem icon="build-outline" label="الصيانة الدورية" onPress={() => router.push("/maintenance")} />
+            <MenuItem icon="bulb-outline" label="التوصيات الذكية" onPress={() => router.push("/recommendations")} />
             <MenuItem icon="chatbubble-ellipses-outline" label="المساعد الذكي" onPress={() => router.push("/assistant")} />
           </View>
         </View>
@@ -122,8 +118,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>الاشتراك</Text>
           <View style={styles.menuGroup}>
-            <MenuItem icon="diamond-outline" label="ترقية الخطة" onPress={() => {}} />
-            <MenuItem icon="receipt-outline" label="الفواتير والدفع" onPress={() => {}} />
+            <MenuItem icon="diamond-outline" label="الاشتراك والباقات" onPress={() => router.push("/subscription")} />
           </View>
         </View>
 

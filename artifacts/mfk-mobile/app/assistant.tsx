@@ -56,16 +56,13 @@ export default function AssistantScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const currentMessages = [userMsg, ...messages];
       const response = await sendChat({
-        data: {
-          messages: currentMessages.slice(0, 10).reverse().map((m) => ({ role: m.role, content: m.content })),
-        }
+        data: { message: msg }
       });
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response.message ?? "عذراً، لم أتمكن من الرد الآن.",
+        content: response.reply ?? "عذراً، لم أتمكن من الرد الآن.",
         ts: Date.now(),
       };
       setMessages((prev) => [assistantMsg, ...prev]);

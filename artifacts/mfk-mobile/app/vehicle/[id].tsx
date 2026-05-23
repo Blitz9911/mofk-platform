@@ -89,7 +89,7 @@ export default function VehicleDetailScreen() {
             </View>
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>الوقود</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>{FUEL_LABELS[vehicle.fuelType] ?? vehicle.fuelType}</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{vehicle.fuelType ? (FUEL_LABELS[vehicle.fuelType] ?? vehicle.fuelType) : "—"}</Text>
             </View>
             {vehicle.engineCc && (
               <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -120,7 +120,7 @@ export default function VehicleDetailScreen() {
                 <View key={d.id} style={[styles.dtcRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.dtcRight}>
                     <Text style={[styles.dtcCode, { color: colors.foreground }]}>{d.code}</Text>
-                    <Text style={[styles.dtcDesc, { color: colors.mutedForeground }]}>{d.descriptionAr ?? d.description}</Text>
+                    <Text style={[styles.dtcDesc, { color: colors.mutedForeground }]}>{d.descriptionAr ?? d.descriptionEn}</Text>
                   </View>
                   <View style={[styles.severityBadge, { backgroundColor: (SEVERITY_COLOR[d.severity] ?? colors.muted) + "22" }]}>
                     <Text style={[styles.severityText, { color: SEVERITY_COLOR[d.severity] ?? colors.mutedForeground }]}>
