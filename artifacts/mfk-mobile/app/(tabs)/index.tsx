@@ -5,7 +5,6 @@ import {
   useGetDashboardOverview,
   useGetRecentActivity,
   useListVehicles,
-  useGetHealthTrend,
 } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import {
@@ -21,6 +20,7 @@ import {
 import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 function StatCard({ label, value, sub, color, icon }: { label: string; value: string | number; sub?: string; color?: string; icon: string }) {
@@ -56,6 +56,7 @@ export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: overview, isLoading: ovLoading, refetch: refetchOv } = useGetDashboardOverview();
@@ -79,11 +80,18 @@ export default function DashboardScreen() {
           </Pressable>
         </View>
         <View style={styles.headerRight}>
-          <Image
-            source={require("@/assets/images/logo.png")}
-            style={styles.headerLogo}
-            contentFit="contain"
-          />
+          {user?.name ? (
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={[styles.greeting, { color: colors.mutedForeground }]}>مرحباً،</Text>
+              <Text style={[styles.userName, { color: colors.foreground }]}>{user.name}</Text>
+            </View>
+          ) : (
+            <Image
+              source={require("@/assets/images/logo.png")}
+              style={styles.headerLogo}
+              contentFit="contain"
+            />
+          )}
         </View>
       </View>
 

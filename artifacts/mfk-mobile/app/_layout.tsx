@@ -6,16 +6,17 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { I18nManager } from "react-native";
+import { ActivityIndicator, I18nManager, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 I18nManager.allowRTL(true);
 I18nManager.forceRTL(true);
@@ -33,10 +34,39 @@ const queryClient = new QueryClient({
   },
 });
 
+const AUTH_SCREENS = ["login", "register"];
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0B0B0B" }}>
+        <ActivityIndicator size="large" color="#FF6A00" />
+      </View>
+    );
+  }
+
+  const inAuthScreen = AUTH_SCREENS.includes(segments[0] as string);
+
+  if (!user && !inAuthScreen) {
+    return <Redirect href="/login" />;
+  }
+
+  if (user && inAuthScreen) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="register" options={{ headerShown: false }} />
       <Stack.Screen name="vehicle/[id]" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="workshop/[id]" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="bookings" options={{ headerShown: false, presentation: "card" }} />
@@ -66,11 +96,15 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
+          <AuthProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <KeyboardProvider>
+                <AuthGate>
+                  <RootLayoutNav />
+                </AuthGate>
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>

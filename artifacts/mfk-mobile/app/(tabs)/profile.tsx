@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useGetMySubscription, useListSubscriptionPlans } from "@workspace/api-client-react";
 import React from "react";
 import {
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 const TIER_LABELS: Record<string, string> = {
@@ -39,26 +41,47 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user, logout } = useAuth();
   const { data: sub } = useGetMySubscription();
   const { data: plans } = useListSubscriptionPlans();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-
   const currentPlan = plans?.find((p) => p.tier === sub?.tier);
+
+  const firstLetter = user?.name?.charAt(0) ?? "م";
+
+  const handleLogout = () => {
+    Alert.alert("تسجيل الخروج", "هل أنت متأكد من تسجيل الخروج؟", [
+      { text: "إلغاء", style: "cancel" },
+      {
+        text: "تسجيل الخروج",
+        style: "destructive",
+        onPress: async () => {
+          await logout();
+          router.replace("/login");
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 120 }}>
+        {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>ع</Text>
+            <Text style={styles.avatarText}>{firstLetter}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: colors.foreground }]}>عبدالله السلمي</Text>
-            <Text style={[styles.profilePhone, { color: colors.mutedForeground }]}>+966 50 123 4567</Text>
+            <Text style={[styles.profileName, { color: colors.foreground }]}>{user?.name ?? "—"}</Text>
+            <Text style={[styles.profilePhone, { color: colors.mutedForeground }]}>{user?.phone ?? ""}</Text>
+            {user?.email ? (
+              <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>{user.email}</Text>
+            ) : null}
           </View>
         </View>
 
+        {/* Subscription Card */}
         {sub && (
           <View style={[styles.subCard, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
             <View style={styles.subHeader}>
@@ -84,6 +107,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Services */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>الخدمات</Text>
           <View style={styles.menuGroup}>
@@ -94,6 +118,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Subscription */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>الاشتراك</Text>
           <View style={styles.menuGroup}>
@@ -102,6 +127,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Settings */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>الإعدادات</Text>
           <View style={styles.menuGroup}>
@@ -111,9 +137,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Logout */}
         <View style={styles.section}>
           <View style={styles.menuGroup}>
-            <MenuItem icon="log-out-outline" label="تسجيل الخروج" onPress={() => {}} danger />
+            <MenuItem icon="log-out-outline" label="تسجيل الخروج" onPress={handleLogout} danger />
           </View>
         </View>
       </ScrollView>
@@ -138,16 +165,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 24, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  profileInfo: { flex: 1, alignItems: "flex-end" },
+  profileInfo: { flex: 1, alignItems: "flex-end", gap: 2 },
   profileName: { fontSize: 18, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  profilePhone: { fontSize: 14, fontFamily: "Inter_400Regular", marginTop: 2 },
-  subCard: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 6,
-  },
+  profilePhone: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  profileEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  subCard: { margin: 16, padding: 16, borderRadius: 16, borderWidth: 1, gap: 6 },
   subHeader: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   subTitle: { fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
   subDesc: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "right" },
