@@ -18,33 +18,11 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-
-function StatCard({ label, value, sub, color, icon }: { label: string; value: string | number; sub?: string; color?: string; icon: string }) {
-  const colors = useColors();
-  return (
-    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Ionicons name={icon as any} size={18} color={color ?? colors.primary} />
-      <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
-      {sub && <Text style={[styles.statSub, { color: color ?? colors.primary }]}>{sub}</Text>}
-      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
-    </View>
-  );
-}
-
-function HealthBar({ score }: { score: number }) {
-  const colors = useColors();
-  const color = score >= 80 ? colors.success : score >= 60 ? colors.warning : "#ef4444";
-  return (
-    <View style={[styles.healthBar, { backgroundColor: colors.accent }]}>
-      <View style={[styles.healthFill, { width: `${score}%` as any, backgroundColor: color }]} />
-    </View>
-  );
-}
 
 const ACTIVITY_ICONS: Record<string, string> = {
   diagnostic_session: "play-circle-outline",
@@ -54,17 +32,50 @@ const ACTIVITY_ICONS: Record<string, string> = {
   booking_created: "calendar-outline",
 };
 
-const MAINTENANCE_STATUS_COLOR: Record<string, string> = {
-  overdue: "#ef4444",
-  upcoming: "#f59e0b",
-  scheduled: "#3b82f6",
-};
+function HealthScore({ score }: { score: number }) {
+  const color = score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
+  const label = score >= 80 ? "ممتازة" : score >= 60 ? "جيدة" : "تحتاج اهتمام";
+  return (
+    <View style={{ alignItems: "center" }}>
+      <Text style={{ fontSize: 28, fontFamily: "Inter_700Bold", color }}>{score}</Text>
+      <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color }}>{label}</Text>
+    </View>
+  );
+}
 
-const MAINTENANCE_STATUS_LABEL: Record<string, string> = {
-  overdue: "متأخرة",
-  upcoming: "قريباً",
-  scheduled: "مجدولة",
-};
+function StatCard({
+  icon, label, value, sub, color,
+}: {
+  icon: string; label: string; value: string | number; sub?: string; color?: string;
+}) {
+  const colors = useColors();
+  const c = color ?? colors.primary;
+  return (
+    <View style={[statStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[statStyles.iconWrap, { backgroundColor: c + "18" }]}>
+        <Ionicons name={icon as any} size={18} color={c} />
+      </View>
+      <Text style={[statStyles.value, { color: colors.foreground }]}>{value}</Text>
+      {sub ? <Text style={[statStyles.sub, { color: c }]}>{sub}</Text> : null}
+      <Text style={[statStyles.label, { color: colors.mutedForeground }]}>{label}</Text>
+    </View>
+  );
+}
+
+const statStyles = StyleSheet.create({
+  card: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+    minWidth: 100,
+  },
+  iconWrap: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
+  value: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  sub: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  label: { fontSize: 11, fontFamily: "Inter_400Regular" },
+});
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -78,6 +89,8 @@ export default function DashboardScreen() {
   const { data: activity, refetch: refetchA } = useGetRecentActivity({ limit: 6 });
   const { data: maintenance, refetch: refetchM } = useGetUpcomingMaintenance();
 
+  const overdueCount = maintenance?.filter((m) => m.status === "overdue").length ?? 0;
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([refetchOv(), refetchV(), refetchA(), refetchM()]);
@@ -85,74 +98,47 @@ export default function DashboardScreen() {
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const today = new Date().toLocaleDateString("ar-SA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
-          <Pressable style={[styles.notifBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Pressable style={[styles.notifBtn, { borderColor: colors.border }]}>
             <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
           </Pressable>
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={styles.avatarText}>{user?.name?.charAt(0) ?? "م"}</Text>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          {user?.name ? (
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={[styles.greeting, { color: colors.mutedForeground }]}>مرحباً،</Text>
-              <Text style={[styles.userName, { color: colors.foreground }]}>{user.name}</Text>
-            </View>
-          ) : (
-            <Image
-              source={require("@/assets/images/logo.png")}
-              style={styles.headerLogo}
-              contentFit="contain"
-            />
-          )}
-        </View>
+        <Image source={require("@/assets/images/logo.png")} style={styles.logo} contentFit="contain" />
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 100 : 120 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-        showsVerticalScrollIndicator={false}
       >
-        {ovLoading ? (
-          <View style={styles.loadCenter}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : overview && (
-          <>
-            <Animated.View entering={FadeInDown.springify()} style={[styles.heroCard, { backgroundColor: colors.primary }]}>
-              <Text style={styles.heroLabel}>متوسط صحة المركبات</Text>
-              <Text style={styles.heroValue}>{overview.avgHealthScore}%</Text>
-              <View style={styles.heroStats}>
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatVal}>{overview.vehicleCount}</Text>
-                  <Text style={styles.heroStatLabel}>مركبات</Text>
-                </View>
-                <View style={[styles.heroDivider]} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatVal}>{overview.activeDtcCount}</Text>
-                  <Text style={styles.heroStatLabel}>أعطال نشطة</Text>
-                </View>
-                <View style={styles.heroDivider} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatVal}>{overview.upcomingMaintenanceCount}</Text>
-                  <Text style={styles.heroStatLabel}>صيانة قادمة</Text>
-                </View>
-              </View>
-            </Animated.View>
+        {/* Greeting */}
+        <View style={styles.greeting}>
+          <Text style={[styles.greetTitle, { color: colors.foreground }]}>
+            مرحباً بك{user?.name ? `، ${user.name.split(" ")[0]}` : ""}
+          </Text>
+          <Text style={[styles.greetDate, { color: colors.mutedForeground }]}>{today}</Text>
+        </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }} style={styles.statsRow}>
-              <StatCard label="كم مقطوعة (30 يوم)" value={(overview.kmDrivenLast30d ?? 0).toLocaleString("ar-SA")} icon="speedometer-outline" />
-              <StatCard label="توفير متوقع" value={`${(overview.estimatedSavingsSar ?? 0).toLocaleString("ar-SA")} ر.س`} icon="wallet-outline" color="#22c55e" />
-              <StatCard label="حجوزات قادمة" value={overview.upcomingBookingCount ?? 0} icon="calendar-outline" />
-              {(overview.criticalDtcCount ?? 0) > 0 && (
-                <StatCard label="أعطال حرجة" value={overview.criticalDtcCount ?? 0} icon="warning-outline" color="#ef4444" />
-              )}
-            </ScrollView>
-          </>
+        {/* Overdue alert banner */}
+        {overdueCount > 0 && (
+          <Pressable onPress={() => router.push("/maintenance")} style={[styles.alertBanner, { backgroundColor: "#ef444415", borderColor: "#ef444440" }]}>
+            <Text style={[styles.alertText, { color: "#ef4444" }]}>
+              ⚠️ {overdueCount} صيانة متأخرة تحتاج اهتمامك
+            </Text>
+            <Ionicons name="chevron-back" size={16} color="#ef4444" />
+          </Pressable>
         )}
 
+        {/* Vehicle health cards */}
         {vehicles && vehicles.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -161,87 +147,88 @@ export default function DashboardScreen() {
               </Pressable>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>مركباتي</Text>
             </View>
-            {vehicles.map((v, i) => (
-              <Animated.View key={v.id} entering={FadeInRight.delay(i * 80).springify()}>
-                <Pressable
-                  style={({ pressed }) => [styles.vehicleRow, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }]}
-                  onPress={() => router.push(`/vehicle/${v.id}`)}
-                >
-                  <View style={styles.vehicleRowLeft}>
-                    <Ionicons name="chevron-back" size={16} color={colors.mutedForeground} />
-                  </View>
-                  <View style={styles.vehicleRowInfo}>
-                    <Text style={[styles.vehicleRowName, { color: colors.foreground }]}>{v.nickname || `${v.make} ${v.model}`}</Text>
-                    <HealthBar score={v.healthScore ?? 0} />
-                  </View>
-                  <View style={[styles.vehicleScoreBadge, { backgroundColor: v.healthScore >= 80 ? colors.success + "22" : v.healthScore >= 60 ? colors.warning + "22" : "#ef444422" }]}>
-                    <Text style={[styles.vehicleScore, { color: v.healthScore >= 80 ? colors.success : v.healthScore >= 60 ? colors.warning : "#ef4444" }]}>{v.healthScore}%</Text>
-                  </View>
-                  <Text style={[styles.vehicleRowName, { color: colors.foreground, textAlign: "right" }]}>{v.nickname || `${v.make} ${v.model}`}</Text>
-                </Pressable>
-              </Animated.View>
-            ))}
-          </View>
-        )}
-
-        {maintenance && maintenance.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Pressable onPress={() => router.push("/maintenance")}>
-                <Text style={[styles.seeAll, { color: colors.primary }]}>عرض الكل</Text>
-              </Pressable>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>الصيانة القادمة</Text>
-            </View>
-            {maintenance.slice(0, 4).map((m, i) => {
-              const color = MAINTENANCE_STATUS_COLOR[m.status] ?? colors.mutedForeground;
-              return (
-                <Animated.View key={m.id} entering={FadeInDown.delay(i * 60).springify()}>
-                  <View style={[styles.maintenanceRow, { backgroundColor: colors.card, borderColor: colors.border, borderRightColor: color }]}>
-                    <View style={styles.maintenanceRight}>
-                      <Text style={[styles.maintenanceName, { color: colors.foreground }]}>
-                        {m.serviceTypeAr || m.serviceType}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
+              {vehicles.map((v, i) => {
+                const score = v.healthScore ?? 0;
+                const hColor = score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
+                const hLabel = score >= 80 ? "ممتازة" : score >= 60 ? "جيدة" : "تحتاج اهتمام";
+                return (
+                  <Animated.View key={v.id} entering={FadeInDown.delay(i * 60).springify()}>
+                    <Pressable
+                      style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: hColor, borderTopWidth: 3 }]}
+                      onPress={() => router.push(`/vehicle/${v.id}`)}
+                    >
+                      <View style={styles.vehicleCardTop}>
+                        <View style={[styles.vehicleScoreWrap, { backgroundColor: hColor + "18" }]}>
+                          <Text style={[styles.vehicleScore, { color: hColor }]}>{score}</Text>
+                          <Text style={[styles.vehicleScoreLabel, { color: hColor }]}>{hLabel}</Text>
+                        </View>
+                        <Ionicons name="car" size={32} color={colors.mutedForeground} style={{ marginBottom: 6 }} />
+                      </View>
+                      <Text style={[styles.vehicleName, { color: colors.foreground }]} numberOfLines={1}>
+                        {v.nickname || `${v.make} ${v.model}`}
                       </Text>
-                      <Text style={[styles.maintenanceVehicle, { color: colors.mutedForeground }]}>
-                        {m.vehicleNickname || m.vehicleMake}
-                      </Text>
-                    </View>
-                    <View style={styles.maintenanceLeft}>
-                      <View style={[styles.maintenanceBadge, { backgroundColor: color + "20" }]}>
-                        <Text style={[styles.maintenanceBadgeText, { color }]}>
-                          {MAINTENANCE_STATUS_LABEL[m.status] ?? m.status}
+                      <Text style={[styles.vehicleSub, { color: colors.mutedForeground }]}>{v.year} • {v.make}</Text>
+                      <View style={[styles.connBadge, { backgroundColor: v.adapterMac ? "#22c55e18" : colors.muted }]}>
+                        <View style={[styles.connDot, { backgroundColor: v.adapterMac ? "#22c55e" : colors.mutedForeground }]} />
+                        <Text style={[styles.connText, { color: v.adapterMac ? "#22c55e" : colors.mutedForeground }]}>
+                          {v.adapterMac ? "متصل" : "غير مرتبط"}
                         </Text>
                       </View>
-                      {m.nextDueKm && (
-                        <Text style={[styles.maintenanceKm, { color: colors.mutedForeground }]}>
-                          {m.nextDueKm.toLocaleString("ar-SA")} كم
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </Animated.View>
-              );
-            })}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
+        {/* Stats grid */}
+        {ovLoading ? (
+          <View style={{ paddingVertical: 32, alignItems: "center" }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : overview ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 4 }]}>نظرة عامة</Text>
+            <View style={styles.statsGrid}>
+              <StatCard icon="car-outline" label="المركبات" value={overview.vehicleCount ?? 0} />
+              <StatCard icon="warning-outline" label="الأعطال النشطة" value={overview.activeDtcCount ?? 0}
+                color={(overview.activeDtcCount ?? 0) > 0 ? "#ef4444" : "#22c55e"}
+                sub={(overview.criticalDtcCount ?? 0) > 0 ? `${overview.criticalDtcCount} حرجة` : undefined}
+              />
+              <StatCard icon="build-outline" label="صيانة قادمة" value={overview.upcomingMaintenanceCount ?? 0}
+                color={(overdueCount) > 0 ? "#ef4444" : colors.primary}
+                sub={overdueCount > 0 ? `${overdueCount} متأخرة` : undefined}
+              />
+            </View>
+            <View style={styles.statsGrid}>
+              <StatCard icon="speedometer-outline" label="كم (30 يوم)" value={(overview.kmDrivenLast30d ?? 0).toLocaleString("ar-SA")} />
+              <StatCard icon="wallet-outline" label="توفير متوقع" value={`${(overview.estimatedSavingsSar ?? 0).toLocaleString("ar-SA")}`} sub="ر.س" color="#22c55e" />
+              <StatCard icon="pulse-outline" label="متوسط الصحة" value={`${overview.avgHealthScore ?? 0}%`}
+                color={(overview.avgHealthScore ?? 0) >= 80 ? "#22c55e" : (overview.avgHealthScore ?? 0) >= 60 ? "#f59e0b" : "#ef4444"}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {/* Recent activity */}
         {activity && activity.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: "right" }]}>آخر النشاطات</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>آخر النشاطات</Text>
             {activity.map((a, i) => (
-              <Animated.View key={a.id} entering={FadeInDown.delay(i * 60).springify()}>
-                <View style={[styles.activityItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.activityMeta}>
-                    <Text style={[styles.activityTime, { color: colors.mutedForeground }]}>
-                      {new Date(a.occurredAt).toLocaleDateString("ar-SA")}
-                    </Text>
-                  </View>
+              <Animated.View key={a.id} entering={FadeInDown.delay(i * 50).springify()}>
+                <View style={[styles.activityRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Text style={[styles.activityTime, { color: colors.mutedForeground }]}>
+                    {new Date(a.occurredAt).toLocaleDateString("ar-SA")}
+                  </Text>
                   <View style={styles.activityContent}>
                     <Text style={[styles.activityTitle, { color: colors.foreground }]}>{a.titleAr}</Text>
                     {a.subtitleAr && (
-                      <Text style={[styles.activityDesc, { color: colors.mutedForeground }]}>{a.subtitleAr}</Text>
+                      <Text style={[styles.activitySub, { color: colors.mutedForeground }]}>{a.subtitleAr}</Text>
                     )}
                   </View>
-                  <View style={[styles.activityIcon, { backgroundColor: colors.primary + "22" }]}>
+                  <View style={[styles.activityIconWrap, { backgroundColor: colors.primary + "18" }]}>
                     <Ionicons name={(ACTIVITY_ICONS[a.kind] ?? "ellipse-outline") as any} size={18} color={colors.primary} />
                   </View>
                 </View>
@@ -249,6 +236,32 @@ export default function DashboardScreen() {
             ))}
           </View>
         )}
+
+        {/* Quick actions */}
+        <View style={[styles.section, { paddingBottom: 8 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>الوصول السريع</Text>
+          <View style={styles.quickGrid}>
+            {[
+              { icon: "pulse-outline", label: "التشخيص", route: "/(tabs)/diagnostics" },
+              { icon: "warning-outline", label: "سجل الأعطال", route: "/dtc" },
+              { icon: "build-outline", label: "الصيانة", route: "/maintenance" },
+              { icon: "construct-outline", label: "الورش", route: "/(tabs)/workshops" },
+              { icon: "chatbubble-ellipses-outline", label: "المساعد الذكي", route: "/assistant" },
+              { icon: "bulb-outline", label: "التوصيات", route: "/recommendations" },
+            ].map((item) => (
+              <Pressable
+                key={item.label}
+                style={({ pressed }) => [styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}
+                onPress={() => router.push(item.route as any)}
+              >
+                <View style={[styles.quickIconWrap, { backgroundColor: colors.primary + "18" }]}>
+                  <Ionicons name={item.icon as any} size={22} color={colors.primary} />
+                </View>
+                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -257,65 +270,54 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerRight: { alignItems: "flex-end" },
-  headerLeft: {},
-  headerLogo: { height: 36, width: 100 },
-  greeting: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  userName: { fontSize: 20, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  notifBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", borderWidth: 1 },
-  loadCenter: { paddingVertical: 60, alignItems: "center" },
-  heroCard: {
-    margin: 16,
-    padding: 20,
-    borderRadius: 20,
-    gap: 8,
-  },
-  heroLabel: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right" },
-  heroValue: { color: "#fff", fontSize: 48, fontWeight: "700", fontFamily: "Inter_700Bold", textAlign: "right" },
-  heroStats: { flexDirection: "row-reverse", marginTop: 4 },
-  heroStat: { flex: 1, alignItems: "center" },
-  heroStatVal: { color: "#fff", fontSize: 22, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  heroStatLabel: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontFamily: "Inter_400Regular" },
-  heroDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.25)", marginVertical: 4 },
-  statsRow: { maxHeight: 110 },
-  statCard: {
-    width: 150,
-    padding: 14,
-    borderRadius: 14,
-    alignItems: "flex-end",
-    gap: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  statValue: { fontSize: 20, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  statSub: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  statLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  section: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
-  sectionHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
-  sectionTitle: { fontSize: 18, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  vehicleRow: {
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  logo: { height: 34, width: 90 },
+  notifBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  greeting: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 8, gap: 4 },
+  greetTitle: { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "right" },
+  greetDate: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right" },
+  alertBanner: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  vehicleRowLeft: {},
-  vehicleRowInfo: { flex: 1, gap: 6 },
-  vehicleRowName: { fontSize: 15, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  vehicleScoreBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
-  vehicleScore: { fontSize: 14, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  healthBar: { height: 4, borderRadius: 2, overflow: "hidden", width: "100%" },
-  healthFill: { height: "100%", borderRadius: 2 },
-  activityItem: {
+  alertText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  section: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
+  sectionHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
+  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "right" },
+  seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  vehicleCard: {
+    width: 160,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+  },
+  vehicleCardTop: { flexDirection: "row-reverse", alignItems: "flex-start", justifyContent: "space-between" },
+  vehicleScoreWrap: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, alignItems: "center" },
+  vehicleScore: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  vehicleScoreLabel: { fontSize: 9, fontFamily: "Inter_500Medium" },
+  vehicleName: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  vehicleSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
+  connBadge: { flexDirection: "row-reverse", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-end" },
+  connDot: { width: 6, height: 6, borderRadius: 3 },
+  connText: { fontSize: 10, fontFamily: "Inter_500Medium" },
+  statsGrid: { flexDirection: "row-reverse", gap: 10 },
+  activityRow: {
     flexDirection: "row-reverse",
     alignItems: "flex-start",
     gap: 12,
@@ -323,27 +325,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  activityIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  activityContent: { flex: 1, gap: 3 },
-  activityTitle: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold", textAlign: "right" },
-  activityDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  activityMeta: {},
-  activityTime: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  maintenanceRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-    borderRadius: 12,
+  activityIconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  activityContent: { flex: 1, gap: 2 },
+  activityTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  activitySub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  activityTime: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  quickGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 10 },
+  quickCard: {
+    width: "30.5%",
+    aspectRatio: 1,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: 4,
-    gap: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 10,
   },
-  maintenanceRight: { flex: 1, gap: 3 },
-  maintenanceName: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
-  maintenanceVehicle: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  maintenanceLeft: { alignItems: "flex-end", gap: 4 },
-  maintenanceBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  maintenanceBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  maintenanceKm: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  quickIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  quickLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
 });

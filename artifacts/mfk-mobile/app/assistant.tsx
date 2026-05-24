@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
 import { useAiChat } from "@workspace/api-client-react";
+import * as Haptics from "expo-haptics";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,7 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import Animated, { FadeInDown, FadeInLeft, FadeInRight } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
@@ -25,26 +26,25 @@ interface Message {
   ts: number;
 }
 
-const SUGGESTIONS = [
-  "ما معنى الكود P0300؟",
-  "متى أغير زيت محركي؟",
-  "ما أسباب ضوء المحرك؟",
-  "كيف أحسّن كفاءة الوقود؟",
+const QUICK_QUESTIONS = [
+  "ليش حرارة سيارتي عالية؟",
+  "متى أغيّر الزيت؟",
+  "كيف أحجز فحص دوري؟",
+  "وش معنى علامة المكينة؟",
 ];
 
 export default function AssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "0", role: "assistant", content: "مرحباً! أنا مساعد MFK الذكي. يمكنني مساعدتك في فهم أعطال سيارتك وخطط الصيانة والتشخيص.", ts: Date.now() },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const { mutateAsync: sendChat, isPending } = useAiChat();
   const flatListRef = useRef<FlatList>(null);
 
+  const { mutateAsync: sendChat, isPending } = useAiChat();
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomPad = Platform.OS === "web" ? 0 : insets.bottom;
 
   const handleSend = async (text?: string) => {
     const msg = (text ?? input).trim();
@@ -56,9 +56,7 @@ export default function AssistantScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const response = await sendChat({
-        data: { message: msg }
-      });
+      const response = await sendChat({ data: { message: msg } });
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
@@ -77,111 +75,184 @@ export default function AssistantScreen() {
     }
   };
 
+  const isEmpty = messages.length === 0;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.navBar, { paddingTop: topPad, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <Text style={[styles.navTitle, { color: colors.foreground }]}>المساعد الذكي</Text>
-        <Pressable onPress={() => router.back()}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad, borderBottomColor: colors.border }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>المساعد الذكي</Text>
+          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>اسأل MFK عن أي شيء يخص سيارتك</Text>
+        </View>
+        <View style={[styles.headerIcon, { backgroundColor: colors.primary + "18" }]}>
+          <Ionicons name="sparkles" size={20} color={colors.primary} />
+        </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={0}
-      >
+      {/* Messages / Welcome */}
+      {isEmpty ? (
+        <Animated.View entering={FadeInDown.springify()} style={styles.welcomeWrap}>
+          {/* AI icon */}
+          <View style={[styles.aiIcon, { backgroundColor: colors.primary + "18" }]}>
+            <Ionicons name="sparkles" size={40} color={colors.primary} />
+          </View>
+          <Text style={[styles.welcomeTitle, { color: colors.foreground }]}>كيف يمكنني مساعدتك اليوم؟</Text>
+          <Text style={[styles.welcomeSub, { color: colors.mutedForeground }]}>
+            يمكنني تحليل أعطال مركبتك، تذكيرك بمواعيد الصيانة، أو الإجابة على أي استفسارات حول السيارات.
+          </Text>
+          {/* Quick questions */}
+          <View style={styles.quickWrap}>
+            {QUICK_QUESTIONS.map((q, i) => (
+              <Animated.View key={i} entering={FadeInDown.delay(i * 80).springify()}>
+                <Pressable
+                  style={({ pressed }) => [styles.quickChip, { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.75 : 1 }]}
+                  onPress={() => handleSend(q)}
+                >
+                  <Text style={[styles.quickChipText, { color: colors.foreground }]}>{q}</Text>
+                </Pressable>
+              </Animated.View>
+            ))}
+          </View>
+          <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
+            المساعد الذكي قد يخطئ في بعض الأحيان. يرجى مراجعة التوصيات مع فني متخصص.
+          </Text>
+        </Animated.View>
+      ) : (
         <FlatList
           ref={flatListRef}
           data={messages}
-          inverted
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 8 }}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
+          inverted
+          contentContainerStyle={{ padding: 16, gap: 12 }}
+          renderItem={({ item }) => {
+            const isUser = item.role === "user";
+            return (
+              <Animated.View
+                entering={isUser ? FadeInLeft.springify() : FadeInRight.springify()}
+                style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble, {
+                  backgroundColor: isUser ? colors.primary : colors.card,
+                  borderColor: isUser ? colors.primary : colors.border,
+                }]}
+              >
+                {!isUser && (
+                  <View style={[styles.assistantAvatar, { backgroundColor: colors.primary + "18" }]}>
+                    <Ionicons name="sparkles" size={12} color={colors.primary} />
+                  </View>
+                )}
+                <Text style={[styles.bubbleText, { color: isUser ? "#fff" : colors.foreground }]}>
+                  {item.content}
+                </Text>
+              </Animated.View>
+            );
+          }}
           ListFooterComponent={
-            messages.length === 1 ? (
-              <View style={styles.suggestions}>
-                <Text style={[styles.suggestTitle, { color: colors.mutedForeground }]}>اقتراحات للبداية</Text>
-                {SUGGESTIONS.map((s) => (
-                  <Pressable key={s} style={[styles.suggestionChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => handleSend(s)}>
-                    <Text style={[styles.suggestionText, { color: colors.foreground }]}>{s}</Text>
-                  </Pressable>
-                ))}
+            isPending ? (
+              <View style={[styles.bubble, styles.assistantBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ActivityIndicator size="small" color={colors.primary} />
               </View>
             ) : null
           }
-          renderItem={({ item }) => (
-            <View style={[
-              styles.bubble,
-              item.role === "user"
-                ? [styles.userBubble, { backgroundColor: colors.primary }]
-                : [styles.aiBubble, { backgroundColor: colors.card, borderColor: colors.border }],
-            ]}>
-              {item.role === "assistant" && (
-                <View style={[styles.aiIcon, { backgroundColor: colors.primary + "22" }]}>
-                  <Ionicons name="car" size={14} color={colors.primary} />
-                </View>
-              )}
-              <Text style={[styles.bubbleText, { color: item.role === "user" ? "#fff" : colors.foreground }]}>{item.content}</Text>
-            </View>
-          )}
-          ListHeaderComponent={isPending ? (
-            <View style={[styles.typingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.typingText, { color: colors.mutedForeground }]}>يكتب...</Text>
-            </View>
-          ) : null}
         />
+      )}
 
-        <View style={[styles.inputBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: bottomPad + 8 }]}>
-          <Pressable
-            style={[styles.sendBtn, { backgroundColor: input.trim() ? colors.primary : colors.muted }]}
-            onPress={() => handleSend()}
-            disabled={!input.trim() || isPending}
-          >
-            <Ionicons name="arrow-up" size={20} color={input.trim() ? "#fff" : colors.mutedForeground} />
-          </Pressable>
-          <TextInput
-            style={[styles.inputField, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-            placeholder="اسأل عن سيارتك..."
-            placeholderTextColor={colors.mutedForeground}
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={() => handleSend()}
-            returnKeyType="send"
-            multiline
-            textAlign="right"
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </View>
+      {/* Input bar */}
+      <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad + 12, backgroundColor: colors.background }]}>
+        <Pressable
+          style={({ pressed }) => [styles.sendBtn, { backgroundColor: input.trim() && !isPending ? colors.primary : colors.muted, opacity: pressed ? 0.8 : 1 }]}
+          onPress={() => handleSend()}
+          disabled={!input.trim() || isPending}
+        >
+          {isPending
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Ionicons name="send" size={18} color="#fff" />
+          }
+        </Pressable>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+          placeholder="اكتب رسالتك هنا..."
+          placeholderTextColor={colors.mutedForeground}
+          value={input}
+          onChangeText={setInput}
+          multiline
+          maxLength={500}
+          textAlign="right"
+          onSubmitEditing={() => handleSend()}
+        />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  navBar: {
+  header: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-  navTitle: { fontSize: 18, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  suggestions: { gap: 8, paddingTop: 8 },
-  suggestTitle: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "right" },
-  suggestionChip: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
-  suggestionText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "right" },
-  bubble: { maxWidth: "85%", padding: 12, borderRadius: 16, flexDirection: "row-reverse", gap: 8, alignItems: "flex-start" },
-  userBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 4 },
-  aiBubble: { alignSelf: "flex-end", borderBottomRightRadius: 4, borderWidth: StyleSheet.hairlineWidth },
-  aiIcon: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  bubbleText: { fontSize: 15, fontFamily: "Inter_400Regular", flex: 1, textAlign: "right", lineHeight: 22 },
-  typingBubble: { flexDirection: "row-reverse", alignItems: "center", gap: 8, padding: 12, borderRadius: 16, alignSelf: "flex-end", borderWidth: StyleSheet.hairlineWidth, marginBottom: 10 },
-  typingText: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  inputBar: { flexDirection: "row-reverse", alignItems: "flex-end", gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  inputField: { flex: 1, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, fontFamily: "Inter_400Regular", maxHeight: 100 },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  backBtn: { padding: 4 },
+  headerCenter: { flex: 1, alignItems: "flex-end", gap: 1 },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  welcomeWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16 },
+  aiIcon: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  welcomeTitle: { fontSize: 22, fontFamily: "Inter_700Bold", textAlign: "center" },
+  welcomeSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
+  quickWrap: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 4 },
+  quickChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  quickChipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  disclaimer: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4 },
+  bubble: {
+    maxWidth: "80%",
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+  },
+  userBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 6 },
+  assistantBubble: { alignSelf: "flex-end", borderBottomRightRadius: 6, flexDirection: "row-reverse", gap: 8 },
+  assistantAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 2 },
+  bubbleText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22, flexShrink: 1 },
+  inputBar: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  input: {
+    flex: 1,
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    maxHeight: 120,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
