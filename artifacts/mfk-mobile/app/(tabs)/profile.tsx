@@ -106,7 +106,6 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>الخدمات</Text>
           <View style={styles.menuGroup}>
             <MenuItem icon="car-outline" label="مركباتي" onPress={() => router.push("/(tabs)/vehicles")} />
-            <MenuItem icon="calendar-outline" label="حجوزاتي" onPress={() => router.push("/bookings")} />
             <MenuItem icon="construct-outline" label="سجل الأعطال" onPress={() => router.push("/dtc")} />
             <MenuItem icon="build-outline" label="الصيانة الدورية" onPress={() => router.push("/maintenance")} />
             <MenuItem icon="bulb-outline" label="التوصيات الذكية" onPress={() => router.push("/recommendations")} />
