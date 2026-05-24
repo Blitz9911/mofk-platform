@@ -24,10 +24,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg" }} />
         <Label>التشخيص</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="workshops">
-        <Icon sf={{ default: "wrench", selected: "wrench.fill" }} />
-        <Label>الورش</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>حسابي</Label>
@@ -103,18 +99,6 @@ function ClassicTabLayout() {
               <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
             ) : (
               <Ionicons name="pulse-outline" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="workshops"
-        options={{
-          title: "الورش",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="wrench" tintColor={color} size={24} />
-            ) : (
-              <Ionicons name="construct-outline" size={22} color={color} />
             ),
         }}
       />
