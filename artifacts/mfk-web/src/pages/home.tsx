@@ -521,7 +521,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid md:grid-cols-3 gap-6 mb-12">
-                {plans?.slice(0, 3).map((plan) => (
+                {Array.isArray(plans) && plans.slice(0, 3).map((plan) => (
                   <div key={plan.id} className="bg-card p-6 rounded-2xl border border-border flex flex-col">
                     <h3 className="text-xl font-bold mb-2">{plan.nameAr}</h3>
                     <div className="text-3xl font-black text-primary mb-6">{plan.priceMonthlySar} <span className="text-sm text-muted-foreground font-normal">ر.س/شهر</span></div>

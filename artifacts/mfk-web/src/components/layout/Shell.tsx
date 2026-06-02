@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Car, Activity, Wrench, MapPin, Calendar, MessageSquare, 
-  Lightbulb, CreditCard, LayoutDashboard, Bell, Menu, 
+  Car, Activity, Wrench, MapPin, Calendar, MessageSquare,
+  Lightbulb, CreditCard, LayoutDashboard, Bell, Menu,
   LogOut, ShieldAlert, Users, Settings, X,
-  AlertTriangle, CheckCircle2, Info, Zap
+  AlertTriangle, CheckCircle2, Info, Zap, Fuel
 } from "lucide-react";
 import { MfkLogo } from "@/components/MfkLogo";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/app/diagnostics", label: "التشخيص المباشر", icon: Activity },
     { href: "/app/dtc", label: "سجل الأعطال", icon: Wrench },
     { href: "/app/maintenance", label: "الصيانة", icon: Calendar },
+    { href: "/app/fuel", label: "البنزين والصرفية", icon: Fuel },
     { href: "/app/assistant", label: "المساعد الذكي", icon: MessageSquare },
     { href: "/app/recommendations", label: "التوصيات", icon: Lightbulb },
     { href: "/app/subscription", label: "الاشتراك", icon: CreditCard },

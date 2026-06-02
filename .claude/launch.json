@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mfk-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set PORT=5173 && set BASE_PATH=/ && cd artifacts\\mfk-web && npx vite --config vite.config.ts"],
+      "port": 5173
+    }
+  ]
+}

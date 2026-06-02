@@ -282,6 +282,33 @@ export const activityTable = pgTable(
   }),
 );
 
+export const fuelLogsTable = pgTable(
+  "fuel_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    filledAt: timestamp("filled_at", { withTimezone: true }).notNull().defaultNow(),
+    odometerKm: integer("odometer_km").notNull(),
+    liters: numeric("liters", { precision: 6, scale: 2 }).notNull(),
+    pricePerLiterHalalas: integer("price_per_liter_halalas").notNull(), // stored in halalas (1/100 SAR) to avoid float issues
+    totalCostHalalas: integer("total_cost_halalas").notNull(),
+    fuelGrade: varchar("fuel_grade", { length: 10 }).notNull().default("91"), // 91, 95, diesel
+    stationNameAr: varchar("station_name_ar", { length: 120 }),
+    isFull: boolean("is_full").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleIdx: index("idx_fuel_vehicle_filled").on(t.vehicleId, t.filledAt),
+    userIdx: index("idx_fuel_user").on(t.userId, t.filledAt),
+  }),
+);
+
 export const revenueTable = pgTable("revenue_monthly", {
   id: uuid("id").primaryKey().defaultRandom(),
   month: varchar("month", { length: 7 }).notNull().unique(),

@@ -37,6 +37,7 @@ import Bookings from "@/pages/app/bookings";
 import Assistant from "@/pages/app/assistant";
 import Recommendations from "@/pages/app/recommendations";
 import Subscription from "@/pages/app/subscription";
+import FuelPage from "@/pages/app/fuel";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -68,6 +69,7 @@ function AppRoutes() {
         <Route path="/app/assistant" component={Assistant} />
         <Route path="/app/recommendations" component={Recommendations} />
         <Route path="/app/subscription" component={Subscription} />
+        <Route path="/app/fuel" component={FuelPage} />
         <Route component={NotFound} />
       </Switch>
     </Shell>

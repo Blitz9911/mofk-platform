@@ -133,7 +133,7 @@ export default function Subscription() {
           </div>
         ) : (
           <div className="grid md:grid-cols-3 gap-6 pt-4 items-center">
-            {plans?.map((plan) => {
+            {Array.isArray(plans) && plans.map((plan) => {
               const isCurrent = subscription?.tier === plan.tier;
               const price = billingCycle === "monthly" ? plan.priceMonthlySar : (plan.priceYearlySar ? Math.round(plan.priceYearlySar / 12) : plan.priceMonthlySar);
               const yearlyTotal = plan.priceYearlySar || (plan.priceMonthlySar * 12);

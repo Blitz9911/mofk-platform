@@ -51,7 +51,7 @@ export default function Pricing() {
             </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-24">
-              {plans?.map((plan) => {
+              {Array.isArray(plans) && plans.map((plan) => {
                 const isPopular = plan.isPopular;
                 const price = isYearly && plan.priceYearlySar 
                   ? Math.round(plan.priceYearlySar / 12) 

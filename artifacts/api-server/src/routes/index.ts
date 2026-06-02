@@ -11,6 +11,7 @@ import bookingsRouter from "./bookings";
 import aiRouter from "./ai";
 import subscriptionsRouter from "./subscriptions";
 import adminRouter from "./admin";
+import fuelRouter from "./fuel";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(bookingsRouter);
 router.use(aiRouter);
 router.use(subscriptionsRouter);
 router.use(adminRouter);
+router.use(fuelRouter);
 
 export default router;

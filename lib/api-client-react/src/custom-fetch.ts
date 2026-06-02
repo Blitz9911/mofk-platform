@@ -286,6 +286,14 @@ function inferResponseType(response: Response): "json" | "text" | "blob" {
   const mediaType = getMediaType(response.headers);
 
   if (isJsonMediaType(mediaType)) return "json";
+  // text/html on a JSON API route means a fallback page (e.g. SPA 404 proxy) —
+  // treat it as an error so callers never receive an HTML string as data.
+  if (mediaType === "text/html") {
+    throw new Error(
+      `Expected JSON response from ${response.url} but received text/html. ` +
+      `The API server may be unreachable.`,
+    );
+  }
   if (isTextMediaType(mediaType) || mediaType == null) return "text";
   return "blob";
 }
