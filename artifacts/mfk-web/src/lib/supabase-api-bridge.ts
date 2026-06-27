@@ -34,6 +34,22 @@ type MaintenanceLogRow = {
   } | null;
 };
 
+type FuelLogRow = {
+  id: string;
+  vehicle_id: string;
+  user_id: string;
+  filled_at: string;
+  odometer_km: number;
+  liters: number | string;
+  price_per_liter_halalas: number;
+  total_cost_halalas: number;
+  fuel_grade: string;
+  station_name_ar?: string | null;
+  is_full: boolean;
+  notes?: string | null;
+  created_at?: string;
+};
+
 type ApiBridgeResult =
   | { handled: true; data?: unknown; status?: number }
   | { handled: false };
@@ -300,6 +316,279 @@ async function handleMaintenance(
   return { handled: false };
 }
 
+function toFuelLog(row: FuelLogRow, consumption: unknown = null) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    filledAt: row.filled_at,
+    odometerKm: row.odometer_km,
+    liters: Number(row.liters),
+    pricePerLiterSar: row.price_per_liter_halalas / 100,
+    totalCostSar: row.total_cost_halalas / 100,
+    fuelGrade: row.fuel_grade,
+    stationNameAr: row.station_name_ar ?? undefined,
+    isFull: row.is_full,
+    notes: row.notes ?? undefined,
+    consumption,
+  };
+}
+
+function withFuelConsumption(rows: FuelLogRow[]) {
+  const asc = [...rows].sort((a, b) => a.odometer_km - b.odometer_km);
+  const map = new Map<string, unknown>();
+
+  asc.forEach((row, index) => {
+    const prev = asc[index - 1];
+
+    if (!prev) {
+      map.set(row.id, null);
+      return;
+    }
+
+    const distanceKm = row.odometer_km - prev.odometer_km;
+    const liters = Number(row.liters);
+
+    if (distanceKm <= 0 || liters <= 0) {
+      map.set(row.id, null);
+      return;
+    }
+
+    map.set(row.id, {
+      distanceKm,
+      consumptionL100km: Number(((liters / distanceKm) * 100).toFixed(2)),
+      kmPerLiter: Number((distanceKm / liters).toFixed(2)),
+    });
+  });
+
+  return rows.map((row) => toFuelLog(row, map.get(row.id) ?? null));
+}
+
+async function listFuelRows(accessToken: string, vehicleId?: string | null) {
+  const vehicleFilter = vehicleId
+    ? `&vehicle_id=eq.${encodeURIComponent(vehicleId)}`
+    : "";
+
+  return supabaseRequest<FuelLogRow[]>(
+    `/rest/v1/fuel_logs?select=*${vehicleFilter}&order=filled_at.desc`,
+    { method: "GET" },
+    accessToken,
+  );
+}
+
+function filterFuelRowsByPeriod(rows: FuelLogRow[], period: string) {
+  if (period === "all") return rows;
+
+  const now = new Date();
+  const from = new Date(now);
+
+  if (period === "week") {
+    from.setDate(now.getDate() - 7);
+  } else if (period === "month") {
+    from.setMonth(now.getMonth() - 1);
+  } else if (period === "year") {
+    from.setFullYear(now.getFullYear() - 1);
+  } else {
+    return rows;
+  }
+
+  return rows.filter((row) => new Date(row.filled_at) >= from);
+}
+
+function buildFuelStats(rows: FuelLogRow[], period: string) {
+  const filtered = filterFuelRowsByPeriod(rows, period);
+  const logs = withFuelConsumption(filtered);
+
+  const totalLiters = logs.reduce(
+    (sum, log) => sum + Number(log.liters || 0),
+    0,
+  );
+
+  const totalCostSar = logs.reduce(
+    (sum, log) => sum + Number(log.totalCostSar || 0),
+    0,
+  );
+
+  const validConsumption = logs
+    .map((log) => log.consumption as any)
+    .filter(Boolean);
+
+  const avgConsumptionL100km = validConsumption.length
+    ? Number(
+        (
+          validConsumption.reduce(
+            (sum: number, item: any) => sum + item.consumptionL100km,
+            0,
+          ) / validConsumption.length
+        ).toFixed(2),
+      )
+    : null;
+
+  const avgKmPerLiter = validConsumption.length
+    ? Number(
+        (
+          validConsumption.reduce(
+            (sum: number, item: any) => sum + item.kmPerLiter,
+            0,
+          ) / validConsumption.length
+        ).toFixed(2),
+      )
+    : null;
+
+  const byDay = new Map<
+    string,
+    { date: string; liters: number; costSar: number; fills: number }
+  >();
+
+  filtered.forEach((row) => {
+    const date = row.filled_at.slice(0, 10);
+    const current = byDay.get(date) ?? {
+      date,
+      liters: 0,
+      costSar: 0,
+      fills: 0,
+    };
+
+    current.liters += Number(row.liters || 0);
+    current.costSar += row.total_cost_halalas / 100;
+    current.fills += 1;
+
+    byDay.set(date, current);
+  });
+
+  const trendByDay = Array.from(byDay.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((item) => ({
+      ...item,
+      liters: Number(item.liters.toFixed(2)),
+      costSar: Number(item.costSar.toFixed(2)),
+    }));
+
+  return {
+    totalLiters: Number(totalLiters.toFixed(2)),
+    totalCostSar: Number(totalCostSar.toFixed(2)),
+    avgConsumptionL100km,
+    avgKmPerLiter,
+    fillCount: filtered.length,
+    trendByDay,
+  };
+}
+
+async function handleFuel(
+  url: URL,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  const path = url.pathname;
+  const session = await requireSession();
+
+  if (path === "/api/fuel" && method === "GET") {
+    const vehicleId = url.searchParams.get("vehicleId");
+    const rows = await listFuelRows(session.access_token, vehicleId);
+
+    return {
+      handled: true,
+      data: {
+        logs: withFuelConsumption(rows),
+      },
+    };
+  }
+
+  if (path === "/api/fuel/stats" && method === "GET") {
+    const vehicleId = url.searchParams.get("vehicleId");
+    const period = url.searchParams.get("period") ?? "month";
+    const rows = await listFuelRows(session.access_token, vehicleId);
+
+    return {
+      handled: true,
+      data: buildFuelStats(rows, period),
+    };
+  }
+
+  if (path === "/api/fuel" && method === "POST") {
+    const body = await readJsonBody(input, init);
+
+    const vehicleId = String(body.vehicleId ?? "").trim();
+    const odometerKm = Number(body.odometerKm);
+    const liters = Number(body.liters);
+    const pricePerLiterSar = Number(body.pricePerLiterSar);
+    const fuelGrade = String(body.fuelGrade ?? "91").trim();
+    const filledAt = String(body.filledAt ?? new Date().toISOString()).trim();
+
+    if (!vehicleId) {
+      throw new ApiBridgeError("اختر المركبة أولًا.", 400);
+    }
+
+    if (!odometerKm || odometerKm <= 0) {
+      throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
+    }
+
+    if (!liters || liters <= 0) {
+      throw new ApiBridgeError("كمية الوقود غير صحيحة.", 400);
+    }
+
+    if (!pricePerLiterSar || pricePerLiterSar <= 0) {
+      throw new ApiBridgeError("سعر اللتر غير صحيح.", 400);
+    }
+
+    const vehicle = await getVehicleRow(vehicleId, session.access_token);
+    if (!vehicle) {
+      throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    }
+
+    const pricePerLiterHalalas = Math.round(pricePerLiterSar * 100);
+    const totalCostHalalas = Math.round(liters * pricePerLiterSar * 100);
+
+    const rows = await supabaseRequest<FuelLogRow[]>(
+      "/rest/v1/fuel_logs?select=*",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          user_id: session.user.id,
+          filled_at: filledAt,
+          odometer_km: odometerKm,
+          liters,
+          price_per_liter_halalas: pricePerLiterHalalas,
+          total_cost_halalas: totalCostHalalas,
+          fuel_grade: fuelGrade,
+          station_name_ar:
+            typeof body.stationNameAr === "string" && body.stationNameAr.trim()
+              ? body.stationNameAr.trim()
+              : null,
+          is_full: Boolean(body.isFull ?? true),
+          notes:
+            typeof body.notes === "string" && body.notes.trim()
+              ? body.notes.trim()
+              : null,
+        }),
+      },
+      session.access_token,
+    );
+
+    return { handled: true, data: toFuelLog(rows[0]), status: 201 };
+  }
+
+  const deleteMatch = path.match(/^\/api\/fuel\/([^/]+)$/);
+  if (deleteMatch && method === "DELETE") {
+    const fuelLogId = decodeURIComponent(deleteMatch[1]);
+
+    await supabaseRequest(
+      `/rest/v1/fuel_logs?id=eq.${encodeURIComponent(fuelLogId)}`,
+      { method: "DELETE" },
+      session.access_token,
+    );
+
+    return { handled: true, data: { ok: true } };
+  }
+
+  return { handled: false };
+}
+
 async function handleVehicles(
   path: string,
   method: string,
@@ -384,7 +673,8 @@ async function handleVehicles(
     const body = await readJsonBody(input, init);
     const payload = {
       nickname: typeof body.nickname === "string" ? body.nickname : undefined,
-      plate_number: typeof body.plateNumber === "string" ? body.plateNumber : undefined,
+      plate_number:
+        typeof body.plateNumber === "string" ? body.plateNumber : undefined,
       odometer_km:
         body.odometerKm !== undefined ? Number(body.odometerKm) : undefined,
     };
@@ -515,6 +805,9 @@ async function handleRequest(
 
   const maintenanceResult = await handleMaintenance(path, method, input, init);
   if (maintenanceResult.handled) return maintenanceResult;
+
+  const fuelResult = await handleFuel(url, method, input, init);
+  if (fuelResult.handled) return fuelResult;
 
   const liveMatch = path.match(/^\/api\/diagnostics\/live\/([^/]+)$/);
   if (liveMatch && method === "GET") {
