@@ -392,16 +392,21 @@ export default function Vehicles() {
                 </div>
 
                 {/* Plate Number - Box Style */}
-                <Controller
-                  control={form.control}
-                  name="plateNumber"
-                  render={({ field }) => (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium leading-none">رقم اللوحة</label>
-                      <PlateInput value={field.value || ""} onChange={field.onChange} />
-                    </div>
-                  )}
-                />
+               <Controller
+  control={form.control}
+  name="plateNumber"
+  render={({ field }) => (
+    <div className="space-y-2">
+      <label className="text-sm font-medium leading-none">رقم اللوحة</label>
+      <Input
+        dir="rtl"
+        placeholder="مثال: أ ب ج 1234"
+        value={field.value || ""}
+        onChange={(e) => field.onChange(e.target.value)}
+      />
+    </div>
+  )}
+/>
 
                 {/* Odometer + VIN */}
                 <div className="grid grid-cols-2 gap-4">
