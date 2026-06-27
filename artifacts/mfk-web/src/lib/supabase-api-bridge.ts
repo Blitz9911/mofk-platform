@@ -17,6 +17,23 @@ type VehicleRow = {
   created_at?: string;
 };
 
+type MaintenanceLogRow = {
+  id: string;
+  vehicle_id: string;
+  user_id: string;
+  service_type: string;
+  done_at: string;
+  done_at_km?: number | null;
+  cost_sar?: number | string | null;
+  notes?: string | null;
+  created_at?: string;
+  vehicles?: {
+    make?: string | null;
+    model?: string | null;
+    nickname?: string | null;
+  } | null;
+};
+
 type ApiBridgeResult =
   | { handled: true; data?: unknown; status?: number }
   | { handled: false };
@@ -58,6 +75,7 @@ function toVehicle(row: VehicleRow) {
 
 async function requireSession() {
   const session = await getValidSupabaseSession();
+
   if (!session?.access_token || !session.user?.id) {
     throw new ApiBridgeError("يلزم تسجيل الدخول أولًا.", 401);
   }
@@ -65,7 +83,10 @@ async function requireSession() {
   return session;
 }
 
-async function readJsonBody(input: RequestInfo | URL, init?: RequestInit): Promise<Record<string, unknown>> {
+async function readJsonBody(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Record<string, unknown>> {
   const body = init?.body;
 
   if (typeof body === "string" && body.trim()) {
@@ -152,7 +173,139 @@ function liveTelemetry(vehicleId: string) {
   };
 }
 
-async function handleVehicles(path: string, method: string, input: RequestInfo | URL, init?: RequestInit): Promise<ApiBridgeResult> {
+const MAINTENANCE_LABELS: Record<string, string> = {
+  oil_change: "تغيير الزيت",
+  tire_rotation: "تدوير الإطارات",
+  brake_inspection: "فحص الفرامل",
+  battery_check: "فحص البطارية",
+  air_filter: "تغيير فلتر الهواء",
+  transmission_fluid: "سائل ناقل الحركة",
+  coolant_flush: "تغيير سائل التبريد",
+  spark_plugs: "تغيير شمعات الإشعال",
+  timing_belt: "سير التوقيت",
+  wheel_alignment: "ضبط زوايا الإطارات",
+  ac_service: "صيانة التكييف",
+};
+
+function toMaintenanceItem(row: MaintenanceLogRow) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    serviceType: row.service_type,
+    serviceTypeAr: MAINTENANCE_LABELS[row.service_type] || row.service_type,
+    intervalKm: null,
+    intervalDays: null,
+    lastDoneKm: row.done_at_km ?? null,
+    lastDoneAt: row.done_at ?? null,
+    nextDueKm: null,
+    nextDueAt: null,
+    status: "done",
+    estimatedCost:
+      row.cost_sar !== null && row.cost_sar !== undefined
+        ? Number(row.cost_sar)
+        : null,
+    vehicleNickname: row.vehicles?.nickname ?? null,
+    vehicleMake: row.vehicles?.make ?? "",
+    vehicleModel: row.vehicles?.model ?? "",
+    daysUntilDue: null,
+  };
+}
+
+async function listMaintenanceLogs(accessToken: string, vehicleId?: string) {
+  const vehicleFilter = vehicleId
+    ? `&vehicle_id=eq.${encodeURIComponent(vehicleId)}`
+    : "";
+
+  return supabaseRequest<MaintenanceLogRow[]>(
+    `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname)${vehicleFilter}&order=done_at.desc&limit=50`,
+    { method: "GET" },
+    accessToken,
+  );
+}
+
+async function handleMaintenance(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  const session = await requireSession();
+
+  if (path === "/api/maintenance/upcoming" && method === "GET") {
+    const rows = await listMaintenanceLogs(session.access_token);
+    return { handled: true, data: rows.map(toMaintenanceItem) };
+  }
+
+  const scheduleMatch = path.match(/^\/api\/maintenance\/([^/]+)\/schedule$/);
+  if (scheduleMatch && method === "GET") {
+    const vehicleId = decodeURIComponent(scheduleMatch[1]);
+    const rows = await listMaintenanceLogs(session.access_token, vehicleId);
+    return { handled: true, data: rows.map(toMaintenanceItem) };
+  }
+
+  const logMatch = path.match(/^\/api\/maintenance\/([^/]+)\/log$/);
+  if (logMatch && method === "POST") {
+    const vehicleId = decodeURIComponent(logMatch[1]);
+    const body = await readJsonBody(input, init);
+
+    const serviceType = String(body.serviceType ?? "").trim();
+    const doneAt = String(body.doneAt ?? "").trim();
+    const doneAtKm = Number(body.doneAtKm ?? 0) || 0;
+    const cost =
+      body.cost !== undefined && body.cost !== null && body.cost !== ""
+        ? Number(body.cost)
+        : null;
+    const notes =
+      typeof body.notes === "string" && body.notes.trim()
+        ? body.notes.trim()
+        : null;
+
+    if (!serviceType) {
+      throw new ApiBridgeError("نوع الصيانة مطلوب.", 400);
+    }
+
+    if (!doneAt) {
+      throw new ApiBridgeError("تاريخ الصيانة مطلوب.", 400);
+    }
+
+    const vehicle = await getVehicleRow(vehicleId, session.access_token);
+    if (!vehicle) {
+      throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    }
+
+    const rows = await supabaseRequest<MaintenanceLogRow[]>(
+      "/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname)",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          user_id: session.user.id,
+          service_type: serviceType,
+          done_at: doneAt,
+          done_at_km: doneAtKm,
+          cost_sar: cost,
+          notes,
+        }),
+      },
+      session.access_token,
+    );
+
+    return { handled: true, data: toMaintenanceItem(rows[0]), status: 201 };
+  }
+
+  return { handled: false };
+}
+
+async function handleVehicles(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
   if (path === "/api/vehicles") {
     const session = await requireSession();
 
@@ -232,7 +385,8 @@ async function handleVehicles(path: string, method: string, input: RequestInfo |
     const payload = {
       nickname: typeof body.nickname === "string" ? body.nickname : undefined,
       plate_number: typeof body.plateNumber === "string" ? body.plateNumber : undefined,
-      odometer_km: body.odometerKm !== undefined ? Number(body.odometerKm) : undefined,
+      odometer_km:
+        body.odometerKm !== undefined ? Number(body.odometerKm) : undefined,
     };
 
     const rows = await supabaseRequest<VehicleRow[]>(
@@ -270,7 +424,10 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
   if (path === "/api/dashboard/overview") {
     const rows = await listVehicleRows(session.access_token);
     const avgHealthScore = rows.length
-      ? Math.round(rows.reduce((sum, row) => sum + (row.health_score ?? 100), 0) / rows.length)
+      ? Math.round(
+          rows.reduce((sum, row) => sum + (row.health_score ?? 100), 0) /
+            rows.length,
+        )
       : 0;
 
     return {
@@ -293,7 +450,10 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
   if (path === "/api/dashboard/health-trend") {
     const rows = await listVehicleRows(session.access_token);
     const avgHealthScore = rows.length
-      ? Math.round(rows.reduce((sum, row) => sum + (row.health_score ?? 100), 0) / rows.length)
+      ? Math.round(
+          rows.reduce((sum, row) => sum + (row.health_score ?? 100), 0) /
+            rows.length,
+        )
       : 0;
 
     return { handled: true, data: healthTrend(avgHealthScore) };
@@ -308,7 +468,9 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
         id: `vehicle-${row.id}`,
         kind: "diagnostic_session",
         titleAr: `تمت إضافة ${row.make} ${row.model}`,
-        subtitleAr: row.plate_number ? `لوحة ${row.plate_number}` : "مركبة مسجلة في مفك",
+        subtitleAr: row.plate_number
+          ? `لوحة ${row.plate_number}`
+          : "مركبة مسجلة في مفك",
         vehicleId: row.id,
         severity: "info",
         occurredAt: row.created_at ?? new Date().toISOString(),
@@ -319,7 +481,10 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
   return { handled: false };
 }
 
-async function handleRequest(input: RequestInfo | URL, init?: RequestInit): Promise<ApiBridgeResult> {
+async function handleRequest(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
   if (typeof window === "undefined") return { handled: false };
 
   const rawUrl =
@@ -331,7 +496,10 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit): Prom
 
   const url = new URL(rawUrl, window.location.origin);
   const path = url.pathname;
-  const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const method = (
+    init?.method ||
+    (input instanceof Request ? input.method : "GET")
+  ).toUpperCase();
 
   if (!path.startsWith("/api")) return { handled: false };
 
@@ -345,20 +513,13 @@ async function handleRequest(input: RequestInfo | URL, init?: RequestInit): Prom
   const dashboardResult = await handleDashboard(path);
   if (dashboardResult.handled) return dashboardResult;
 
+  const maintenanceResult = await handleMaintenance(path, method, input, init);
+  if (maintenanceResult.handled) return maintenanceResult;
+
   const liveMatch = path.match(/^\/api\/diagnostics\/live\/([^/]+)$/);
   if (liveMatch && method === "GET") {
     await requireSession();
     return { handled: true, data: liveTelemetry(liveMatch[1]) };
-  }
-
-  if (path === "/api/maintenance/upcoming" && method === "GET") {
-    await requireSession();
-    return { handled: true, data: [] };
-  }
-
-  if (/^\/api\/maintenance\/[^/]+\/schedule$/.test(path) && method === "GET") {
-    await requireSession();
-    return { handled: true, data: [] };
   }
 
   if (path === "/api/dtc/trending" && method === "GET") {
@@ -426,7 +587,8 @@ export function installSupabaseApiBridge() {
       }
     } catch (error) {
       const status = error instanceof ApiBridgeError ? error.status : 500;
-      const message = error instanceof Error ? error.message : "حدث خطأ غير متوقع";
+      const message =
+        error instanceof Error ? error.message : "حدث خطأ غير متوقع";
       return jsonResponse({ error: message }, status);
     }
 
