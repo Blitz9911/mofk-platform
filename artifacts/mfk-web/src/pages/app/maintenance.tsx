@@ -119,8 +119,9 @@ export default function Maintenance() {
   };
 
   const overdue = maintenance?.filter(m => m.status === "overdue") || [];
-  const upcoming = maintenance?.filter(m => m.status === "upcoming") || [];
-  const scheduled = maintenance?.filter(m => m.status === "scheduled") || [];
+const upcoming = maintenance?.filter(m => m.status === "upcoming") || [];
+const scheduled = maintenance?.filter(m => m.status === "scheduled") || [];
+const completed = maintenance?.filter(m => m.status === "done") || [];
 
   const Section = ({ title, items, icon: Icon, colorClass }: any) => {
     if (items.length === 0) return null;
@@ -372,8 +373,9 @@ export default function Maintenance() {
           ) : (
             <>
               <Section title="صيانة متأخرة" items={overdue} icon={Wrench} colorClass="text-destructive" />
-              <Section title="صيانة قريبة" items={upcoming} icon={Calendar} colorClass="text-amber-500" />
-              <Section title="صيانة مجدولة" items={scheduled} icon={CheckCircle2} colorClass="text-blue-500" />
+<Section title="صيانة قريبة" items={upcoming} icon={Calendar} colorClass="text-amber-500" />
+<Section title="صيانة مجدولة" items={scheduled} icon={CheckCircle2} colorClass="text-blue-500" />
+<Section title="سجل الصيانة المنجزة" items={completed} icon={CheckCircle2} colorClass="text-green-500" />
             </>
           )}
         </>
