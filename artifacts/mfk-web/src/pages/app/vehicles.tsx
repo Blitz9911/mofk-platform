@@ -282,39 +282,49 @@ function PlateInput({
     onChange(plate);
   };
 
-  const focusNext = (ref?: RefObject<HTMLInputElement>) => {
-    window.setTimeout(() => ref?.current?.focus(), 0);
-  };
+ const focusNext = (ref?: RefObject<HTMLInputElement>) => {
+  requestAnimationFrame(() => {
+    ref?.current?.focus();
+    ref?.current?.select();
+  });
+};
 
   const handleLetter = (idx: number, input: string) => {
-    const char = input.slice(-1);
+  const char = input.slice(-1);
 
-    if (char && !/[\u0600-\u06FFa-zA-Z]/.test(char)) return;
+  if (char && !/[\u0600-\u06FFa-zA-Z]/.test(char)) return;
 
-    const next = [...letters];
-    next[idx] = char ? normalizeLetter(char) : "";
+  const next = [...letters];
+  next[idx] = char ? normalizeLetter(char) : "";
 
-    setLetters(next);
-    emit(next, digits);
+  setLetters(next);
+  emit(next, digits);
 
-    if (char && idx < 2) focusNext(letterRefs[idx + 1]);
-    if (char && idx === 2) focusNext(digitRefs[0]);
-  };
+  if (char) {
+    if (idx < 2) {
+      focusNext(letterRefs[idx + 1]);
+    } else {
+      focusNext(digitRefs[0]);
+    }
+  }
+};
+  
 
-  const handleDigit = (idx: number, input: string) => {
-    const char = normalizeDigit(input).slice(-1);
+const handleDigit = (idx: number, input: string) => {
+  const char = normalizeDigit(input).slice(-1);
 
-    if (char && !/^[0-9]$/.test(char)) return;
+  if (char && !/^[0-9]$/.test(char)) return;
 
-    const next = [...digits];
-    next[idx] = char || "";
+  const next = [...digits];
+  next[idx] = char || "";
 
-    setDigits(next);
-    emit(letters, next);
+  setDigits(next);
+  emit(letters, next);
 
-    if (char && idx < 3) focusNext(digitRefs[idx + 1]);
-  };
-
+  if (char && idx < 3) {
+    focusNext(digitRefs[idx + 1]);
+  }
+};
   const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
     event.preventDefault();
 
