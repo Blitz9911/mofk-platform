@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo, useEffect } from "react";
-import type { KeyboardEvent, RefObject, ClipboardEvent } from "react";
+import { useState, useRef } from "react";
+import type { KeyboardEvent, ClipboardEvent } from "react";
 import { useLocation } from "wouter";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,7 +121,15 @@ const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
   },
   ford: {
     label: "فورد",
-    models: ["إكسبلورر", "F-150", "موستانج", "إيدج", "برونكو", "إكسبيدشن", "فيوجن"],
+    models: [
+      "إكسبلورر",
+      "F-150",
+      "موستانج",
+      "إيدج",
+      "برونكو",
+      "إكسبيدشن",
+      "فيوجن",
+    ],
   },
   chevrolet: {
     label: "شيفروليه",
@@ -138,7 +146,16 @@ const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
   },
   lexus: {
     label: "لكزس",
-    models: ["ES 350", "ES 300h", "LX 570", "LX 600", "RX 350", "GX 460", "LS 500", "NX 350"],
+    models: [
+      "ES 350",
+      "ES 300h",
+      "LX 570",
+      "LX 600",
+      "RX 350",
+      "GX 460",
+      "LS 500",
+      "NX 350",
+    ],
   },
   bmw: {
     label: "بي إم دبليو",
@@ -146,7 +163,16 @@ const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
   },
   mercedes: {
     label: "مرسيدس",
-    models: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "GLA", "CLA", "G-Class"],
+    models: [
+      "C-Class",
+      "E-Class",
+      "S-Class",
+      "GLE",
+      "GLS",
+      "GLA",
+      "CLA",
+      "G-Class",
+    ],
   },
   audi: {
     label: "أودي",
@@ -202,6 +228,7 @@ function normalizeDigit(value: string) {
 
 function normalizeLetter(value: string) {
   const char = value.slice(-1);
+
   const map: Record<string, string> = {
     ا: "ا",
     أ: "أ",
@@ -234,6 +261,7 @@ function parsePlate(value: string) {
   const normalized = normalizeDigit(raw);
 
   const digits = normalized.replace(/[^0-9]/g, "").slice(0, 4).split("");
+
   const letters = normalized
     .replace(/[0-9\s\-_/]/g, "")
     .split("")
@@ -254,136 +282,174 @@ function PlateInput({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const parsed = useMemo(() => parsePlate(value || ""), [value]);
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
 
-  const [letters, setLetters] = useState<string[]>(parsed.letters);
-  const [digits, setDigits] = useState<string[]>(parsed.digits);
+  const parsed = parsePlate(value || "");
+  const letters = parsed.letters;
+  const digits = parsed.digits;
 
-  useEffect(() => {
-    setLetters(parsed.letters);
-    setDigits(parsed.digits);
-  }, [value]);
-
-  const l0 = useRef<HTMLInputElement>(null);
-  const l1 = useRef<HTMLInputElement>(null);
-  const l2 = useRef<HTMLInputElement>(null);
-  const d0 = useRef<HTMLInputElement>(null);
-  const d1 = useRef<HTMLInputElement>(null);
-  const d2 = useRef<HTMLInputElement>(null);
-  const d3 = useRef<HTMLInputElement>(null);
-
-  const letterRefs = [l0, l1, l2];
-  const digitRefs = [d0, d1, d2, d3];
-
-  const emit = (nextLetters: string[], nextDigits: string[]) => {
+  const buildPlate = (nextLetters: string[], nextDigits: string[]) => {
     const lettersPart = nextLetters.filter(Boolean).join(" ");
     const digitsPart = nextDigits.filter(Boolean).join("");
-    const plate = [lettersPart, digitsPart].filter(Boolean).join(" ").trim();
-    onChange(plate);
+    return [lettersPart, digitsPart].filter(Boolean).join(" ").trim();
   };
 
- const focusNext = (ref?: RefObject<HTMLInputElement>) => {
-  requestAnimationFrame(() => {
-    ref?.current?.focus();
-    ref?.current?.select();
-  });
-};
+  const focusBox = (index: number) => {
+    if (index < 0 || index > 6) return;
 
-  const handleLetter = (idx: number, input: string) => {
-  const char = input.slice(-1);
+    window.setTimeout(() => {
+      const el = refs.current[index];
+      el?.focus();
+      el?.select();
+    }, 25);
+  };
 
-  if (char && !/[\u0600-\u06FFa-zA-Z]/.test(char)) return;
+  const updateBox = (globalIndex: number, nextValue: string) => {
+    const nextLetters = [...letters];
+    const nextDigits = [...digits];
 
-  const next = [...letters];
-  next[idx] = char ? normalizeLetter(char) : "";
-
-  setLetters(next);
-  emit(next, digits);
-
-  if (char) {
-    if (idx < 2) {
-      focusNext(letterRefs[idx + 1]);
+    if (globalIndex < 3) {
+      nextLetters[globalIndex] = nextValue;
     } else {
-      focusNext(digitRefs[0]);
+      nextDigits[globalIndex - 3] = nextValue;
     }
-  }
-};
-  
 
-const handleDigit = (idx: number, input: string) => {
-  const char = normalizeDigit(input).slice(-1);
+    onChange(buildPlate(nextLetters, nextDigits));
+  };
 
-  if (char && !/^[0-9]$/.test(char)) return;
+  const handleLetterChange = (idx: number, input: string) => {
+    const globalIndex = idx;
+    const raw = input.slice(-1);
 
-  const next = [...digits];
-  next[idx] = char || "";
+    if (!raw) {
+      updateBox(globalIndex, "");
+      return;
+    }
 
-  setDigits(next);
-  emit(letters, next);
+    if (!/[\u0600-\u06FFa-zA-Z]/.test(raw)) return;
 
-  if (char && idx < 3) {
-    focusNext(digitRefs[idx + 1]);
-  }
-};
+    const char = normalizeLetter(raw);
+    updateBox(globalIndex, char);
+
+    if (globalIndex < 6) {
+      focusBox(globalIndex + 1);
+    }
+  };
+
+  const handleDigitChange = (idx: number, input: string) => {
+    const globalIndex = idx + 3;
+    const raw = normalizeDigit(input).slice(-1);
+
+    if (!raw) {
+      updateBox(globalIndex, "");
+      return;
+    }
+
+    if (!/^[0-9]$/.test(raw)) return;
+
+    updateBox(globalIndex, raw);
+
+    if (globalIndex < 6) {
+      focusBox(globalIndex + 1);
+    }
+  };
+
+  const handleKeyDown = (
+    globalIndex: number,
+    e: KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace") {
+      e.preventDefault();
+
+      const currentValue =
+        globalIndex < 3 ? letters[globalIndex] : digits[globalIndex - 3];
+
+      const nextLetters = [...letters];
+      const nextDigits = [...digits];
+
+      if (currentValue) {
+        if (globalIndex < 3) {
+          nextLetters[globalIndex] = "";
+        } else {
+          nextDigits[globalIndex - 3] = "";
+        }
+
+        onChange(buildPlate(nextLetters, nextDigits));
+        focusBox(Math.max(globalIndex - 1, 0));
+        return;
+      }
+
+      const prevIndex = globalIndex - 1;
+
+      if (prevIndex >= 0) {
+        if (prevIndex < 3) {
+          nextLetters[prevIndex] = "";
+        } else {
+          nextDigits[prevIndex - 3] = "";
+        }
+
+        onChange(buildPlate(nextLetters, nextDigits));
+        focusBox(prevIndex);
+      }
+
+      return;
+    }
+
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      focusBox(Math.min(globalIndex + 1, 6));
+      return;
+    }
+
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      focusBox(Math.max(globalIndex - 1, 0));
+    }
+  };
+
   const handlePaste = (event: ClipboardEvent<HTMLInputElement>) => {
     event.preventDefault();
 
     const pasted = event.clipboardData.getData("text");
     const next = parsePlate(pasted);
 
-    setLetters(next.letters);
-    setDigits(next.digits);
-    emit(next.letters, next.digits);
+    onChange(buildPlate(next.letters, next.digits));
 
     const nextEmptyLetter = next.letters.findIndex((v) => !v);
     const nextEmptyDigit = next.digits.findIndex((v) => !v);
 
     if (nextEmptyLetter !== -1) {
-      focusNext(letterRefs[nextEmptyLetter]);
+      focusBox(nextEmptyLetter);
     } else if (nextEmptyDigit !== -1) {
-      focusNext(digitRefs[nextEmptyDigit]);
-    }
-  };
-
-  const handleLetterKey = (idx: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !letters[idx] && idx > 0) {
-      focusNext(letterRefs[idx - 1]);
-    }
-  };
-
-  const handleDigitKey = (idx: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !digits[idx]) {
-      if (idx > 0) {
-        focusNext(digitRefs[idx - 1]);
-      } else {
-        focusNext(letterRefs[2]);
-      }
+      focusBox(nextEmptyDigit + 3);
+    } else {
+      focusBox(6);
     }
   };
 
   const Box = ({
+    globalIndex,
     val,
-    inputRef,
     onInput,
-    onKey,
     hint,
     isLetter,
   }: {
+    globalIndex: number;
     val: string;
-    inputRef: RefObject<HTMLInputElement>;
     onInput: (v: string) => void;
-    onKey: (e: KeyboardEvent<HTMLInputElement>) => void;
     hint?: string;
     isLetter?: boolean;
   }) => (
     <input
-      ref={inputRef}
+      ref={(el) => {
+        refs.current[globalIndex] = el;
+      }}
       value={val}
       maxLength={1}
       dir={isLetter ? "rtl" : "ltr"}
       inputMode={isLetter ? "text" : "numeric"}
       onChange={(e) => onInput(e.target.value)}
-      onKeyDown={onKey}
+      onKeyDown={(e) => handleKeyDown(globalIndex, e)}
       onPaste={handlePaste}
       className={cn(
         "w-11 h-12 text-center text-xl font-bold rounded-lg border-2 bg-background transition-all outline-none",
@@ -404,10 +470,9 @@ const handleDigit = (idx: number, input: string) => {
         {[0, 1, 2].map((i) => (
           <Box
             key={`l${i}`}
+            globalIndex={i}
             val={letters[i] || ""}
-            inputRef={letterRefs[i]}
-            onInput={(v) => handleLetter(i, v)}
-            onKey={(e) => handleLetterKey(i, e)}
+            onInput={(v) => handleLetterChange(i, v)}
             hint="أ"
             isLetter
           />
@@ -418,10 +483,9 @@ const handleDigit = (idx: number, input: string) => {
         {[0, 1, 2, 3].map((i) => (
           <Box
             key={`d${i}`}
+            globalIndex={i + 3}
             val={digits[i] || ""}
-            inputRef={digitRefs[i]}
-            onInput={(v) => handleDigit(i, v)}
-            onKey={(e) => handleDigitKey(i, e)}
+            onInput={(v) => handleDigitChange(i, v)}
             hint={String(i + 1)}
           />
         ))}
@@ -570,7 +634,13 @@ export default function Vehicles() {
           : "from-destructive/20 to-destructive/5";
 
   const getHealthLabel = (s: number) =>
-    s >= 80 ? "ممتازة" : s >= 60 ? "جيدة" : s >= 40 ? "تحتاج عناية" : "تحتاج صيانة";
+    s >= 80
+      ? "ممتازة"
+      : s >= 60
+        ? "جيدة"
+        : s >= 40
+          ? "تحتاج عناية"
+          : "تحتاج صيانة";
 
   const ACTIONS = (v: any) => [
     {
@@ -609,7 +679,9 @@ export default function Vehicles() {
   ];
 
   const currentModels =
-    selectedMake && CAR_BRANDS[selectedMake] ? CAR_BRANDS[selectedMake].models : [];
+    selectedMake && CAR_BRANDS[selectedMake]
+      ? CAR_BRANDS[selectedMake].models
+      : [];
 
   return (
     <div className="space-y-8 pb-12">
@@ -671,6 +743,7 @@ export default function Vehicles() {
                               onChange={(e) => field.onChange(e.target.value)}
                             />
                           </FormControl>
+
                           <Button
                             type="button"
                             variant="outline"
@@ -710,6 +783,7 @@ export default function Vehicles() {
                               <SelectValue placeholder="اختر الشركة" />
                             </SelectTrigger>
                           </FormControl>
+
                           <SelectContent className="max-h-60">
                             {Object.entries(CAR_BRANDS).map(([key, brand]) => (
                               <SelectItem key={key} value={key}>
@@ -773,11 +847,14 @@ export default function Vehicles() {
                             <SelectTrigger>
                               <SelectValue
                                 placeholder={
-                                  selectedMake ? "اختر الموديل" : "اختر الشركة أولاً"
+                                  selectedMake
+                                    ? "اختر الموديل"
+                                    : "اختر الشركة أولاً"
                                 }
                               />
                             </SelectTrigger>
                           </FormControl>
+
                           <SelectContent className="max-h-60">
                             {currentModels.map((model) => (
                               <SelectItem key={model} value={model}>
@@ -806,6 +883,7 @@ export default function Vehicles() {
                         <FormLabel>
                           سنة الصنع <span className="text-destructive">*</span>
                         </FormLabel>
+
                         <Select
                           onValueChange={(v) => field.onChange(Number(v))}
                           value={String(field.value)}
@@ -815,6 +893,7 @@ export default function Vehicles() {
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
+
                           <SelectContent className="max-h-60">
                             {YEARS.map((year) => (
                               <SelectItem key={year} value={String(year)}>
@@ -823,6 +902,7 @@ export default function Vehicles() {
                             ))}
                           </SelectContent>
                         </Select>
+
                         <FormMessage />
                       </FormItem>
                     )}
@@ -834,12 +914,17 @@ export default function Vehicles() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>نوع الوقود</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
+
                           <SelectContent>
                             <SelectItem value="petrol">بنزين</SelectItem>
                             <SelectItem value="diesel">ديزل</SelectItem>
@@ -861,6 +946,7 @@ export default function Vehicles() {
                       <label className="text-sm font-medium leading-none">
                         رقم اللوحة
                       </label>
+
                       <PlateInput
                         value={field.value || ""}
                         onChange={field.onChange}
@@ -877,6 +963,7 @@ export default function Vehicles() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>قراءة العداد (كم)</FormLabel>
+
                         <FormControl>
                           <Input
                             type="number"
@@ -884,6 +971,7 @@ export default function Vehicles() {
                             {...field}
                           />
                         </FormControl>
+
                         <FormMessage />
                       </FormItem>
                     )}
@@ -895,9 +983,11 @@ export default function Vehicles() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>رقم الهيكل VIN</FormLabel>
+
                         <FormControl>
                           <Input placeholder="اختياري" {...field} />
                         </FormControl>
+
                         <FormMessage />
                       </FormItem>
                     )}
@@ -912,6 +1002,7 @@ export default function Vehicles() {
                   >
                     إلغاء
                   </Button>
+
                   <Button type="submit" disabled={createVehicle.isPending}>
                     {createVehicle.isPending ? "جاري الإضافة..." : "إضافة المركبة"}
                   </Button>
@@ -938,16 +1029,21 @@ export default function Vehicles() {
           </DialogHeader>
 
           <Form {...pairForm}>
-            <form onSubmit={pairForm.handleSubmit(onPairSubmit)} className="space-y-4">
+            <form
+              onSubmit={pairForm.handleSubmit(onPairSubmit)}
+              className="space-y-4"
+            >
               <FormField
                 control={pairForm.control}
                 name="adapterMac"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>عنوان MAC</FormLabel>
+
                     <FormControl>
                       <Input placeholder="00:11:22:33:44:55" {...field} />
                     </FormControl>
+
                     <FormMessage />
                   </FormItem>
                 )}
@@ -961,6 +1057,7 @@ export default function Vehicles() {
                 >
                   إلغاء
                 </Button>
+
                 <Button type="submit" disabled={pairAdapter.isPending}>
                   ربط الجهاز
                 </Button>
@@ -1043,7 +1140,10 @@ export default function Vehicles() {
                           مرتبط
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="gap-1 text-muted-foreground">
+                        <Badge
+                          variant="outline"
+                          className="gap-1 text-muted-foreground"
+                        >
                           <WifiOff className="w-3 h-3" />
                           غير مرتبط
                         </Badge>
@@ -1065,7 +1165,11 @@ export default function Vehicles() {
                     >
                       {v.healthScore}
                     </div>
-                    <div className="text-xs text-muted-foreground">صحة المركبة</div>
+
+                    <div className="text-xs text-muted-foreground">
+                      صحة المركبة
+                    </div>
+
                     <div
                       className={cn(
                         "text-xs font-semibold mt-0.5",
@@ -1082,11 +1186,15 @@ export default function Vehicles() {
                   <div className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                       <Gauge className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">المسافة</span>
+                      <span className="text-xs text-muted-foreground">
+                        المسافة
+                      </span>
                     </div>
+
                     <div className="font-bold text-lg">
                       {(v.odometerKm || 0).toLocaleString("ar-SA")}
                     </div>
+
                     <div className="text-xs text-muted-foreground">كيلومتر</div>
                   </div>
 
@@ -1097,7 +1205,10 @@ export default function Vehicles() {
                       ) : (
                         <ShieldCheck className="w-4 h-4 text-green-500" />
                       )}
-                      <span className="text-xs text-muted-foreground">الأعطال</span>
+
+                      <span className="text-xs text-muted-foreground">
+                        الأعطال
+                      </span>
                     </div>
 
                     <div
@@ -1117,7 +1228,9 @@ export default function Vehicles() {
                   <div className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                       <Settings2 className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">الجهاز</span>
+                      <span className="text-xs text-muted-foreground">
+                        الجهاز
+                      </span>
                     </div>
 
                     <div
@@ -1148,10 +1261,12 @@ export default function Vehicles() {
                       )}
                     >
                       <action.icon className="w-6 h-6" />
+
                       <div>
                         <div className="text-sm font-semibold leading-tight">
                           {action.label}
                         </div>
+
                         <div className="text-[11px] opacity-70 mt-0.5 leading-tight">
                           {action.desc}
                         </div>
