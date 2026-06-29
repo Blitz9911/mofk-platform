@@ -31,6 +31,7 @@ type MaintenanceLogRow = {
     make?: string | null;
     model?: string | null;
     nickname?: string | null;
+    odometer_km?: number | null;
   } | null;
 };
 
@@ -203,7 +204,135 @@ const MAINTENANCE_LABELS: Record<string, string> = {
   ac_service: "صيانة التكييف",
 };
 
-function toMaintenanceItem(row: MaintenanceLogRow) {
+type MaintenanceRule = {
+  intervalKm?: number;
+  intervalDays?: number;
+  soonKm?: number;
+  soonDays?: number;
+  estimatedCost?: number;
+};
+
+const MAINTENANCE_RULES: Record<string, MaintenanceRule> = {
+  oil_change: {
+    intervalKm: 10000,
+    intervalDays: 180,
+    soonKm: 1500,
+    soonDays: 30,
+    estimatedCost: 250,
+  },
+  tire_rotation: {
+    intervalKm: 10000,
+    intervalDays: 180,
+    soonKm: 1500,
+    soonDays: 30,
+    estimatedCost: 120,
+  },
+  brake_inspection: {
+    intervalKm: 20000,
+    intervalDays: 365,
+    soonKm: 2500,
+    soonDays: 45,
+    estimatedCost: 180,
+  },
+  battery_check: {
+    intervalDays: 365,
+    soonDays: 45,
+    estimatedCost: 80,
+  },
+  air_filter: {
+    intervalKm: 15000,
+    intervalDays: 365,
+    soonKm: 2000,
+    soonDays: 45,
+    estimatedCost: 90,
+  },
+  transmission_fluid: {
+    intervalKm: 60000,
+    intervalDays: 1095,
+    soonKm: 5000,
+    soonDays: 60,
+    estimatedCost: 450,
+  },
+  coolant_flush: {
+    intervalKm: 40000,
+    intervalDays: 730,
+    soonKm: 4000,
+    soonDays: 60,
+    estimatedCost: 250,
+  },
+  spark_plugs: {
+    intervalKm: 40000,
+    intervalDays: 730,
+    soonKm: 4000,
+    soonDays: 60,
+    estimatedCost: 300,
+  },
+  timing_belt: {
+    intervalKm: 100000,
+    intervalDays: 1825,
+    soonKm: 8000,
+    soonDays: 90,
+    estimatedCost: 900,
+  },
+  wheel_alignment: {
+    intervalKm: 20000,
+    intervalDays: 365,
+    soonKm: 2500,
+    soonDays: 45,
+    estimatedCost: 180,
+  },
+  ac_service: {
+    intervalDays: 365,
+    soonDays: 45,
+    estimatedCost: 220,
+  },
+};
+
+function todayStart() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function addDays(dateString: string, days: number) {
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+function daysUntil(dateString: string) {
+  const target = new Date(dateString);
+  const targetStart = new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+  );
+
+  return Math.ceil(
+    (targetStart.getTime() - todayStart().getTime()) / (1000 * 60 * 60 * 24),
+  );
+}
+
+function vehicleName(row: MaintenanceLogRow) {
+  return (
+    row.vehicles?.nickname ||
+    [row.vehicles?.make, row.vehicles?.model].filter(Boolean).join(" ") ||
+    "مركبة"
+  );
+}
+
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "-";
+  return value.toLocaleString("ar-SA");
+}
+
+function statusRank(status: string) {
+  if (status === "overdue") return 1;
+  if (status === "upcoming") return 2;
+  if (status === "scheduled") return 3;
+  return 4;
+}
+
+function completedMaintenanceItem(row: MaintenanceLogRow) {
   return {
     id: row.id,
     vehicleId: row.vehicle_id,
@@ -213,8 +342,13 @@ function toMaintenanceItem(row: MaintenanceLogRow) {
     intervalDays: null,
     lastDoneKm: row.done_at_km ?? null,
     lastDoneAt: row.done_at ?? null,
+    currentOdometerKm: row.done_at_km ?? null,
+    kmSinceLast: null,
     nextDueKm: null,
     nextDueAt: null,
+    remainingKm: null,
+    daysUntilDue: null,
+    progressPct: null,
     status: "done",
     estimatedCost:
       row.cost_sar !== null && row.cost_sar !== undefined
@@ -223,8 +357,177 @@ function toMaintenanceItem(row: MaintenanceLogRow) {
     vehicleNickname: row.vehicles?.nickname ?? null,
     vehicleMake: row.vehicles?.make ?? "",
     vehicleModel: row.vehicles?.model ?? "",
-    daysUntilDue: null,
+    notes: row.notes ?? null,
+    recommendationReason: null,
+    isRecommendation: false,
   };
+}
+
+function recommendationFromLastLog(row: MaintenanceLogRow) {
+  const rule = MAINTENANCE_RULES[row.service_type];
+  if (!rule) return null;
+
+  const currentOdometerKm =
+    row.vehicles?.odometer_km !== null && row.vehicles?.odometer_km !== undefined
+      ? Number(row.vehicles.odometer_km)
+      : Number(row.done_at_km ?? 0);
+
+  const lastDoneKm =
+    row.done_at_km !== null && row.done_at_km !== undefined
+      ? Number(row.done_at_km)
+      : null;
+
+  const kmSinceLast =
+    lastDoneKm !== null && currentOdometerKm >= lastDoneKm
+      ? currentOdometerKm - lastDoneKm
+      : null;
+
+  const nextDueKm =
+    rule.intervalKm && lastDoneKm !== null
+      ? lastDoneKm + rule.intervalKm
+      : null;
+
+  const remainingKm =
+    nextDueKm !== null ? nextDueKm - currentOdometerKm : null;
+
+  const nextDueAt =
+    rule.intervalDays && row.done_at
+      ? addDays(row.done_at, rule.intervalDays)
+      : null;
+
+  const remainingDays = nextDueAt ? daysUntil(nextDueAt) : null;
+
+  const progressPct =
+    rule.intervalKm && kmSinceLast !== null
+      ? Math.min(100, Math.max(0, Math.round((kmSinceLast / rule.intervalKm) * 100)))
+      : null;
+
+  const isKmOverdue = remainingKm !== null && remainingKm < 0;
+  const isDayOverdue = remainingDays !== null && remainingDays < 0;
+
+  const isKmSoon =
+    remainingKm !== null &&
+    rule.soonKm !== undefined &&
+    remainingKm >= 0 &&
+    remainingKm <= rule.soonKm;
+
+  const isDaySoon =
+    remainingDays !== null &&
+    rule.soonDays !== undefined &&
+    remainingDays >= 0 &&
+    remainingDays <= rule.soonDays;
+
+  let status = "scheduled";
+
+  if (isKmOverdue || isDayOverdue) {
+    status = "overdue";
+  } else if (isKmSoon || isDaySoon) {
+    status = "upcoming";
+  }
+
+  const label = MAINTENANCE_LABELS[row.service_type] || row.service_type;
+  const vehicle = vehicleName(row);
+
+  let recommendationReason = `تم احتساب ${label} لـ ${vehicle} بناءً على آخر صيانة مسجلة.`;
+
+  if (rule.intervalKm && lastDoneKm !== null && nextDueKm !== null) {
+    recommendationReason = `آخر ${label} كان عند ${formatNumber(lastDoneKm)} كم. الفاصل الموصى به ${formatNumber(rule.intervalKm)} كم، لذلك الصيانة القادمة عند ${formatNumber(nextDueKm)} كم. العداد الحالي ${formatNumber(currentOdometerKm)} كم.`;
+
+    if (remainingKm !== null && remainingKm < 0) {
+      recommendationReason += ` الصيانة متأخرة بمقدار ${formatNumber(Math.abs(remainingKm))} كم.`;
+    } else if (remainingKm !== null) {
+      recommendationReason += ` المتبقي تقريبًا ${formatNumber(remainingKm)} كم.`;
+    }
+  } else if (rule.intervalDays && nextDueAt) {
+    recommendationReason = `آخر ${label} كان بتاريخ ${row.done_at}. الفاصل الموصى به ${rule.intervalDays} يوم، لذلك تاريخ الاستحقاق القادم هو ${nextDueAt.slice(0, 10)}.`;
+
+    if (remainingDays !== null && remainingDays < 0) {
+      recommendationReason += ` الصيانة متأخرة ${Math.abs(remainingDays)} يوم.`;
+    } else if (remainingDays !== null) {
+      recommendationReason += ` المتبقي ${remainingDays} يوم.`;
+    }
+  }
+
+  return {
+    id: `rec-${row.vehicle_id}-${row.service_type}`,
+    sourceLogId: row.id,
+    vehicleId: row.vehicle_id,
+    serviceType: row.service_type,
+    serviceTypeAr: label,
+    intervalKm: rule.intervalKm ?? null,
+    intervalDays: rule.intervalDays ?? null,
+    lastDoneKm,
+    lastDoneAt: row.done_at ?? null,
+    currentOdometerKm,
+    kmSinceLast,
+    nextDueKm,
+    nextDueAt,
+    remainingKm,
+    daysUntilDue: remainingDays,
+    progressPct,
+    status,
+    estimatedCost:
+      row.cost_sar !== null && row.cost_sar !== undefined
+        ? Number(row.cost_sar)
+        : rule.estimatedCost ?? null,
+    vehicleNickname: row.vehicles?.nickname ?? null,
+    vehicleMake: row.vehicles?.make ?? "",
+    vehicleModel: row.vehicles?.model ?? "",
+    notes: row.notes ?? null,
+    recommendationReason,
+    isRecommendation: true,
+  };
+}
+
+function buildMaintenanceItems(rows: MaintenanceLogRow[]) {
+  const completed = rows.map(completedMaintenanceItem);
+
+  const latestByVehicleAndService = new Map<string, MaintenanceLogRow>();
+
+  for (const row of rows) {
+    if (!MAINTENANCE_RULES[row.service_type]) continue;
+
+    const key = `${row.vehicle_id}:${row.service_type}`;
+    const existing = latestByVehicleAndService.get(key);
+
+    if (!existing) {
+      latestByVehicleAndService.set(key, row);
+      continue;
+    }
+
+    const currentTime = new Date(row.done_at || row.created_at || 0).getTime();
+    const existingTime = new Date(existing.done_at || existing.created_at || 0).getTime();
+
+    if (currentTime > existingTime) {
+      latestByVehicleAndService.set(key, row);
+    }
+  }
+
+  const recommendations = Array.from(latestByVehicleAndService.values())
+    .map(recommendationFromLastLog)
+    .filter(Boolean);
+
+  return [...recommendations, ...completed].sort((a: any, b: any) => {
+    const rankDiff = statusRank(a.status) - statusRank(b.status);
+    if (rankDiff !== 0) return rankDiff;
+
+    const aDate = new Date(a.nextDueAt || a.lastDoneAt || 0).getTime();
+    const bDate = new Date(b.nextDueAt || b.lastDoneAt || 0).getTime();
+    return aDate - bDate;
+  });
+}
+
+function maintenanceCounts(items: any[]) {
+  return {
+    overdue: items.filter((item) => item.status === "overdue").length,
+    upcoming: items.filter((item) => item.status === "upcoming").length,
+    scheduled: items.filter((item) => item.status === "scheduled").length,
+    done: items.filter((item) => item.status === "done").length,
+  };
+}
+
+function toMaintenanceItem(row: MaintenanceLogRow) {
+  return completedMaintenanceItem(row);
 }
 
 async function listMaintenanceLogs(accessToken: string, vehicleId?: string) {
@@ -233,7 +536,7 @@ async function listMaintenanceLogs(accessToken: string, vehicleId?: string) {
     : "";
 
   return supabaseRequest<MaintenanceLogRow[]>(
-    `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname)${vehicleFilter}&order=done_at.desc&limit=50`,
+    `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)${vehicleFilter}&order=done_at.desc&limit=200`,
     { method: "GET" },
     accessToken,
   );
@@ -249,14 +552,14 @@ async function handleMaintenance(
 
   if (path === "/api/maintenance/upcoming" && method === "GET") {
     const rows = await listMaintenanceLogs(session.access_token);
-    return { handled: true, data: rows.map(toMaintenanceItem) };
+    return { handled: true, data: buildMaintenanceItems(rows) };
   }
 
   const scheduleMatch = path.match(/^\/api\/maintenance\/([^/]+)\/schedule$/);
   if (scheduleMatch && method === "GET") {
     const vehicleId = decodeURIComponent(scheduleMatch[1]);
     const rows = await listMaintenanceLogs(session.access_token, vehicleId);
-    return { handled: true, data: rows.map(toMaintenanceItem) };
+    return { handled: true, data: buildMaintenanceItems(rows) };
   }
 
   const logMatch = path.match(/^\/api\/maintenance\/([^/]+)\/log$/);
@@ -290,7 +593,7 @@ async function handleMaintenance(
     }
 
     const rows = await supabaseRequest<MaintenanceLogRow[]>(
-      "/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname)",
+      "/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)",
       {
         method: "POST",
         headers: {
@@ -713,6 +1016,10 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
 
   if (path === "/api/dashboard/overview") {
     const rows = await listVehicleRows(session.access_token);
+    const maintenanceRows = await listMaintenanceLogs(session.access_token);
+    const maintenanceItems = buildMaintenanceItems(maintenanceRows);
+    const counts = maintenanceCounts(maintenanceItems);
+
     const avgHealthScore = rows.length
       ? Math.round(
           rows.reduce((sum, row) => sum + (row.health_score ?? 100), 0) /
@@ -726,8 +1033,10 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
         vehicleCount: rows.length,
         activeDtcCount: 0,
         criticalDtcCount: 0,
-        upcomingMaintenanceCount: 0,
-        overdueMaintenanceCount: 0,
+        upcomingMaintenanceCount: counts.upcoming,
+        overdueMaintenanceCount: counts.overdue,
+        scheduledMaintenanceCount: counts.scheduled,
+        completedMaintenanceCount: counts.done,
         avgHealthScore,
         upcomingBookingCount: 0,
         totalSessionsLast30d: 0,
