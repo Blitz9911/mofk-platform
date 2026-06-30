@@ -479,9 +479,7 @@ function recommendationFromLastLog(row: MaintenanceLogRow) {
   };
 }
 
-function buildMaintenanceItems(rows: MaintenanceLogRow[]) {
-  const completed = rows.map(completedMaintenanceItem);
-
+function latestMaintenanceRows(rows: MaintenanceLogRow[]) {
   const latestByVehicleAndService = new Map<string, MaintenanceLogRow>();
 
   for (const row of rows) {
@@ -503,11 +501,18 @@ function buildMaintenanceItems(rows: MaintenanceLogRow[]) {
     }
   }
 
-  const recommendations = Array.from(latestByVehicleAndService.values())
-    .map(recommendationFromLastLog)
-    .filter(Boolean);
+  return Array.from(latestByVehicleAndService.values());
+}
 
-  return [...recommendations, ...completed].sort((a: any, b: any) => {
+function buildMaintenanceRecommendations(rows: MaintenanceLogRow[]) {
+  const recommendations = latestMaintenanceRows(rows)
+    .map(recommendationFromLastLog)
+    .filter(
+      (item): item is NonNullable<ReturnType<typeof recommendationFromLastLog>> =>
+        Boolean(item),
+    );
+
+  return recommendations.sort((a: any, b: any) => {
     const rankDiff = statusRank(a.status) - statusRank(b.status);
     if (rankDiff !== 0) return rankDiff;
 
@@ -517,12 +522,84 @@ function buildMaintenanceItems(rows: MaintenanceLogRow[]) {
   });
 }
 
+function buildMaintenanceItems(rows: MaintenanceLogRow[]) {
+  return rows.map(completedMaintenanceItem).sort((a: any, b: any) => {
+    const aDate = new Date(a.lastDoneAt || 0).getTime();
+    const bDate = new Date(b.lastDoneAt || 0).getTime();
+    return bDate - aDate;
+  });
+}
+
 function maintenanceCounts(items: any[]) {
   return {
     overdue: items.filter((item) => item.status === "overdue").length,
     upcoming: items.filter((item) => item.status === "upcoming").length,
     scheduled: items.filter((item) => item.status === "scheduled").length,
     done: items.filter((item) => item.status === "done").length,
+  };
+}
+
+function toAiRecommendation(item: any) {
+  const isOverdue = item.status === "overdue";
+  const isUpcoming = item.status === "upcoming";
+
+  const titlePrefix = isOverdue ? "صيانة متأخرة" : isUpcoming ? "صيانة قريبة" : "متابعة صيانة";
+  const label = item.serviceTypeAr || item.serviceType;
+
+  const descriptionParts = [
+    item.recommendationReason,
+    item.intervalKm
+      ? `المعادلة: آخر صيانة (${formatNumber(item.lastDoneKm)} كم) + الفاصل (${formatNumber(item.intervalKm)} كم) = الاستحقاق (${formatNumber(item.nextDueKm)} كم).`
+      : null,
+    item.intervalDays && item.nextDueAt
+      ? `المعادلة الزمنية: تاريخ آخر صيانة (${item.lastDoneAt?.slice(0, 10) || "-"}) + ${item.intervalDays} يوم = ${item.nextDueAt.slice(0, 10)}.`
+      : null,
+    item.remainingKm !== null && item.remainingKm !== undefined
+      ? item.remainingKm < 0
+        ? `متأخرة بمقدار ${formatNumber(Math.abs(item.remainingKm))} كم.`
+        : `المتبقي تقريبًا ${formatNumber(item.remainingKm)} كم.`
+      : null,
+    item.daysUntilDue !== null && item.daysUntilDue !== undefined
+      ? item.daysUntilDue < 0
+        ? `متأخرة ${Math.abs(item.daysUntilDue)} يوم.`
+        : `المتبقي زمنيًا ${item.daysUntilDue} يوم.`
+      : null,
+  ].filter(Boolean);
+
+  return {
+    id: item.id,
+    vehicleId: item.vehicleId,
+    kind: "maintenance_due",
+    severity: isOverdue ? "critical" : isUpcoming ? "warning" : "info",
+    titleAr: `${titlePrefix}: ${label}`,
+    descriptionAr: descriptionParts.join(" "),
+    confidencePct: item.progressPct !== null && item.progressPct !== undefined
+      ? Math.min(99, Math.max(60, Number(item.progressPct)))
+      : isOverdue
+        ? 95
+        : isUpcoming
+          ? 85
+          : 70,
+    suggestedAction: isOverdue
+      ? `احجز أو سجل ${label} الآن.`
+      : isUpcoming
+        ? `خطط لتنفيذ ${label} قريبًا.`
+        : `تابع ${label} حسب العداد أو التاريخ القادم.`,
+    suggestedCostSar: item.estimatedCost ?? undefined,
+    createdAt: new Date().toISOString(),
+    metadata: {
+      serviceType: item.serviceType,
+      status: item.status,
+      lastDoneKm: item.lastDoneKm,
+      currentOdometerKm: item.currentOdometerKm,
+      kmSinceLast: item.kmSinceLast,
+      nextDueKm: item.nextDueKm,
+      remainingKm: item.remainingKm,
+      lastDoneAt: item.lastDoneAt,
+      nextDueAt: item.nextDueAt,
+      daysUntilDue: item.daysUntilDue,
+      progressPct: item.progressPct,
+    },
   };
 }
 
@@ -617,6 +694,32 @@ async function handleMaintenance(
   }
 
   return { handled: false };
+}
+
+async function handleRecommendations(
+  path: string,
+  method: string,
+): Promise<ApiBridgeResult> {
+  const match = path.match(/^\/api\/ai\/recommendations\/([^/]+)$/);
+  if (!match || method !== "GET") {
+    return { handled: false };
+  }
+
+  const session = await requireSession();
+  const vehicleId = decodeURIComponent(match[1]);
+
+  const vehicle = await getVehicleRow(vehicleId, session.access_token);
+  if (!vehicle) {
+    throw new ApiBridgeError("المركبة غير موجودة.", 404);
+  }
+
+  const rows = await listMaintenanceLogs(session.access_token, vehicleId);
+  const maintenanceRecommendations = buildMaintenanceRecommendations(rows).map(toAiRecommendation);
+
+  return {
+    handled: true,
+    data: maintenanceRecommendations,
+  };
 }
 
 function toFuelLog(row: FuelLogRow, consumption: unknown = null) {
@@ -1017,8 +1120,9 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
   if (path === "/api/dashboard/overview") {
     const rows = await listVehicleRows(session.access_token);
     const maintenanceRows = await listMaintenanceLogs(session.access_token);
-    const maintenanceItems = buildMaintenanceItems(maintenanceRows);
-    const counts = maintenanceCounts(maintenanceItems);
+    const completedMaintenance = buildMaintenanceItems(maintenanceRows);
+    const maintenanceRecommendations = buildMaintenanceRecommendations(maintenanceRows);
+    const recommendationCounts = maintenanceCounts(maintenanceRecommendations);
 
     const avgHealthScore = rows.length
       ? Math.round(
@@ -1033,10 +1137,11 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
         vehicleCount: rows.length,
         activeDtcCount: 0,
         criticalDtcCount: 0,
-        upcomingMaintenanceCount: counts.upcoming,
-        overdueMaintenanceCount: counts.overdue,
-        scheduledMaintenanceCount: counts.scheduled,
-        completedMaintenanceCount: counts.done,
+        upcomingMaintenanceCount: recommendationCounts.upcoming,
+        overdueMaintenanceCount: recommendationCounts.overdue,
+        scheduledMaintenanceCount: recommendationCounts.scheduled,
+        completedMaintenanceCount: completedMaintenance.length,
+        activeRecommendationsCount: maintenanceRecommendations.length,
         avgHealthScore,
         upcomingBookingCount: 0,
         totalSessionsLast30d: 0,
@@ -1117,6 +1222,9 @@ async function handleRequest(
 
   const fuelResult = await handleFuel(url, method, input, init);
   if (fuelResult.handled) return fuelResult;
+
+  const recommendationResult = await handleRecommendations(path, method);
+  if (recommendationResult.handled) return recommendationResult;
 
   const liveMatch = path.match(/^\/api\/diagnostics\/live\/([^/]+)$/);
   if (liveMatch && method === "GET") {
