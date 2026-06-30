@@ -1438,6 +1438,9 @@ async function handleRequest(
     return { handled: true, data: { status: "ok" } };
   }
 
+  const profileResult = await handleProfile(path, method, input, init);
+  if (profileResult.handled) return profileResult;
+
   const notificationResult = await handleNotifications(path, method, input, init);
   if (notificationResult.handled) return notificationResult;
 
