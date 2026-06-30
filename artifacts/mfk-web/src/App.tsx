@@ -40,7 +40,6 @@ import Subscription from "@/pages/app/subscription";
 import FuelPage from "@/pages/app/fuel";
 import ProfilePage from "@/pages/app/profile";
 
-import ProfilePage from "@/pages/app/profile";
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
