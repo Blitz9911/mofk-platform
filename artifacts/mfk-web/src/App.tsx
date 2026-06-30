@@ -38,7 +38,7 @@ import Assistant from "@/pages/app/assistant";
 import Recommendations from "@/pages/app/recommendations";
 import Subscription from "@/pages/app/subscription";
 import FuelPage from "@/pages/app/fuel";
-
+import ProfilePage from "@/pages/app/profile";
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
