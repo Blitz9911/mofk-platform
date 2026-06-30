@@ -176,17 +176,74 @@ function AddFuelDialog({
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const FUEL_PRICES: Record<"91" | "95" | "diesel", string> = {
+    "91": "2.18",
+    "95": "2.33",
+    diesel: "1.66",
+  };
+
   const [form, setForm] = useState({
     vehicleId: defaultVehicleId || (vehicles[0]?.id ?? ""),
     odometerKm: "",
+    totalCostSar: "",
     liters: "",
-    pricePerLiterSar: "2.18",
+    pricePerLiterSar: FUEL_PRICES["91"],
     fuelGrade: "91" as "91" | "95" | "diesel",
     stationNameAr: "",
     isFull: true,
     filledAt: new Date().toISOString().slice(0, 16),
     notes: "",
   });
+
+  const calculateLiters = (totalCostSar: string, pricePerLiterSar: string) => {
+    const total = parseFloat(totalCostSar);
+    const price = parseFloat(pricePerLiterSar);
+
+    if (
+      !Number.isFinite(total) ||
+      !Number.isFinite(price) ||
+      total <= 0 ||
+      price <= 0
+    ) {
+      return "";
+    }
+
+    return (total / price).toFixed(2);
+  };
+
+  const updateTotalCost = (value: string) => {
+    setForm((current) => ({
+      ...current,
+      totalCostSar: value,
+      liters: calculateLiters(value, current.pricePerLiterSar),
+    }));
+  };
+
+  const updateFuelGrade = (grade: "91" | "95" | "diesel") => {
+    const fixedPrice = FUEL_PRICES[grade];
+
+    setForm((current) => ({
+      ...current,
+      fuelGrade: grade,
+      pricePerLiterSar: fixedPrice,
+      liters: calculateLiters(current.totalCostSar, fixedPrice),
+    }));
+  };
+
+  const resetForm = () => {
+    setForm({
+      vehicleId: defaultVehicleId || (vehicles[0]?.id ?? ""),
+      odometerKm: "",
+      totalCostSar: "",
+      liters: "",
+      pricePerLiterSar: FUEL_PRICES["91"],
+      fuelGrade: "91",
+      stationNameAr: "",
+      isFull: true,
+      filledAt: new Date().toISOString().slice(0, 16),
+      notes: "",
+    });
+  };
 
   const mutation = useMutation({
     mutationFn: (data: typeof form) =>
@@ -209,24 +266,39 @@ function AddFuelDialog({
       qc.invalidateQueries({ queryKey: ["fuel-stats"] });
       toast({ title: "✅ تم تسجيل التعبئة بنجاح" });
       setOpen(false);
+      resetForm();
       onSuccess();
     },
-    onError: () => toast({ title: "حدث خطأ", variant: "destructive" }),
+    onError: () =>
+      toast({
+        title: "حدث خطأ",
+        description: "تأكد من اختيار المركبة وإدخال العداد والمبلغ",
+        variant: "destructive",
+      }),
   });
 
-  const totalEstimate =
-    form.liters && form.pricePerLiterSar
-      ? (parseFloat(form.liters) * parseFloat(form.pricePerLiterSar)).toFixed(2)
-      : null;
+  const canSubmit =
+    form.vehicleId &&
+    form.odometerKm &&
+    form.totalCostSar &&
+    form.pricePerLiterSar &&
+    form.liters;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        setOpen(value);
+        if (!value) resetForm();
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="gap-2 rounded-full">
           <Plus className="h-4 w-4" />
           تسجيل تعبئة
         </Button>
       </DialogTrigger>
+
       <DialogContent className="max-w-md" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-right">
@@ -239,14 +311,20 @@ function AddFuelDialog({
           {/* Vehicle */}
           <div>
             <Label className="mb-1.5 block">المركبة</Label>
-            <Select value={form.vehicleId} onValueChange={v => setForm(f => ({ ...f, vehicleId: v }))}>
+            <Select
+              value={form.vehicleId}
+              onValueChange={(value) =>
+                setForm((current) => ({ ...current, vehicleId: value }))
+              }
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {vehicles.map(v => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.nickname || `${v.make} ${v.model}`} — {v.year}
+                {vehicles.map((vehicle) => (
+                  <SelectItem key={vehicle.id} value={vehicle.id}>
+                    {vehicle.nickname || `${vehicle.make} ${vehicle.model}`} —{" "}
+                    {vehicle.year}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -260,90 +338,119 @@ function AddFuelDialog({
               <Input
                 type="datetime-local"
                 value={form.filledAt}
-                onChange={e => setForm(f => ({ ...f, filledAt: e.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    filledAt: event.target.value,
+                  }))
+                }
               />
             </div>
+
             <div>
               <Label className="mb-1.5 block">قراءة العداد (كم)</Label>
               <Input
                 type="number"
                 placeholder="مثال: 52400"
                 value={form.odometerKm}
-                onChange={e => setForm(f => ({ ...f, odometerKm: e.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    odometerKm: event.target.value,
+                  }))
+                }
               />
             </div>
           </div>
-
-          {/* Liters + Price */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="mb-1.5 block">الكمية (لتر)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="مثال: 45.5"
-                value={form.liters}
-                onChange={e => setForm(f => ({ ...f, liters: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label className="mb-1.5 block">سعر اللتر (ر.س)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.pricePerLiterSar}
-                onChange={e => setForm(f => ({ ...f, pricePerLiterSar: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          {/* Total estimate */}
-          {totalEstimate && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">التكلفة الإجمالية</span>
-              <span className="text-lg font-bold text-primary">{totalEstimate} ر.س</span>
-            </div>
-          )}
 
           {/* Fuel Grade */}
           <div>
             <Label className="mb-1.5 block">نوع الوقود</Label>
             <div className="flex gap-2">
-              {(["91", "95", "diesel"] as const).map(g => (
+              {(["91", "95", "diesel"] as const).map((grade) => (
                 <button
-                  key={g}
+                  key={grade}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, fuelGrade: g }))}
+                  onClick={() => updateFuelGrade(grade)}
                   className={cn(
                     "flex-1 py-2 rounded-xl border text-sm font-bold transition-all",
-                    form.fuelGrade === g
+                    form.fuelGrade === grade
                       ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border hover:border-primary/40"
+                      : "border-border hover:border-primary/40",
                   )}
                 >
-                  {GRADE_LABELS[g]}
+                  {GRADE_LABELS[grade]}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Station + Full tank */}
+          {/* Total + Fixed Price */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="mb-1.5 block">كم عبيت؟ (ر.س)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="مثال: 100"
+                value={form.totalCostSar}
+                onChange={(event) => updateTotalCost(event.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">سعر اللتر</Label>
+              <div className="h-10 rounded-md border border-border bg-muted px-3 flex items-center justify-between">
+                <span className="font-bold">{form.pricePerLiterSar} ر.س</span>
+                <span className="text-xs text-muted-foreground">ثابت</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Liters calculated automatically */}
+          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                الكمية المحسوبة تلقائيًا
+              </span>
+              <span className="text-lg font-bold text-primary">
+                {form.liters ? `${form.liters} لتر` : "-"}
+              </span>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              المعادلة: المبلغ ÷ سعر اللتر الثابت = عدد اللترات
+            </p>
+          </div>
+
+          {/* Station */}
           <div>
             <Label className="mb-1.5 block">اسم المحطة (اختياري)</Label>
             <Input
               placeholder="مثال: محطة الوطنية — الملقا"
               value={form.stationNameAr}
-              onChange={e => setForm(f => ({ ...f, stationNameAr: e.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  stationNameAr: event.target.value,
+                }))
+              }
             />
           </div>
 
+          {/* Full tank */}
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setForm(f => ({ ...f, isFull: !f.isFull }))}
+              onClick={() =>
+                setForm((current) => ({
+                  ...current,
+                  isFull: !current.isFull,
+                }))
+              }
               className={cn(
                 "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
-                form.isFull ? "bg-primary border-primary" : "border-border"
+                form.isFull ? "bg-primary border-primary" : "border-border",
               )}
             >
               {form.isFull && <Check className="h-3 w-3 text-primary-foreground" />}
@@ -354,7 +461,7 @@ function AddFuelDialog({
           <Button
             className="w-full"
             onClick={() => mutation.mutate(form)}
-            disabled={mutation.isPending || !form.vehicleId || !form.odometerKm || !form.liters}
+            disabled={mutation.isPending || !canSubmit}
           >
             {mutation.isPending ? "جارٍ الحفظ..." : "حفظ التعبئة"}
           </Button>
