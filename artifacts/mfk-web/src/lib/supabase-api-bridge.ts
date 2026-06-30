@@ -51,6 +51,14 @@ type FuelLogRow = {
   created_at?: string;
 };
 
+type UserRow = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone: string;
+  role?: string | null;
+};
+
 type NotificationRow = {
   id: string;
   user_id: string;
