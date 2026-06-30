@@ -1500,6 +1500,77 @@ async function handleRequest(
   return { handled: false };
 }
 
+function toProfile(row: UserRow) {
+  return {
+    userId: row.id,
+    name: row.name,
+    email: row.email ?? undefined,
+    phone: row.phone,
+    role: row.role || "user",
+  };
+}
+
+async function handleProfile(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  if (path !== "/api/profile") return { handled: false };
+
+  const session = await requireSession();
+
+  if (method === "GET") {
+    const rows = await supabaseRequest<UserRow[]>(
+      `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(session.user.id)}&limit=1`,
+      { method: "GET" },
+      session.access_token,
+    );
+
+    const row = rows[0];
+
+    if (!row) {
+      throw new ApiBridgeError("لم يتم العثور على الملف الشخصي.", 404);
+    }
+
+    return { handled: true, data: toProfile(row) };
+  }
+
+  if (method === "PATCH") {
+    const body = await readJsonBody(input, init);
+
+    const name = String(body.name ?? "").trim();
+    const phone = String(body.phone ?? "").trim();
+
+    if (!name) throw new ApiBridgeError("الاسم مطلوب.", 400);
+    if (!phone) throw new ApiBridgeError("رقم الجوال مطلوب.", 400);
+
+    const rows = await supabaseRequest<UserRow[]>(
+      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ name, phone }),
+      },
+      session.access_token,
+    );
+
+    const row = rows[0];
+
+    if (!row) {
+      throw new ApiBridgeError("تعذر تحديث الملف الشخصي.", 500);
+    }
+
+    return { handled: true, data: toProfile(row) };
+  }
+
+  return { handled: false };
+}
+
+
 function jsonResponse(data: unknown, status = 200) {
   if (status === 204) {
     return new Response(null, { status });
