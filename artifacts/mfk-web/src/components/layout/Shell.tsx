@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldAlert,
   Users,
+  User,
   X,
   AlertTriangle,
   CheckCircle2,
@@ -201,16 +202,17 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
   const initials = displayName.charAt(0);
 
   const userNavItems = [
-    { href: "/app", label: "نظرة عامة", icon: LayoutDashboard },
-    { href: "/app/vehicles", label: "مركباتي", icon: Car },
-    { href: "/app/diagnostics", label: "التشخيص المباشر", icon: Activity },
-    { href: "/app/dtc", label: "سجل الأعطال", icon: Wrench },
-    { href: "/app/maintenance", label: "الصيانة", icon: Calendar },
-    { href: "/app/fuel", label: "البنزين والصرفية", icon: Fuel },
-    { href: "/app/assistant", label: "المساعد الذكي", icon: MessageSquare },
-    { href: "/app/recommendations", label: "التوصيات", icon: Lightbulb },
-    { href: "/app/subscription", label: "الاشتراك", icon: CreditCard },
-  ];
+  { href: "/app", label: "نظرة عامة", icon: LayoutDashboard },
+  { href: "/app/vehicles", label: "مركباتي", icon: Car },
+  { href: "/app/diagnostics", label: "التشخيص المباشر", icon: Activity },
+  { href: "/app/dtc", label: "سجل الأعطال", icon: Wrench },
+  { href: "/app/maintenance", label: "الصيانة", icon: Calendar },
+  { href: "/app/fuel", label: "البنزين والصرفية", icon: Fuel },
+  { href: "/app/assistant", label: "المساعد الذكي", icon: MessageSquare },
+  { href: "/app/recommendations", label: "التوصيات", icon: Lightbulb },
+  { href: "/app/profile", label: "الملف الشخصي", icon: User },
+  { href: "/app/subscription", label: "الاشتراك", icon: CreditCard },
+];
 
   const adminNavItems = [
     { href: "/admin", label: "نظرة عامة", icon: LayoutDashboard },
