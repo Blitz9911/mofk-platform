@@ -39,6 +39,8 @@ import Recommendations from "@/pages/app/recommendations";
 import Subscription from "@/pages/app/subscription";
 import FuelPage from "@/pages/app/fuel";
 import ProfilePage from "@/pages/app/profile";
+
+import ProfilePage from "@/pages/app/profile";
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
@@ -68,6 +70,7 @@ function AppRoutes() {
         <Route path="/app/bookings" component={Bookings} />
         <Route path="/app/assistant" component={Assistant} />
         <Route path="/app/recommendations" component={Recommendations} />
+        <Route path="/app/profile" component={ProfilePage} />
         <Route path="/app/subscription" component={Subscription} />
         <Route path="/app/fuel" component={FuelPage} />
         <Route component={NotFound} />
