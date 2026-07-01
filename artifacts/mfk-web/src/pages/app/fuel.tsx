@@ -2,13 +2,28 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
-  Fuel, Plus, Trash2, TrendingUp, TrendingDown, Minus,
-  ChevronDown, DropletIcon, Wallet, Gauge, Car,
-  CalendarIcon, AlertCircle, X, Check
+  Fuel,
+  Plus,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  DropletIcon,
+  Wallet,
+  Gauge,
+  Car,
+  CalendarIcon,
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -92,8 +107,13 @@ interface FuelStats {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 const apiFetch = async (path: string, opts?: RequestInit) => {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+
   if (!res.ok) throw new Error(await res.text());
+
   return res.json();
 };
 
@@ -106,11 +126,16 @@ const PERIOD_LABELS: Record<string, string> = {
   all: "الكل",
 };
 
-const GRADE_LABELS: Record<string, string> = { "91": "91", "95": "95", "diesel": "ديزل" };
+const GRADE_LABELS: Record<string, string> = {
+  "91": "91",
+  "95": "95",
+  diesel: "ديزل",
+};
+
 const GRADE_COLORS: Record<string, string> = {
   "91": "bg-blue-500/10 text-blue-500 border-blue-500/20",
   "95": "bg-orange-500/10 text-orange-500 border-orange-500/20",
-  "diesel": "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  diesel: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
 };
 
 function StatCard({
@@ -130,20 +155,34 @@ function StatCard({
   loading?: boolean;
   color?: string;
 }) {
-  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
-  const trendColor = trend === "up" ? "text-green-500" : trend === "down" ? "text-destructive" : "text-muted-foreground";
+  const TrendIcon =
+    trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
+
+  const trendColor =
+    trend === "up"
+      ? "text-green-500"
+      : trend === "down"
+        ? "text-destructive"
+        : "text-muted-foreground";
 
   return (
     <Card className="hover:border-primary/30 transition-colors">
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
-          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10", color === "text-primary" ? "bg-primary/10" : color.replace("text-", "bg-").replace("500", "500/10"))}>
+          <div
+            className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10",
+              color === "text-primary"
+                ? "bg-primary/10"
+                : color.replace("text-", "bg-").replace("500", "500/10"),
+            )}
+          >
             <Icon className={cn("h-5 w-5", color)} />
           </div>
-          {trend && (
-            <TrendIcon className={cn("h-4 w-4", trendColor)} />
-          )}
+
+          {trend && <TrendIcon className={cn("h-4 w-4", trendColor)} />}
         </div>
+
         {loading ? (
           <>
             <Skeleton className="h-7 w-24 mb-1" />
@@ -153,7 +192,12 @@ function StatCard({
           <>
             <p className="text-2xl font-bold tracking-tight">{value}</p>
             <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1 opacity-70">{sub}</p>}
+
+            {sub && (
+              <p className="text-xs text-muted-foreground mt-1 opacity-70">
+                {sub}
+              </p>
+            )}
           </>
         )}
       </CardContent>
@@ -190,7 +234,6 @@ function AddFuelDialog({
     pricePerLiterSar: FUEL_PRICES["91"],
     fuelGrade: "91" as "91" | "95" | "diesel",
     stationNameAr: "",
-    isFull: true,
     filledAt: new Date().toISOString().slice(0, 16),
     notes: "",
   });
@@ -239,7 +282,6 @@ function AddFuelDialog({
       pricePerLiterSar: FUEL_PRICES["91"],
       fuelGrade: "91",
       stationNameAr: "",
-      isFull: true,
       filledAt: new Date().toISOString().slice(0, 16),
       notes: "",
     });
@@ -251,16 +293,16 @@ function AddFuelDialog({
         method: "POST",
         body: JSON.stringify({
           vehicleId: data.vehicleId,
-          odometerKm: parseInt(data.odometerKm),
+          odometerKm: data.odometerKm ? parseInt(data.odometerKm) : undefined,
           liters: parseFloat(data.liters),
           pricePerLiterSar: parseFloat(data.pricePerLiterSar),
           fuelGrade: data.fuelGrade,
           stationNameAr: data.stationNameAr || undefined,
-          isFull: data.isFull,
           filledAt: new Date(data.filledAt).toISOString(),
           notes: data.notes || undefined,
         }),
       }),
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fuel-logs"] });
       qc.invalidateQueries({ queryKey: ["fuel-stats"] });
@@ -269,20 +311,23 @@ function AddFuelDialog({
       resetForm();
       onSuccess();
     },
+
     onError: () =>
       toast({
         title: "حدث خطأ",
-        description: "تأكد من اختيار المركبة وإدخال العداد والمبلغ",
+        description: "تأكد من اختيار المركبة وإدخال المبلغ بشكل صحيح",
         variant: "destructive",
       }),
   });
 
   const canSubmit =
-    form.vehicleId &&
-    form.odometerKm &&
-    form.totalCostSar &&
-    form.pricePerLiterSar &&
-    form.liters;
+    Boolean(form.vehicleId) &&
+    Boolean(form.totalCostSar) &&
+    Boolean(form.pricePerLiterSar) &&
+    Boolean(form.liters) &&
+    Number(form.totalCostSar) > 0 &&
+    Number(form.pricePerLiterSar) > 0 &&
+    Number(form.liters) > 0;
 
   return (
     <Dialog
@@ -311,6 +356,7 @@ function AddFuelDialog({
           {/* Vehicle */}
           <div>
             <Label className="mb-1.5 block">المركبة</Label>
+
             <Select
               value={form.vehicleId}
               onValueChange={(value) =>
@@ -320,6 +366,7 @@ function AddFuelDialog({
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
+
               <SelectContent>
                 {vehicles.map((vehicle) => (
                   <SelectItem key={vehicle.id} value={vehicle.id}>
@@ -335,6 +382,7 @@ function AddFuelDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-1.5 block">تاريخ التعبئة</Label>
+
               <Input
                 type="datetime-local"
                 value={form.filledAt}
@@ -348,10 +396,11 @@ function AddFuelDialog({
             </div>
 
             <div>
-              <Label className="mb-1.5 block">قراءة العداد (كم)</Label>
+              <Label className="mb-1.5 block">قراءة العداد (اختياري)</Label>
+
               <Input
                 type="number"
-                placeholder="مثال: 52400"
+                placeholder="اختياري — مثال: 52400"
                 value={form.odometerKm}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -366,6 +415,7 @@ function AddFuelDialog({
           {/* Fuel Grade */}
           <div>
             <Label className="mb-1.5 block">نوع الوقود</Label>
+
             <div className="flex gap-2">
               {(["91", "95", "diesel"] as const).map((grade) => (
                 <button
@@ -385,10 +435,11 @@ function AddFuelDialog({
             </div>
           </div>
 
-          {/* Total + Fixed Price */}
+          {/* Total + Price */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-1.5 block">كم عبيت؟ (ر.س)</Label>
+
               <Input
                 type="number"
                 step="0.01"
@@ -400,32 +451,17 @@ function AddFuelDialog({
 
             <div>
               <Label className="mb-1.5 block">سعر اللتر</Label>
-              <div className="h-10 rounded-md border border-border bg-muted px-3 flex items-center justify-between">
+
+              <div className="h-10 rounded-md border border-border bg-muted px-3 flex items-center">
                 <span className="font-bold">{form.pricePerLiterSar} ر.س</span>
-                <span className="text-xs text-muted-foreground">ثابت</span>
               </div>
             </div>
-          </div>
-
-          {/* Liters calculated automatically */}
-          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                الكمية المحسوبة تلقائيًا
-              </span>
-              <span className="text-lg font-bold text-primary">
-                {form.liters ? `${form.liters} لتر` : "-"}
-              </span>
-            </div>
-
-            <p className="text-xs text-muted-foreground mt-1">
-              المعادلة: المبلغ ÷ سعر اللتر الثابت = عدد اللترات
-            </p>
           </div>
 
           {/* Station */}
           <div>
             <Label className="mb-1.5 block">اسم المحطة (اختياري)</Label>
+
             <Input
               placeholder="مثال: محطة الوطنية — الملقا"
               value={form.stationNameAr}
@@ -436,26 +472,6 @@ function AddFuelDialog({
                 }))
               }
             />
-          </div>
-
-          {/* Full tank */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                setForm((current) => ({
-                  ...current,
-                  isFull: !current.isFull,
-                }))
-              }
-              className={cn(
-                "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
-                form.isFull ? "bg-primary border-primary" : "border-border",
-              )}
-            >
-              {form.isFull && <Check className="h-3 w-3 text-primary-foreground" />}
-            </button>
-            <span className="text-sm">تعبئة خزان كامل</span>
           </div>
 
           <Button
@@ -475,11 +491,17 @@ function AddFuelDialog({
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+
   return (
     <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-xl text-right">
       <p className="text-xs text-muted-foreground mb-2">{label}</p>
+
       {payload.map((p: any) => (
-        <p key={p.dataKey} className="text-sm font-bold" style={{ color: p.color }}>
+        <p
+          key={p.dataKey}
+          className="text-sm font-bold"
+          style={{ color: p.color }}
+        >
           {p.name}: {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
         </p>
       ))}
@@ -494,11 +516,17 @@ export default function FuelPage() {
   const qc = useQueryClient();
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [period, setPeriod] = useState<"week" | "month" | "year" | "all">("month");
-  const [chartType, setChartType] = useState<"cost" | "liters" | "consumption">("cost");
+  const [period, setPeriod] = useState<"week" | "month" | "year" | "all">(
+    "month",
+  );
+  const [chartType, setChartType] = useState<"cost" | "liters" | "consumption">(
+    "cost",
+  );
 
   // Fetch vehicles
-  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<Vehicle[]>({
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<
+    Vehicle[]
+  >({
     queryKey: ["vehicles"],
     queryFn: () => apiFetch("/api/vehicles"),
     select: (d) => (Array.isArray(d) ? d : []),
@@ -510,9 +538,12 @@ export default function FuelPage() {
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ["fuel-logs", activeVehicleId],
     queryFn: () =>
-      apiFetch(`/api/fuel${activeVehicleId ? `?vehicleId=${activeVehicleId}` : ""}`),
+      apiFetch(
+        `/api/fuel${activeVehicleId ? `?vehicleId=${activeVehicleId}` : ""}`,
+      ),
     enabled: vehicles.length > 0,
   });
+
   const logs: FuelLog[] = Array.isArray(logsData?.logs) ? logsData.logs : [];
 
   // Fetch stats
@@ -520,7 +551,7 @@ export default function FuelPage() {
     queryKey: ["fuel-stats", activeVehicleId, period],
     queryFn: () =>
       apiFetch(
-        `/api/fuel/stats?period=${period}${activeVehicleId ? `&vehicleId=${activeVehicleId}` : ""}`
+        `/api/fuel/stats?period=${period}${activeVehicleId ? `&vehicleId=${activeVehicleId}` : ""}`,
       ),
     enabled: vehicles.length > 0,
   });
@@ -535,42 +566,50 @@ export default function FuelPage() {
     },
   });
 
-  // Chart data — enrich trend with consumption for "consumption" mode
+  // Chart data
   const chartData = useMemo(() => {
     if (!stats?.trendByDay) return [];
-    return stats.trendByDay.map(d => ({
+
+    return stats.trendByDay.map((d) => ({
       date: format(parseISO(d.date), "d MMM", { locale: ar }),
       "التكلفة (ر.س)": d.costSar,
       "الكمية (لتر)": d.liters,
     }));
   }, [stats]);
 
-  // Per-vehicle comparison (all vehicles)
+  // Per-vehicle comparison
   const { data: allStats } = useQuery({
     queryKey: ["fuel-stats-all", period],
     queryFn: async () => {
       const results = await Promise.all(
-        vehicles.map(v =>
-          apiFetch(`/api/fuel/stats?period=${period}&vehicleId=${v.id}`).then(s => ({
-            vehicle: v.nickname || `${v.make} ${v.model}`,
-            avgL100: s.avgConsumptionL100km,
-            totalCost: s.totalCostSar,
-            totalLiters: s.totalLiters,
-          }))
-        )
+        vehicles.map((v) =>
+          apiFetch(`/api/fuel/stats?period=${period}&vehicleId=${v.id}`).then(
+            (s) => ({
+              vehicle: v.nickname || `${v.make} ${v.model}`,
+              avgL100: s.avgConsumptionL100km,
+              totalCost: s.totalCostSar,
+              totalLiters: s.totalLiters,
+            }),
+          ),
+        ),
       );
+
       return results;
     },
     enabled: vehicles.length > 1,
   });
 
-  const activeVehicle = vehicles.find(v => v.id === activeVehicleId);
+  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId);
   const latestLog = logs[0];
   const prevLog = logs[1];
 
   const consumptionTrend: "up" | "down" | "neutral" = useMemo(() => {
     if (!latestLog?.consumption || !prevLog?.consumption) return "neutral";
-    const diff = latestLog.consumption.consumptionL100km - prevLog.consumption.consumptionL100km;
+
+    const diff =
+      latestLog.consumption.consumptionL100km -
+      prevLog.consumption.consumptionL100km;
+
     return diff > 0.3 ? "up" : diff < -0.3 ? "down" : "neutral";
   }, [latestLog, prevLog]);
 
@@ -578,7 +617,6 @@ export default function FuelPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto" dir="rtl">
-
       {/* ─── Header ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -586,24 +624,28 @@ export default function FuelPage() {
             <Fuel className="h-6 w-6 text-primary" />
             إدارة البنزين والصرفية
           </h1>
+
           <p className="text-muted-foreground text-sm mt-1">
             تتبع استهلاك الوقود وتكاليف التعبئة لكل مركبة
           </p>
         </div>
+
         <div className="flex items-center gap-3 flex-wrap">
           {/* Vehicle selector */}
           {vehicles.length > 1 && (
             <Select
               value={activeVehicleId ?? "all"}
-              onValueChange={v => setSelectedVehicleId(v === "all" ? null : v)}
+              onValueChange={(v) => setSelectedVehicleId(v === "all" ? null : v)}
             >
               <SelectTrigger className="w-[180px]">
                 <Car className="h-4 w-4 ml-2 text-muted-foreground" />
                 <SelectValue />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="all">جميع المركبات</SelectItem>
-                {vehicles.map(v => (
+
+                {vehicles.map((v) => (
                   <SelectItem key={v.id} value={v.id}>
                     {v.nickname || `${v.make} ${v.model}`}
                   </SelectItem>
@@ -611,15 +653,22 @@ export default function FuelPage() {
               </SelectContent>
             </Select>
           )}
+
           {/* Period picker */}
-          <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+          <Select
+            value={period}
+            onValueChange={(v) => setPeriod(v as typeof period)}
+          >
             <SelectTrigger className="w-[150px]">
               <CalendarIcon className="h-4 w-4 ml-2 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
+
             <SelectContent>
               {Object.entries(PERIOD_LABELS).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {v}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -642,6 +691,7 @@ export default function FuelPage() {
           loading={isLoading}
           color="text-blue-500"
         />
+
         <StatCard
           icon={Wallet}
           label="إجمالي الإنفاق"
@@ -650,20 +700,39 @@ export default function FuelPage() {
           loading={isLoading}
           color="text-orange-500"
         />
+
         <StatCard
           icon={Gauge}
           label="متوسط الصرفية"
-          value={stats?.avgConsumptionL100km ? `${stats.avgConsumptionL100km} L/100` : "—"}
-          sub={stats?.avgKmPerLiter ? `${stats.avgKmPerLiter} كم/لتر` : undefined}
-          trend={consumptionTrend === "up" ? "down" : consumptionTrend === "down" ? "up" : "neutral"}
+          value={
+            stats?.avgConsumptionL100km
+              ? `${stats.avgConsumptionL100km} L/100`
+              : "—"
+          }
+          sub={
+            stats?.avgKmPerLiter ? `${stats.avgKmPerLiter} كم/لتر` : undefined
+          }
+          trend={
+            consumptionTrend === "up"
+              ? "down"
+              : consumptionTrend === "down"
+                ? "up"
+                : "neutral"
+          }
           loading={isLoading}
           color="text-primary"
         />
+
         <StatCard
           icon={Car}
           label="آخر قراءة عداد"
           value={latestLog ? `${latestLog.odometerKm.toLocaleString()} كم` : "—"}
-          sub={activeVehicle?.nickname || activeVehicle ? `${activeVehicle?.make} ${activeVehicle?.model}` : undefined}
+          sub={
+            activeVehicle
+              ? activeVehicle.nickname ||
+                `${activeVehicle.make} ${activeVehicle.model}`
+              : undefined
+          }
           loading={isLoading}
           color="text-green-500"
         />
@@ -674,18 +743,25 @@ export default function FuelPage() {
         {/* Main trend chart */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold">التطور الزمني</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              التطور الزمني
+            </CardTitle>
+
             <div className="flex gap-1 bg-muted rounded-lg p-1">
-              {([
-                { key: "cost", label: "التكلفة" },
-                { key: "liters", label: "الكمية" },
-              ] as const).map(({ key, label }) => (
+              {(
+                [
+                  { key: "cost", label: "التكلفة" },
+                  { key: "liters", label: "الكمية" },
+                ] as const
+              ).map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => setChartType(key)}
                   className={cn(
                     "px-3 py-1 rounded-md text-xs font-medium transition-colors",
-                    chartType === key ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+                    chartType === key
+                      ? "bg-background shadow text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {label}
@@ -693,6 +769,7 @@ export default function FuelPage() {
               ))}
             </div>
           </CardHeader>
+
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-52 w-full" />
@@ -703,21 +780,35 @@ export default function FuelPage() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="gCost" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
+
                     <linearGradient id="gLiters" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
+
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
+
                   {chartType === "cost" && (
                     <Area
                       type="monotone"
@@ -727,6 +818,7 @@ export default function FuelPage() {
                       strokeWidth={2}
                     />
                   )}
+
                   {chartType === "liters" && (
                     <Area
                       type="monotone"
@@ -746,32 +838,57 @@ export default function FuelPage() {
         {vehicles.length > 1 ? (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">مقارنة المركبات</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                مقارنة المركبات
+              </CardTitle>
             </CardHeader>
+
             <CardContent>
               {!allStats ? (
                 <Skeleton className="h-52 w-full" />
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={allStats} layout="vertical" margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis dataKey="vehicle" type="category" tick={{ fontSize: 10 }} width={72} />
-                    <Tooltip
-                      formatter={(v: number) => [`${v.toFixed(1)} L/100km`, "الصرفية"]}
+                  <BarChart
+                    data={allStats}
+                    layout="vertical"
+                    margin={{ top: 4, right: 8, left: 4, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
                     />
-                    <Bar dataKey="avgL100" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} name="الصرفية" />
+                    <XAxis type="number" tick={{ fontSize: 10 }} />
+                    <YAxis
+                      dataKey="vehicle"
+                      type="category"
+                      tick={{ fontSize: 10 }}
+                      width={72}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [
+                        `${v.toFixed(1)} L/100km`,
+                        "الصرفية",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="avgL100"
+                      fill="hsl(var(--primary))"
+                      radius={[0, 6, 6, 0]}
+                      name="الصرفية"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
         ) : (
-          /* Consumption gauge for single vehicle */
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">تفاصيل آخر تعبئة</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                تفاصيل آخر تعبئة
+              </CardTitle>
             </CardHeader>
+
             <CardContent>
               {logsLoading ? (
                 <div className="space-y-3">
@@ -785,24 +902,38 @@ export default function FuelPage() {
                     <div className="text-5xl font-black text-primary">
                       {latestLog.consumption?.consumptionL100km ?? "—"}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">لتر / 100 كم</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      لتر / 100 كم
+                    </div>
                   </div>
+
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">المسافة المقطوعة</span>
-                      <span className="font-medium">{latestLog.consumption?.distanceKm ?? "—"} كم</span>
+                      <span className="text-muted-foreground">
+                        المسافة المقطوعة
+                      </span>
+                      <span className="font-medium">
+                        {latestLog.consumption?.distanceKm ?? "—"} كم
+                      </span>
                     </div>
+
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">كم لكل لتر</span>
-                      <span className="font-medium">{latestLog.consumption?.kmPerLiter ?? "—"}</span>
+                      <span className="font-medium">
+                        {latestLog.consumption?.kmPerLiter ?? "—"}
+                      </span>
                     </div>
+
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">الكمية</span>
                       <span className="font-medium">{latestLog.liters} لتر</span>
                     </div>
+
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">التكلفة</span>
-                      <span className="font-bold text-primary">{latestLog.totalCostSar} ر.س</span>
+                      <span className="font-bold text-primary">
+                        {latestLog.totalCostSar} ر.س
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -822,27 +953,34 @@ export default function FuelPage() {
           <CardTitle className="text-base font-semibold">
             سجل التعبئات
             {logs.length > 0 && (
-              <Badge variant="secondary" className="mr-2 text-xs">{logs.length}</Badge>
+              <Badge variant="secondary" className="mr-2 text-xs">
+                {logs.length}
+              </Badge>
             )}
           </CardTitle>
         </CardHeader>
+
         <CardContent className="p-0">
           {logsLoading ? (
             <div className="p-6 space-y-3">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
             </div>
           ) : logs.length === 0 ? (
             <div className="py-16 flex flex-col items-center text-muted-foreground gap-3">
               <Fuel className="h-12 w-12 opacity-15" />
               <p className="font-medium">لا توجد تعبئات مسجلة</p>
-              <p className="text-sm opacity-60">سجّل أول تعبئة لتبدأ بتتبع صرفية سيارتك</p>
+              <p className="text-sm opacity-60">
+                سجّل أول تعبئة لتبدأ بتتبع صرفية سيارتك
+              </p>
             </div>
           ) : (
             <ScrollArea className="max-h-[520px]">
               <div className="divide-y divide-border">
                 {logs.map((log, idx) => {
-                  const vehicle = vehicles.find(v => v.id === log.vehicleId);
-                  const isFirst = idx === 0;
+                  const vehicle = vehicles.find((v) => v.id === log.vehicleId);
+
                   return (
                     <motion.div
                       key={log.id}
@@ -854,7 +992,9 @@ export default function FuelPage() {
                       {/* Date */}
                       <div className="w-20 shrink-0 text-center">
                         <p className="text-sm font-semibold">
-                          {format(parseISO(log.filledAt), "d MMM", { locale: ar })}
+                          {format(parseISO(log.filledAt), "d MMM", {
+                            locale: ar,
+                          })}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {format(parseISO(log.filledAt), "yyyy")}
@@ -864,14 +1004,20 @@ export default function FuelPage() {
                       {/* Vehicle badge */}
                       <div className="w-28 shrink-0">
                         <p className="text-xs font-medium truncate text-muted-foreground">
-                          {vehicle?.nickname || (vehicle ? `${vehicle.make} ${vehicle.model}` : "—")}
+                          {vehicle?.nickname ||
+                            (vehicle
+                              ? `${vehicle.make} ${vehicle.model}`
+                              : "—")}
                         </p>
                       </div>
 
                       {/* Fuel grade */}
                       <Badge
                         variant="outline"
-                        className={cn("text-xs shrink-0 w-14 justify-center", GRADE_COLORS[log.fuelGrade] || "")}
+                        className={cn(
+                          "text-xs shrink-0 w-14 justify-center",
+                          GRADE_COLORS[log.fuelGrade] || "",
+                        )}
                       >
                         {GRADE_LABELS[log.fuelGrade] || log.fuelGrade}
                       </Badge>
@@ -879,19 +1025,32 @@ export default function FuelPage() {
                       {/* Odometer */}
                       <div className="hidden sm:block w-28 shrink-0">
                         <p className="text-xs text-muted-foreground">عداد</p>
-                        <p className="text-sm font-medium">{log.odometerKm.toLocaleString()} كم</p>
+                        <p className="text-sm font-medium">
+                          {log.odometerKm
+                            ? `${log.odometerKm.toLocaleString()} كم`
+                            : "—"}
+                        </p>
                       </div>
 
                       {/* Liters + Cost */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 flex-wrap">
-                          <span className="text-sm font-medium text-blue-500">{log.liters} L</span>
+                          <span className="text-sm font-medium text-blue-500">
+                            {log.liters} L
+                          </span>
                           <span className="text-muted-foreground text-xs">×</span>
-                          <span className="text-xs text-muted-foreground">{log.pricePerLiterSar} ر.س/L</span>
-                          <span className="text-sm font-bold text-primary">{log.totalCostSar} ر.س</span>
+                          <span className="text-xs text-muted-foreground">
+                            {log.pricePerLiterSar} ر.س/L
+                          </span>
+                          <span className="text-sm font-bold text-primary">
+                            {log.totalCostSar} ر.س
+                          </span>
                         </div>
+
                         {log.stationNameAr && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{log.stationNameAr}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {log.stationNameAr}
+                          </p>
                         )}
                       </div>
 
@@ -901,12 +1060,18 @@ export default function FuelPage() {
                           <>
                             <p className="text-sm font-bold">
                               {log.consumption.consumptionL100km}
-                              <span className="text-xs font-normal text-muted-foreground mr-1">L/100</span>
+                              <span className="text-xs font-normal text-muted-foreground mr-1">
+                                L/100
+                              </span>
                             </p>
-                            <p className="text-xs text-muted-foreground">{log.consumption.distanceKm} كم</p>
+                            <p className="text-xs text-muted-foreground">
+                              {log.consumption.distanceKm} كم
+                            </p>
                           </>
                         ) : (
-                          <span className="text-xs text-muted-foreground">أول تعبئة</span>
+                          <span className="text-xs text-muted-foreground">
+                            أول تعبئة
+                          </span>
                         )}
                       </div>
 
@@ -921,15 +1086,19 @@ export default function FuelPage() {
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </AlertDialogTrigger>
+
                         <AlertDialogContent dir="rtl">
                           <AlertDialogHeader>
                             <AlertDialogTitle>حذف السجل؟</AlertDialogTitle>
                             <AlertDialogDescription>
                               سيتم حذف تعبئة {log.liters} لتر بتاريخ{" "}
-                              {format(parseISO(log.filledAt), "d MMMM yyyy", { locale: ar })}
+                              {format(parseISO(log.filledAt), "d MMMM yyyy", {
+                                locale: ar,
+                              })}
                               . لا يمكن التراجع عن هذا.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
+
                           <AlertDialogFooter className="flex-row-reverse gap-2">
                             <AlertDialogAction
                               className="bg-destructive hover:bg-destructive/90 text-white"
@@ -937,6 +1106,7 @@ export default function FuelPage() {
                             >
                               حذف
                             </AlertDialogAction>
+
                             <AlertDialogCancel>إلغاء</AlertDialogCancel>
                           </AlertDialogFooter>
                         </AlertDialogContent>
