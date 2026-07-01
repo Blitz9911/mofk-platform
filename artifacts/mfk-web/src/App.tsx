@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -97,9 +98,26 @@ function AdminRoutes() {
 
 function AnimatedSwitch() {
   const [location] = useLocation();
-  const pageKey = location.startsWith("/app") ? "app"
-    : location.startsWith("/admin") ? "admin"
-    : location.split("?")[0];
+
+  const pageKey = location.startsWith("/app")
+    ? "app"
+    : location.startsWith("/admin")
+      ? "admin"
+      : location.split("?")[0];
+
+  useEffect(() => {
+    const pendingScrollTarget = window.sessionStorage.getItem(
+      "mfk-pending-scroll-target",
+    );
+
+    if (pendingScrollTarget) return;
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: "auto",
+    });
+  }, [pageKey]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
