@@ -1217,24 +1217,80 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
     return { handled: true, data: healthTrend(avgHealthScore) };
   }
 
-  if (path === "/api/dashboard/recent-activity") {
-    const rows = await listVehicleRows(session.access_token);
+if (path === "/api/dashboard/recent-activity") {
+  const vehicles = await listVehicleRows(session.access_token);
+  const fuelRows = await listFuelRows(session.access_token);
+  const maintenanceRows = await listMaintenanceLogs(session.access_token);
+  const notifications = await listNotificationRows(session.access_token);
 
-    return {
-      handled: true,
-      data: rows.slice(0, 6).map((row) => ({
-        id: `vehicle-${row.id}`,
-        kind: "diagnostic_session",
-        titleAr: `تمت إضافة ${row.make} ${row.model}`,
-        subtitleAr: row.plate_number
-          ? `لوحة ${row.plate_number}`
-          : "مركبة مسجلة في مفك",
-        vehicleId: row.id,
-        severity: "info",
-        occurredAt: row.created_at ?? new Date().toISOString(),
-      })),
-    };
-  }
+  const vehicleActivities = vehicles.map((row) => ({
+    id: `vehicle-${row.id}`,
+    kind: "diagnostic_session",
+    titleAr: `تمت إضافة ${row.make} ${row.model}`,
+    subtitleAr: row.plate_number
+      ? `لوحة ${row.plate_number}`
+      : "مركبة مسجلة في مفك",
+    vehicleId: row.id,
+    severity: "info",
+    occurredAt: row.created_at ?? new Date().toISOString(),
+  }));
+
+  const fuelActivities = fuelRows.map((row) => ({
+    id: `fuel-${row.id}`,
+    kind: "fuel_added",
+    titleAr: "تم تسجيل تعبئة بنزين",
+    subtitleAr: `${Number(row.liters).toFixed(2)} لتر بقيمة ${(row.total_cost_halalas / 100).toFixed(2)} ر.س`,
+    vehicleId: row.vehicle_id,
+    severity: "success",
+    occurredAt: row.created_at ?? row.filled_at ?? new Date().toISOString(),
+  }));
+
+  const maintenanceActivities = maintenanceRows.map((row) => ({
+    id: `maintenance-${row.id}`,
+    kind: "maintenance_done",
+    titleAr: `تم تسجيل ${MAINTENANCE_LABELS[row.service_type] || row.service_type}`,
+    subtitleAr:
+      row.vehicles?.nickname ||
+      [row.vehicles?.make, row.vehicles?.model].filter(Boolean).join(" ") ||
+      "صيانة مسجلة",
+    vehicleId: row.vehicle_id,
+    severity: "info",
+    occurredAt: row.created_at ?? row.done_at ?? new Date().toISOString(),
+  }));
+
+  const notificationActivities = notifications.map((row) => ({
+    id: `notification-${row.id}`,
+    kind: row.type || "notification",
+    titleAr: row.title_ar,
+    subtitleAr: row.body_ar ?? "تنبيه من مفك",
+    vehicleId: row.vehicle_id ?? null,
+    severity: row.severity || "info",
+    occurredAt:
+      row.created_at ||
+      row.sent_at ||
+      row.scheduled_at ||
+      new Date().toISOString(),
+  }));
+
+  const activities = [
+    ...fuelActivities,
+    ...maintenanceActivities,
+    ...notificationActivities,
+    ...vehicleActivities,
+  ]
+    .sort((a, b) => {
+      return (
+        new Date(b.occurredAt).getTime() -
+        new Date(a.occurredAt).getTime()
+      );
+    })
+    .slice(0, 12);
+
+  return {
+    handled: true,
+    data: activities,
+  };
+}
 
   return { handled: false };
 }
