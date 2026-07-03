@@ -1568,18 +1568,291 @@ async function handleRequest(
     return { handled: true, data: [] };
   }
 
-  if (path === "/api/ai/chat" && method === "POST") {
-    await requireSession();
-    return {
-      handled: true,
-      data: {
-        reply:
-          "المساعد الذكي جاهز مبدئيًا. اربط قاعدة المعرفة أو مزود الذكاء لاحقًا لتفسير الأعطال بشكل كامل.",
-        suggestedActions: [],
-      },
-    };
+ if (path === "/api/ai/chat" && method === "POST") {
+  const session = await requireSession();
+  const body = await readJsonBody(input, init);
+
+  const message = String(body.message ?? "").trim();
+  const vehicleId =
+    typeof body.vehicleId === "string" && body.vehicleId.trim()
+      ? body.vehicleId.trim()
+      : null;
+
+  if (!message) {
+    throw new ApiBridgeError("اكتب سؤالك أولًا.", 400);
   }
 
+  const normalizedMessage = message.toLowerCase();
+
+  const vehicle = vehicleId
+    ? await getVehicleRow(vehicleId, session.access_token)
+    : null;
+
+  const maintenanceRows = vehicleId
+    ? await listMaintenanceLogs(session.access_token, vehicleId)
+    : [];
+
+  const fuelRows = vehicleId
+    ? await listFuelRows(session.access_token, vehicleId)
+    : [];
+
+  const fuelStats = buildFuelStats(fuelRows, "month");
+  const maintenanceItems = buildMaintenanceRecommendations(maintenanceRows);
+
+  const vehicleName =
+    vehicle
+      ? vehicle.nickname || `${vehicle.make} ${vehicle.model} ${vehicle.year}`
+      : "المركبة المحددة";
+
+  const dtcKnowledge: Record<
+    string,
+    {
+      title: string;
+      severity: "info" | "warning" | "critical";
+      meaning: string;
+      causes: string[];
+      actions: string[];
+    }
+  > = {
+    p0300: {
+      title: "P0300 — تفتفة أو Missfire عشوائي",
+      severity: "warning",
+      meaning:
+        "الكود يعني أن المحرك فيه تفتفة عشوائية في أكثر من سلندر أو أن الاحتراق غير منتظم.",
+      causes: [
+        "بواجي ضعيفة أو قديمة",
+        "كويلات تحتاج فحص",
+        "بخاخات متسخة",
+        "تهريب هواء",
+        "ضعف في ضغط الوقود",
+      ],
+      actions: [
+        "لا تضغط على السيارة إذا التفتفة قوية",
+        "ابدأ بفحص البواجي والكويلات",
+        "افحص تهريب الهواء",
+        "إذا لمبة المكينة تومض، الأفضل توقف السيارة وتفحصها فورًا",
+      ],
+    },
+    p0420: {
+      title: "P0420 — كفاءة دبة التلوث منخفضة",
+      severity: "warning",
+      meaning:
+        "الكود غالبًا يعني أن كفاءة المحول الحفاز أقل من الطبيعي، وقد يكون السبب من الدبة أو حساس الأكسجين.",
+      causes: [
+        "دبة التلوث ضعيفة",
+        "حساس أكسجين قبل أو بعد الدبة",
+        "تهريب في الشكمان",
+        "احتراق غير منتظم أثر على الدبة",
+      ],
+      actions: [
+        "لا تغيّر الدبة مباشرة قبل فحص الحساسات",
+        "افحص حساسات الأكسجين",
+        "افحص وجود تهريب في الشكمان",
+        "راجع سجل الأكواد الأخرى إذا فيه أكواد تفتفة أو خليط وقود",
+      ],
+    },
+    p0171: {
+      title: "P0171 — خليط هواء/وقود فقير",
+      severity: "warning",
+      meaning:
+        "يعني أن المحرك يستقبل هواء أكثر من الوقود أو أن الوقود أقل من المطلوب.",
+      causes: [
+        "تهريب هواء بعد حساس الهواء",
+        "حساس MAF متسخ",
+        "ضعف طرمبة البنزين",
+        "بخاخات متسخة",
+        "تهريب فاكيوم",
+      ],
+      actions: [
+        "افحص تهريبات الهواء",
+        "نظف حساس MAF بمنظف مخصص",
+        "افحص ضغط الوقود",
+        "لا تطول باستخدام السيارة إذا معها رجفة أو ضعف واضح",
+      ],
+    },
+    p0700: {
+      title: "P0700 — تنبيه من نظام القير",
+      severity: "critical",
+      meaning:
+        "الكود يعني أن كمبيوتر القير أرسل تنبيهًا. غالبًا تحتاج قراءة أكواد القير التفصيلية وليس هذا الكود فقط.",
+      causes: [
+        "حساسات داخل القير",
+        "مشكلة في solenoid",
+        "نقص أو تدهور زيت القير",
+        "خلل كهربائي في نظام القير",
+      ],
+      actions: [
+        "تجنب القيادة القوية",
+        "افحص زيت القير إذا كان مسموح حسب نوع السيارة",
+        "اقرأ أكواد القير التفصيلية بجهاز يدعم TCM",
+        "إذا فيه نتعة قوية أو تأخير تعشيق، راجع ورشة متخصصة",
+      ],
+    },
+  };
+
+  const detectedCode = Object.keys(dtcKnowledge).find((code) =>
+    normalizedMessage.includes(code),
+  );
+
+  let reply = "";
+  let suggestedActions: Array<{ kind: string; labelAr: string }> = [];
+
+  if (detectedCode) {
+    const info = dtcKnowledge[detectedCode];
+
+    reply = [
+      `## ${info.title}`,
+      "",
+      `**المعنى:** ${info.meaning}`,
+      "",
+      vehicle
+        ? `**سياق المركبة:** ${vehicleName} — العداد الحالي تقريبًا ${Number(vehicle.odometer_km ?? 0).toLocaleString("ar-SA")} كم.`
+        : null,
+      "",
+      "### الأسباب المحتملة",
+      ...info.causes.map((item) => `- ${item}`),
+      "",
+      "### وش تسوي الآن؟",
+      ...info.actions.map((item) => `- ${item}`),
+      "",
+      info.severity === "critical"
+        ? "> تنبيه: هذا الكود يحتاج فحص قريب، خصوصًا إذا فيه نتعة، حرارة، أو لمبة مكينة تومض."
+        : "> التوصية: لا تغيّر قطع مباشرة. ابدأ بالفحص الأرخص والأكثر احتمالًا.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    suggestedActions = [
+      { kind: "view_dtc", labelAr: "عرض الأعطال" },
+      { kind: "schedule_maintenance", labelAr: "تسجيل صيانة" },
+      { kind: "book_workshop", labelAr: "حجز ورشة" },
+    ];
+  } else if (
+    normalizedMessage.includes("بنزين") ||
+    normalizedMessage.includes("صرف") ||
+    normalizedMessage.includes("صرفية") ||
+    normalizedMessage.includes("وقود")
+  ) {
+    reply = [
+      "## ملخص البنزين والصرفية",
+      "",
+      vehicle
+        ? `**المركبة:** ${vehicleName}`
+        : "**ملاحظة:** اختر مركبة من أعلى الصفحة عشان أعطيك تحليل أدق.",
+      "",
+      `- إجمالي الإنفاق هذا الشهر: **${fuelStats.totalCostSar.toLocaleString("ar-SA")} ر.س**`,
+      `- إجمالي اللترات: **${fuelStats.totalLiters.toLocaleString("ar-SA")} لتر**`,
+      `- عدد التعبئات: **${fuelStats.fillCount}**`,
+      `- متوسط الصرفية: **${fuelStats.avgKmPerLiter ? `${fuelStats.avgKmPerLiter} كم/لتر` : "غير كافٍ للحساب"}**`,
+      "",
+      fuelStats.fillCount < 2
+        ? "تحتاج تسجل أكثر من تعبئة مع قراءة عداد مختلفة عشان أحسب الصرفية بدقة."
+        : "إذا لاحظت انخفاض مفاجئ في كم/لتر، راجع ضغط الكفرات، فلتر الهواء، والبواجي.",
+    ].join("\n");
+
+    suggestedActions = [
+      { kind: "view_vehicle", labelAr: "عرض المركبة" },
+      { kind: "schedule_maintenance", labelAr: "فحص استهلاك الوقود" },
+    ];
+  } else if (
+    normalizedMessage.includes("صيانة") ||
+    normalizedMessage.includes("زيت") ||
+    normalizedMessage.includes("فرامل") ||
+    normalizedMessage.includes("بطارية")
+  ) {
+    const nextItems = maintenanceItems.slice(0, 4);
+
+    reply = [
+      "## توصيات الصيانة",
+      "",
+      vehicle
+        ? `**المركبة:** ${vehicleName}`
+        : "**ملاحظة:** اختر مركبة عشان أطلع لك توصياتها الفعلية.",
+      "",
+      nextItems.length
+        ? "### أقرب التوصيات"
+        : "لا توجد توصيات صيانة محسوبة حاليًا. سجل آخر صيانة عشان أقدر أحسب القادم.",
+      ...nextItems.map((item: any) => {
+        const status =
+          item.status === "overdue"
+            ? "متأخرة"
+            : item.status === "upcoming"
+              ? "قريبة"
+              : "مجدولة";
+
+        return `- **${item.serviceTypeAr || item.serviceType}** — ${status}${item.remainingKm !== null && item.remainingKm !== undefined ? ` — المتبقي ${Number(item.remainingKm).toLocaleString("ar-SA")} كم` : ""}`;
+      }),
+      "",
+      "### نصيحتي",
+      "- سجل كل صيانة مع العداد.",
+      "- لا تعتمد على التاريخ فقط؛ العداد مهم جدًا.",
+      "- إذا السيارة استخدامك لها يومي، راجع الزيت والفلاتر بشكل منتظم.",
+    ].join("\n");
+
+    suggestedActions = [
+      { kind: "schedule_maintenance", labelAr: "فتح الصيانة" },
+      { kind: "view_vehicle", labelAr: "عرض المركبة" },
+    ];
+  } else if (
+    normalizedMessage.includes("حرارة") ||
+    normalizedMessage.includes("سخونة") ||
+    normalizedMessage.includes("تسخن")
+  ) {
+    reply = [
+      "## ارتفاع حرارة السيارة",
+      "",
+      "إذا السيارة بدأت تسخن، تعامل معها كحالة مهمة.",
+      "",
+      "### وش تسوي الآن؟",
+      "- وقف السيارة في مكان آمن.",
+      "- لا تفتح غطاء الرديتر وهي حارة.",
+      "- شغل المكيف على الحار إذا تحتاج تخفف الحرارة مؤقتًا.",
+      "- افحص مستوى ماء الرديتر بعد ما تبرد السيارة.",
+      "- إذا الحرارة ترتفع بسرعة، لا تكمل مشوارك.",
+      "",
+      "### أسباب شائعة",
+      "- نقص ماء الرديتر",
+      "- تهريب في نظام التبريد",
+      "- بلف حرارة",
+      "- مروحة تبريد",
+      "- طرمبة ماء",
+    ].join("\n");
+
+    suggestedActions = [
+      { kind: "schedule_maintenance", labelAr: "تسجيل فحص تبريد" },
+      { kind: "book_workshop", labelAr: "حجز ورشة" },
+    ];
+  } else {
+    reply = [
+      "## أنا معك",
+      "",
+      "اقدر أساعدك في:",
+      "- شرح أكواد الأعطال مثل P0300 و P0420 و P0171",
+      "- تحليل البنزين والصرفية",
+      "- متابعة الصيانة القادمة",
+      "- إعطاء خطوات فحص أولية قبل الورشة",
+      "",
+      vehicle
+        ? `أنت الآن تسأل عن **${vehicleName}**.`
+        : "اختر مركبة من أعلى الصفحة عشان أعطيك إجابة مرتبطة ببيانات سيارتك.",
+      "",
+      "اكتب لي المشكلة أو الكود اللي ظهر لك، مثال: `P0300` أو `السيارة تسخن`.",
+    ].join("\n");
+
+    suggestedActions = [
+      { kind: "view_vehicle", labelAr: "عرض المركبة" },
+      { kind: "view_dtc", labelAr: "عرض الأعطال" },
+    ];
+  }
+
+  return {
+    handled: true,
+    data: {
+      reply,
+      suggestedActions,
+    },
+  };
+}
   return { handled: false };
 }
 
