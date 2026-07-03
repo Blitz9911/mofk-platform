@@ -610,7 +610,7 @@ export default function Assistant() {
                 onKeyDown={e => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
                 }}
-                placeholder="اكتب رسالتك هنا... (Enter للإرسال، Shift+Enter لسطر جديد)"
+                placeholder="اكتب رسالتك هنا..."
                 rows={1}
                 disabled={aiChat.isPending}
                 className="w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 min-h-[44px] max-h-[160px]"
