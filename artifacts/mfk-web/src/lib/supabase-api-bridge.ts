@@ -1723,10 +1723,9 @@ async function handleRequest(
       .join("\n");
 
     suggestedActions = [
-      { kind: "view_dtc", labelAr: "عرض الأعطال" },
-      { kind: "schedule_maintenance", labelAr: "تسجيل صيانة" },
-      { kind: "book_workshop", labelAr: "حجز ورشة" },
-    ];
+  { kind: "view_dtc", labelAr: "عرض الأعطال" },
+  { kind: "schedule_maintenance", labelAr: "تسجيل صيانة" },
+];
   } else if (
     normalizedMessage.includes("بنزين") ||
     normalizedMessage.includes("صرف") ||
@@ -1819,9 +1818,8 @@ async function handleRequest(
     ].join("\n");
 
     suggestedActions = [
-      { kind: "schedule_maintenance", labelAr: "تسجيل فحص تبريد" },
-      { kind: "book_workshop", labelAr: "حجز ورشة" },
-    ];
+  { kind: "schedule_maintenance", labelAr: "تسجيل صيانة" },
+];
   } else {
     reply = [
       "## أنا معك",
