@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -211,6 +212,25 @@ function getActionIcon(kind?: string) {
   }
 }
 
+
+function getActionHref(kind?: string) {
+  switch (kind) {
+    case "view_dtc":
+      return "/app/dtc";
+    case "schedule_maintenance":
+      return "/app/maintenance";
+    case "view_vehicle":
+      return "/app/vehicles";
+    case "view_fuel":
+      return "/app/fuel";
+    case "book_workshop":
+      return "/app/maintenance";
+    default:
+      return "/app";
+  }
+}
+
+
 // ─── Suggestion Categories ────────────────────────────────────────────────────
 
 const SUGGESTION_GROUPS = [
@@ -252,6 +272,7 @@ export default function Assistant() {
   const { data: vehicles } = useListVehicles();
   const aiChat = useAiChat();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   // Persist messages
   useEffect(() => {
@@ -492,20 +513,21 @@ export default function Assistant() {
                       )}
                     </div>
 
-                    {msg.actions && msg.actions.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-0.5">
-                        {msg.actions.map((action, i) => (
-                          <Badge
-                            key={i}
-                            variant="outline"
-                            className="bg-background cursor-pointer hover:bg-primary/5 py-1 px-2.5 border-primary/30 text-primary gap-1 text-xs"
-                          >
-                            {getActionIcon(action.kind)}
-                            {action.labelAr}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                  {msg.actions && msg.actions.length > 0 && (
+  <div className="flex flex-wrap gap-2 mt-2">
+    {msg.actions.map((action, i) => (
+      <button
+        key={i}
+        type="button"
+        onClick={() => setLocation(getActionHref(action.kind))}
+        className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
+      >
+        {getActionIcon(action.kind)}
+        {action.labelAr}
+      </button>
+    ))}
+  </div>
+)}
 
                     <span className="text-[10px] text-muted-foreground/60 px-1">{formatTime(msg.timestamp)}</span>
                   </div>
