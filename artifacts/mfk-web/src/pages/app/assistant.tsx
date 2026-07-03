@@ -389,8 +389,8 @@ export default function Assistant() {
     new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-5rem)]">
-      {/* Header */}
+<div className="flex flex-col h-[calc(100vh-6rem)] md:h-[calc(100vh-4rem)] max-w-6xl mx-auto w-full px-1 md:px-0">   
+  {/* Header */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -428,9 +428,10 @@ export default function Assistant() {
       </div>
 
       {/* Chat area */}
-      <Card className="flex-1 flex flex-col overflow-hidden border-border relative">
-        <ScrollArea
-          className="flex-1 px-4 py-4"
+<Card className="flex-1 flex flex-col overflow-hidden border-border/80 relative rounded-3xl bg-card/80 shadow-sm">    
+  
+  <ScrollArea
+         className="flex-1 px-3 sm:px-6 py-5"
           ref={scrollRef}
           onScrollCapture={handleScroll}
         >
