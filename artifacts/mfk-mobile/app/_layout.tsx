@@ -21,8 +21,11 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 I18nManager.allowRTL(true);
 I18nManager.forceRTL(true);
 
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+const apiBaseUrl =
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : null);
 
+setBaseUrl(apiBaseUrl);
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
