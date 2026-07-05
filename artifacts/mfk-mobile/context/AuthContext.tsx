@@ -26,11 +26,24 @@ const AuthContext = createContext<AuthContextValue>({
 
 const STORAGE_KEY = "mfk-auth-user";
 
-const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+const BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
+
+
+function buildApiUrl(path: string): string {
+  if (!BASE_URL) {
+    throw new Error("رابط API غير مضبوط. أضف EXPO_PUBLIC_API_BASE_URL قبل تشغيل التطبيق.");
+  }
+
+  return `${BASE_URL.replace(/\/+$/, "")}${path}`;
+}
+
+
 
 async function apiPost<T>(path: string, body: object): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
+const res = await fetch(buildApiUrl(path), {
+  method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
