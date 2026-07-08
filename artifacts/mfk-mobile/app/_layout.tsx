@@ -17,6 +17,9 @@ import { setBaseUrl } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import "@/lib/supabase-api-bridge";
+
+
 
 I18nManager.allowRTL(true);
 I18nManager.forceRTL(true);
