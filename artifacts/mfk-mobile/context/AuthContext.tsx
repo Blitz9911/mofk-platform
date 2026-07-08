@@ -1,14 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
-export interface AuthUser {
-  userId: string;
-  name: string;
-  email?: string;
-  phone: string;
-  role: string;
-}
+import {
+  authApi,
+  type AuthUser,
+} from "@/lib/supabase";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -24,73 +26,66 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
 });
 
-const STORAGE_KEY = "mfk-auth-user";
-
-const BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ??
-  (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
-
-
-function buildApiUrl(path: string): string {
-  if (!BASE_URL) {
-    throw new Error("رابط API غير مضبوط. أضف EXPO_PUBLIC_API_BASE_URL قبل تشغيل التطبيق.");
-  }
-
-  return `${BASE_URL.replace(/\/+$/, "")}${path}`;
-}
-
-
-
-async function apiPost<T>(path: string, body: object): Promise<T> {
-const res = await fetch(buildApiUrl(path), {
-  method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "حدث خطأ");
-  return data as T;
-}
-
-export const authApi = {
-  register: (name: string, phone: string, email: string, password: string) =>
-    apiPost<AuthUser>("/api/auth/register", { name, phone, email, password }),
-
-  login: (email: string, password: string) =>
-    apiPost<AuthUser>("/api/auth/login", { email, password }),
-};
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((stored) => {
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored) as AuthUser;
-          setUser(parsed);
-          setAuthTokenGetter(() => parsed.userId);
-        } catch {}
+    let cancelled = false;
+
+    setAuthTokenGetter(() => authApi.getAccessToken());
+
+    async function restoreSession() {
+      try {
+        const currentUser = await authApi.getCurrentUser();
+
+        if (!cancelled) {
+          setUser(currentUser);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
-    });
+    }
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = useCallback(async (u: AuthUser) => {
-    setUser(u);
-    setAuthTokenGetter(() => u.userId);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+  const login = useCallback(async (nextUser: AuthUser) => {
+    setUser(nextUser);
+
+    setAuthTokenGetter(() => authApi.getAccessToken());
   }, []);
 
   const logout = useCallback(async () => {
     setUser(null);
     setAuthTokenGetter(null);
-    await AsyncStorage.removeItem(STORAGE_KEY);
+
+    await authApi.logout();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -99,3 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+export type { AuthUser };
+export { authApi };
