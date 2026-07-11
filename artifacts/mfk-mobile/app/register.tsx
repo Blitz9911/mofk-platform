@@ -41,9 +41,14 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      const user = await authApi.register(name.trim(), phone, email.trim(), password);
-      await login(user);
-      router.replace("/(tabs)");
+      const user = await authApi.register(
+  name.trim(),
+  phone,
+  email.trim(),
+  password,
+);
+
+await login(user);
     } catch (err: any) {
       setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {
