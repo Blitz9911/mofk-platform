@@ -35,9 +35,12 @@ export default function LoginScreen() {
     if (!email.trim() || !password) return;
     setIsLoading(true);
     try {
-      const user = await authApi.login(email.trim(), password);
-      await login(user);
-      router.replace("/(tabs)");
+      const user = await authApi.login(
+  email.trim(),
+  password,
+);
+
+await login(user);
     } catch (err: any) {
       setError(err.message || "البريد الإلكتروني أو كلمة المرور غير صحيحة");
     } finally {
