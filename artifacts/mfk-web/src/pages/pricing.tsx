@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { AlertCircle, CheckCircle2, Crown, Lock, ShieldCheck, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Crown } from "lucide-react";
 import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,6 @@ import {
   subscriptionPlans,
 } from "@/data/subscriptionPlans";
 
-const statusMessages = [
-  { icon: Sparkles, title: "تجربة مجانية", body: "ابدأ بإدارة السيارة والوقود والصيانة، مع تجربة AI كاملة مرة شهريًا." },
-  { icon: ShieldCheck, title: "مفك يجمع كل شيء", body: "تم دمج Plus وPro والعائلة في باقة واحدة بسعر أبسط وحتى ٣ مركبات." },
-  { icon: AlertCircle, title: "الأسطول بلا سعر", body: "الأسطول مبيعات فقط: لا سعر ظاهر، لا حاسبة، ولا تسعير لكل مركبة في الواجهة." },
-];
-
 function PlanPrice({ planId, cycle }: { planId: SubscriptionPlanId; cycle: BillingCycle }) {
   const plan = getPlanById(planId);
 
@@ -32,7 +26,7 @@ function PlanPrice({ planId, cycle }: { planId: SubscriptionPlanId; cycle: Billi
     return (
       <div className="space-y-1">
         <div className="text-3xl font-black text-white">تواصل معنا</div>
-        <p className="text-sm text-[#8A8A8A]">٥ مركبات فأكثر، بدون سعر معلن</p>
+        <p className="text-sm text-[#8A8A8A]">بدون سعر معلن</p>
       </div>
     );
   }
@@ -76,49 +70,35 @@ export default function Pricing() {
 
       <main className="pb-32 pt-28 md:pt-32">
         <section className="mx-auto w-full max-w-7xl px-4 md:px-6">
-          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#8A8A8A]">
-                <Crown className="h-4 w-4 text-[#FF6A00]" />
-                هيكل الاشتراكات النهائي
-              </div>
-              <div className="space-y-4">
-                <h1 className="max-w-2xl text-4xl font-black leading-tight tracking-normal md:text-6xl">
-                  ثلاث باقات واضحة لموفك
-                </h1>
-                <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
-                  مجاني للتجربة، مفك للاستخدام الكامل حتى ٣ مركبات، وأسطول للشركات عبر فريق المبيعات فقط.
-                </p>
-              </div>
-
-              <div className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1" role="tablist" aria-label="دورة الفوترة">
-                {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
-                  <button
-                    key={cycle}
-                    type="button"
-                    role="tab"
-                    aria-selected={billingCycle === cycle}
-                    aria-pressed={billingCycle === cycle}
-                    onClick={() => setBillingCycle(cycle)}
-                    className={cn(
-                      "rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
-                      billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
-                    )}
-                  >
-                    {cycle === "monthly" ? "شهري" : "سنوي"}
-                    {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٣٪</span>}
-                  </button>
-                ))}
-              </div>
+          <div className="max-w-3xl space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#8A8A8A]">
+              <Crown className="h-4 w-4 text-[#FF6A00]" />
+              باقات موفك
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-4xl font-black leading-tight tracking-normal md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
+              <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
+                مجاني للأساسيات، مفك لمركبة واحدة، العائلة لعدة مركبات، والأسطول للشركات عبر المبيعات.
+              </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              {statusMessages.map((item) => (
-                <div key={item.title} className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
-                  <item.icon className="mb-4 h-5 w-5 text-[#FF6A00]" />
-                  <h2 className="text-sm font-bold">{item.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[#8A8A8A]">{item.body}</p>
-                </div>
+            <div className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1" role="tablist" aria-label="دورة الفوترة">
+              {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
+                <button
+                  key={cycle}
+                  type="button"
+                  role="tab"
+                  aria-selected={billingCycle === cycle}
+                  aria-pressed={billingCycle === cycle}
+                  onClick={() => setBillingCycle(cycle)}
+                  className={cn(
+                    "rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                    billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
+                  )}
+                >
+                  {cycle === "monthly" ? "شهري" : "سنوي"}
+                  {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر أكثر</span>}
+                </button>
               ))}
             </div>
           </div>
@@ -133,13 +113,13 @@ export default function Pricing() {
           )}
 
           {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              {[1, 2, 3].map((item) => (
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
                 <Skeleton key={item} className="h-[420px] rounded-[16px] bg-[#1A1A1A]" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {subscriptionPlans.map((plan) => {
                 const selected = selectedPlanId === plan.id;
 
@@ -150,7 +130,7 @@ export default function Pricing() {
                     onClick={() => setSelectedPlanId(plan.id)}
                     aria-pressed={selected}
                     className={cn(
-                      "relative flex min-h-[430px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                      "relative flex min-h-[410px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
                       selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                     )}
                   >
@@ -183,7 +163,7 @@ export default function Pricing() {
           )}
         </section>
 
-        <section className="mx-auto mt-6 grid w-full max-w-7xl gap-6 px-4 md:px-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="mx-auto mt-6 w-full max-w-7xl px-4 md:px-6">
           <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -196,57 +176,13 @@ export default function Pricing() {
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="space-y-3">
-                <h3 className="font-black">المتاح الآن</h3>
-                {selectedPlan.included.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="font-black">ميزات مقفلة</h3>
-                {selectedPlan.locked.length ? (
-                  selectedPlan.locked.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3 rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
-                      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#5A5A5A]" />
-                      <span>{feature}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
-                    لا توجد ميزات مقفلة لهذه الباقة ضمن العرض الحالي.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {selectedPlan.id === "free" && (
-              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
-                <h2 className="text-xl font-black">باقة البداية</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">ابدأ مجانًا، وجرب التشخيص الكامل مرة شهريًا قبل الترقية إلى مفك.</p>
-              </div>
-            )}
-
-            {selectedPlan.id === "fleet" && (
-              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
-                <h2 className="text-xl font-black">الأسطول مبيعات فقط</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">لا يوجد سعر أو حاسبة للأسطول. زر التواصل يفتح نموذج أو صفحة المبيعات.</p>
-              </div>
-            )}
-
-            <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
-              <h2 className="text-xl font-black">الحصص والاحتفاظ</h2>
-              <div className="mt-4 space-y-3">
-                {selectedPlan.quotas.map((quota) => (
-                  <div key={quota} className="rounded-[12px] bg-[#222] p-3 text-sm leading-6 text-[#E6E6E6]">{quota}</div>
-                ))}
-              </div>
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {selectedPlan.included.map((feature) => (
+                <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                  <span>{feature}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -254,16 +190,17 @@ export default function Pricing() {
         <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
           <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
             <div className="mb-6">
-              <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة الكامل</p>
-              <h2 className="mt-2 text-2xl font-black">كل الميزات في شاشة واحدة</h2>
+              <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
+              <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[780px] text-sm">
+              <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
                     <th className="p-3 text-right">الميزة</th>
                     <th className="p-3 text-center">مجاني</th>
                     <th className="p-3 text-center text-[#FF6A00]">مفك</th>
+                    <th className="p-3 text-center">العائلة</th>
                     <th className="p-3 text-center">أسطول</th>
                   </tr>
                 </thead>
@@ -271,13 +208,14 @@ export default function Pricing() {
                   {comparisonRows.map((row) =>
                     row.type === "section" ? (
                       <tr key={row.label}>
-                        <td colSpan={4} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                        <td colSpan={5} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
                       </tr>
                     ) : (
                       <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                         <td className="p-3 font-bold">{row.label}</td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
                         <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                       </tr>
                     ),

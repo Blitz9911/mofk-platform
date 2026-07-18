@@ -1,6 +1,6 @@
 export type BillingCycle = "monthly" | "yearly";
 
-export type SubscriptionPlanId = "free" | "mofk" | "fleet";
+export type SubscriptionPlanId = "free" | "mofk" | "family" | "fleet";
 
 export type SubscriptionPlan = {
   id: SubscriptionPlanId;
@@ -13,129 +13,134 @@ export type SubscriptionPlan = {
   badge?: string;
   summary: string;
   included: string[];
-  locked: string[];
-  quotas: string[];
 };
 
 export type ComparisonRow =
   | { type: "section"; label: string }
-  | { type: "feature"; label: string; free: string; mofk: string; fleet: string };
+  | {
+      type: "feature";
+      label: string;
+      free: string;
+      mofk: string;
+      family: string;
+      fleet: string;
+    };
 
 export const subscriptionPlans: SubscriptionPlan[] = [
   {
     id: "free",
     name: "مجاني",
-    subtitle: "أساسيات إدارة السيارة بدون بطاقة بنكية",
+    subtitle: "أساسيات إدارة المركبة بدون الذكاء الاصطناعي",
     monthlyPrice: 0,
     yearlyPrice: 0,
     maxVehicles: 1,
     saleType: "self-serve",
-    summary: "مناسب لمن يريد تسجيل بيانات السيارة والصيانة والوقود مع تجربة محدودة للذكاء الاصطناعي.",
+    summary: "لمن يريد تسجيل بيانات السيارة والصيانة والوقود فقط، بدون خدمات AI أو OBD.",
     included: [
       "مركبة واحدة",
+      "تسجيل بيانات المركبة",
       "سجل الصيانة والتكاليف",
-      "تذكيرات التأمين والاستمارة",
-      "١٥ رسالة مساعد ذكي شهريًا",
-      "تشخيص AI كامل مرة شهريًا",
+      "متابعة مواعيد الصيانة",
+      "تسجيل تعبئات البنزين",
     ],
-    locked: [
-      "ربط جهاز مفك OBD-II",
-      "البيانات الحية وتنبيهات الأعطال",
-      "تقدير تكلفة الإصلاح",
-      "تصدير PDF والرسوم البيانية",
-    ],
-    quotas: ["سجل الصيانة اليدوي دائم", "سجلات الوقود دائمة", "١٥ رسالة ذكاء اصطناعي شهريًا", "تشخيص كامل واحد شهريًا"],
   },
   {
     id: "mofk",
     name: "مفك",
-    subtitle: "الباقة الكاملة للأفراد وحتى ٣ مركبات",
+    subtitle: "الخطة الكاملة لمركبة واحدة",
     monthlyPrice: 29,
     yearlyPrice: 199,
-    maxVehicles: 3,
+    maxVehicles: 1,
     saleType: "self-serve",
     badge: "الأكثر اختيارًا",
-    summary: "تجمع مزايا Plus وPro والعائلة في خطة واحدة: OBD، تشخيص ذكي، تقارير، وحتى ٣ مركبات.",
+    summary: "تشخيص ذكي، ربط OBD، بيانات حية، وتقارير لمركبة واحدة.",
     included: [
-      "حتى ٣ مركبات",
+      "مركبة واحدة",
       "ربط جهاز مفك OBD-II",
+      "البيانات الحية وتنبيهات الأعطال",
       "تشخيص AI غير محدود",
-      "رسائل مساعد ذكي غير محدودة",
-      "تقدير تكلفة الإصلاح وتصدير PDF",
+      "رسائل المساعد الذكي غير محدودة",
     ],
-    locked: [
-      "لوحة تحكم الأسطول",
-      "مقارنة المركبات وترتيب التدخل",
-      "تصدير API/CSV",
-      "مدير حساب مخصص",
+  },
+  {
+    id: "family",
+    name: "العائلة",
+    subtitle: "عدة مركبات في حساب واحد",
+    monthlyPrice: 59,
+    yearlyPrice: 419,
+    maxVehicles: 4,
+    saleType: "self-serve",
+    summary: "كل مزايا مفك مع إدارة حتى ٤ مركبات للعائلة.",
+    included: [
+      "حتى ٤ مركبات",
+      "كل مزايا مفك",
+      "تقارير لكل مركبة",
+      "رسائل المساعد الذكي غير محدودة",
+      "تصدير PDF",
     ],
-    quotas: ["حفظ OBD الخام ٢٤ شهرًا", "تاريخ الأعطال ٢٤ شهرًا", "مؤشر صحة المركبة ٣٦٥ يومًا", "+١٥ ر.س شهريًا لكل مركبة إضافية حتى ٣"],
   },
   {
     id: "fleet",
     name: "أسطول",
-    subtitle: "للشركات: تواصل مع المبيعات بدون سعر معلن",
+    subtitle: "للشركات: تواصل مع المبيعات",
     monthlyPrice: null,
     yearlyPrice: null,
     maxVehicles: "sales",
     saleType: "sales-led",
-    summary: "خطة مبيعات للشركات تبدأ من ٥ مركبات فأكثر، بدون تسعير ظاهر أو حاسبة في الواجهة.",
+    summary: "حل للشركات يبدأ من ٥ مركبات فأكثر، بدون سعر معلن في الواجهة.",
     included: [
       "٥ مركبات فأكثر",
       "لوحة تحكم الأسطول",
       "مقارنة المركبات وترتيب أولوية التدخل",
-      "تصدير البيانات API/CSV",
-      "مدير حساب مخصص",
+      "تصدير البيانات Excel",
+      "دعم خاص",
     ],
-    locked: [],
-    quotas: ["حفظ OBD الخام ٣٦ شهرًا", "تاريخ الأعطال ٣٦ شهرًا", "٥٠٠ رسالة مساعد ذكي لكل مستخدم", "حتى ١٠ مستخدمين"],
   },
 ];
 
 export const comparisonRows: ComparisonRow[] = [
-  { type: "feature", label: "السعر الشهري", free: "مجانًا", mofk: "٢٩ ر.س", fleet: "تواصل معنا" },
-  { type: "feature", label: "السعر السنوي", free: "مجانًا", mofk: "١٩٩ ر.س", fleet: "تواصل معنا" },
-  { type: "feature", label: "عدد المركبات", free: "مركبة واحدة", mofk: "حتى ٣ مركبات", fleet: "٥ فأكثر" },
+  {
+    type: "feature",
+    label: "عدد المركبات",
+    free: "مركبة واحدة",
+    mofk: "مركبة واحدة",
+    family: "حتى ٤ مركبات",
+    fleet: "٥ فأكثر",
+  },
   { type: "section", label: "الأساسيات" },
-  { type: "feature", label: "تسجيل بيانات المركبة", free: "نعم", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "سجل الصيانة والتكاليف", free: "نعم", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "متابعة مواعيد الصيانة", free: "نعم", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تذكيرات التأمين والاستمارة", free: "نعم", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تسجيل تعبئات البنزين", free: "نعم", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "حساب استهلاك الوقود", free: "أساسي", mofk: "متقدم", fleet: "متقدم" },
-  { type: "feature", label: "تكلفة الكيلومتر", free: "لا", mofk: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تسجيل بيانات المركبة", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "سجل الصيانة والتكاليف", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "متابعة مواعيد الصيانة", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تسجيل تعبئات البنزين", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "حساب استهلاك الوقود", free: "أساسي", mofk: "متقدم", family: "متقدم", fleet: "متقدم" },
   { type: "section", label: "OBD والبيانات الحية" },
-  { type: "feature", label: "ربط جهاز مفك OBD-II", free: "لا", mofk: "نعم", fleet: "لكل مركبة" },
-  { type: "feature", label: "البيانات الحية للمركبة", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "اكتشاف الأعطال تلقائيًا", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تنبيهات الأعطال الحرجة", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تنبيهات الحرارة والبطارية", free: "لا", mofk: "نعم", fleet: "نعم" },
+  { type: "feature", label: "ربط جهاز مفك OBD-II", free: "لا", mofk: "نعم", family: "نعم", fleet: "لكل مركبة" },
+  { type: "feature", label: "البيانات الحية للمركبة", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "اكتشاف الأعطال تلقائيًا", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تنبيهات الأعطال الحرجة", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تنبيهات الحرارة والبطارية", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "section", label: "التشخيص والذكاء الاصطناعي" },
-  { type: "feature", label: "شرح الأعطال بالعربي", free: "إدخال يدوي", mofk: "تلقائي ومفصل", fleet: "تلقائي ومفصل" },
-  { type: "feature", label: "تشخيص AI كامل", free: "مرة شهريًا", mofk: "غير محدود", fleet: "غير محدود" },
-  { type: "feature", label: "رسائل المساعد الذكي", free: "١٥/شهر", mofk: "غير محدود", fleet: "٥٠٠/مستخدم" },
-  { type: "feature", label: "تصنيف خطورة الأعطال", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "هل أقدر أكمل قيادة؟", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تقدير تكلفة الإصلاح", free: "لا", mofk: "نعم", fleet: "نعم" },
+  { type: "feature", label: "شرح الأعطال بالعربي", free: "لا", mofk: "تلقائي ومفصل", family: "تلقائي ومفصل", fleet: "تلقائي ومفصل" },
+  { type: "feature", label: "تشخيص AI كامل", free: "لا", mofk: "غير محدود", family: "غير محدود", fleet: "غير محدود" },
+  { type: "feature", label: "رسائل المساعد الذكي", free: "لا", mofk: "غير محدود", family: "غير محدود", fleet: "غير محدود" },
+  { type: "feature", label: "تصنيف خطورة الأعطال", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "هل أقدر أكمل قيادة؟", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تقدير تكلفة الإصلاح", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "section", label: "صحة المركبة والتقارير" },
-  { type: "feature", label: "مؤشر صحة المركبة", free: "لا", mofk: "تفصيلي كامل", fleet: "تفصيلي لكل مركبة" },
-  { type: "feature", label: "متابعة تغير الصحة", free: "لا", mofk: "١٢ شهرًا", fleet: "على مستوى الأسطول" },
-  { type: "feature", label: "توصيات الصيانة الذكية", free: "أساسية", mofk: "متقدمة", fleet: "متقدمة" },
-  { type: "feature", label: "الرسوم البيانية", free: "لا", mofk: "أسبوعي وشهري وسنوي", fleet: "تقارير موحدة" },
-  { type: "feature", label: "تصدير PDF", free: "لا", mofk: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تقرير فحص ما قبل الشراء", free: "لا", mofk: "نعم", fleet: "لا" },
+  { type: "feature", label: "مؤشر صحة المركبة", free: "لا", mofk: "تفصيلي", family: "تفصيلي لكل مركبة", fleet: "تفصيلي لكل مركبة" },
+  { type: "feature", label: "توصيات الصيانة الذكية", free: "أساسية", mofk: "متقدمة", family: "متقدمة", fleet: "متقدمة" },
+  { type: "feature", label: "الرسوم البيانية", free: "لا", mofk: "أسبوعي وشهري وسنوي", family: "أسبوعي وشهري وسنوي", fleet: "تقارير موحدة" },
+  { type: "feature", label: "تصدير PDF", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "section", label: "مزايا الأسطول" },
-  { type: "feature", label: "لوحة تحكم الأسطول", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "feature", label: "مقارنة المركبات", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "feature", label: "ترتيب حسب أولوية التدخل", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "feature", label: "إجمالي تكاليف الأسطول", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "feature", label: "المستخدمون والصلاحيات", free: "مستخدم واحد", mofk: "مستخدم واحد", fleet: "حتى ١٠ مستخدمين" },
-  { type: "feature", label: "تصدير البيانات API/CSV", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "feature", label: "مدير حساب مخصص", free: "لا", mofk: "لا", fleet: "نعم" },
-  { type: "section", label: "الحفظ والدعم" },
-  { type: "feature", label: "سجل الصيانة اليدوي", free: "دائم", mofk: "دائم", fleet: "دائم" },
-  { type: "feature", label: "حفظ بيانات OBD الخام", free: "لا ينطبق", mofk: "٢٤ شهرًا", fleet: "٣٦ شهرًا" },
-  { type: "feature", label: "الدعم الفني", free: "أساسي", mofk: "أولوية", fleet: "أولوية قصوى" },
+  { type: "feature", label: "لوحة تحكم الأسطول", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "مقارنة المركبات", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "ترتيب حسب أولوية التدخل", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "إجمالي تكاليف الأسطول", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "المستخدمون والصلاحيات", free: "مستخدم واحد", mofk: "مستخدم واحد", family: "مستخدم واحد", fleet: "حسب العقد" },
+  { type: "feature", label: "تصدير البيانات Excel", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "مدير حساب مخصص", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "section", label: "الدعم" },
+  { type: "feature", label: "الدعم الفني", free: "أساسي", mofk: "أولوية", family: "أولوية", fleet: "دعم خاص" },
 ];
 
 export const getPlanById = (id: SubscriptionPlanId) =>

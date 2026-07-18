@@ -4,7 +4,6 @@ import {
   CalendarClock,
   CheckCircle2,
   CreditCard,
-  Lock,
   LucideIcon,
   ReceiptText,
   RefreshCw,
@@ -57,7 +56,7 @@ function PlanAmount({ planId, cycle }: { planId: SubscriptionPlanId; cycle: Bill
     return (
       <>
         <span className="text-2xl font-black">تواصل معنا</span>
-        <span className="text-xs text-[#8A8A8A]">لا يوجد سعر معلن للأسطول</span>
+        <span className="text-xs text-[#8A8A8A]">بدون سعر معلن</span>
       </>
     );
   }
@@ -100,7 +99,7 @@ export default function Subscription() {
             <p className="text-sm font-bold text-[#FF6A00]">الاشتراك والباقات</p>
             <h1 className="mt-2 text-3xl font-black tracking-normal md:text-4xl">إدارة اشتراك موفك</h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">
-              الهيكل النهائي بثلاث باقات: مجاني، مفك، وأسطول تواصل مع المبيعات بدون تسعير ظاهر.
+              مجاني للأساسيات، مفك لمركبة واحدة، العائلة لعدة مركبات، والأسطول للشركات.
             </p>
           </div>
 
@@ -119,7 +118,7 @@ export default function Subscription() {
                 )}
               >
                 {cycle === "monthly" ? "شهري" : "سنوي"}
-                {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٣٪</span>}
+                {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر أكثر</span>}
               </button>
             ))}
           </div>
@@ -161,7 +160,7 @@ export default function Subscription() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {subscriptionPlans.map((plan) => {
             const selected = selectedPlanId === plan.id;
             const current = currentPlanId === plan.id;
@@ -208,83 +207,41 @@ export default function Subscription() {
           })}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm font-bold text-[#FF6A00]">مقارنة الصلاحيات</p>
-                <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
-                <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
-              </div>
-              <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
-                {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
-              </div>
+        <section className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#FF6A00]">تفاصيل الباقة</p>
+              <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
             </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="space-y-3">
-                <h3 className="font-black">مفعلة</h3>
-                {selectedPlan.included.map((feature) => (
-                  <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
-                    <span>{feature}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-3">
-                <h3 className="font-black">مقفلة</h3>
-                {selectedPlan.locked.length ? (
-                  selectedPlan.locked.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3 rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
-                      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#5A5A5A]" />
-                      <span>{feature}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">لا توجد ميزات مقفلة لهذه الباقة.</div>
-                )}
-              </div>
+            <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
+              {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
             </div>
           </div>
 
-          <aside className="space-y-4">
-            {selectedPlan.id === "free" && (
-              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
-                <h2 className="text-xl font-black">باقة البداية</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">تجربة مجانية واضحة مع سجل دائم للصيانة والوقود.</p>
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {selectedPlan.included.map((feature) => (
+              <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                <span>{feature}</span>
               </div>
-            )}
-
-            {selectedPlan.id === "fleet" && (
-              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
-                <h2 className="text-xl font-black">الأسطول بلا حاسبة</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">التسعير بالكامل عبر المبيعات، ولا يوجد حقل عدد مركبات أو preview للأسطول.</p>
-              </div>
-            )}
-
-            <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
-              <h2 className="text-xl font-black">الحصص والاحتفاظ</h2>
-              <div className="mt-4 space-y-3">
-                {selectedPlan.quotas.map((quota) => (
-                  <div key={quota} className="rounded-[12px] bg-[#222] p-3 text-sm leading-6 text-[#E6E6E6]">{quota}</div>
-                ))}
-              </div>
-            </div>
-          </aside>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
           <div className="mb-6">
-            <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة الكامل</p>
-            <h2 className="mt-2 text-2xl font-black">كل الميزات في شاشة واحدة</h2>
+            <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
+            <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[780px] text-sm">
+            <table className="w-full min-w-[920px] text-sm">
               <thead>
                 <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
                   <th className="p-3 text-right">الميزة</th>
                   <th className="p-3 text-center">مجاني</th>
                   <th className="p-3 text-center text-[#FF6A00]">مفك</th>
+                  <th className="p-3 text-center">العائلة</th>
                   <th className="p-3 text-center">أسطول</th>
                 </tr>
               </thead>
@@ -292,13 +249,14 @@ export default function Subscription() {
                 {comparisonRows.map((row) =>
                   row.type === "section" ? (
                     <tr key={row.label}>
-                      <td colSpan={4} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                      <td colSpan={5} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
                     </tr>
                   ) : (
                     <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                       <td className="p-3 font-bold">{row.label}</td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
                       <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                      <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                     </tr>
                   ),
