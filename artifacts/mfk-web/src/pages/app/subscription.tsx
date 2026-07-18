@@ -9,18 +9,16 @@ import {
   ReceiptText,
   RefreshCw,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import {
   BillingCycle,
   SubscriptionPlanId,
+  comparisonRows,
   formatSar,
   formatVehicles,
   getDisplayPrice,
-  getFleetPreview,
   getMonthlyEquivalent,
   getPlanById,
   getYearlySavings,
@@ -52,20 +50,14 @@ const stateCopy: Record<PaymentState, { title: string; body: string; tone: strin
   },
 };
 
-function PlanAmount({
-  planId,
-  cycle,
-}: {
-  planId: SubscriptionPlanId;
-  cycle: BillingCycle;
-}) {
+function PlanAmount({ planId, cycle }: { planId: SubscriptionPlanId; cycle: BillingCycle }) {
   const plan = getPlanById(planId);
 
-  if (plan.id === "fleet") {
+  if (plan.saleType === "sales-led") {
     return (
       <>
-        <span className="text-2xl font-black">حسب العدد</span>
-        <span className="text-xs text-[#8A8A8A]">يبدأ من ٢١ ر.س لكل مركبة</span>
+        <span className="text-2xl font-black">تواصل معنا</span>
+        <span className="text-xs text-[#8A8A8A]">لا يوجد سعر معلن للأسطول</span>
       </>
     );
   }
@@ -79,21 +71,25 @@ function PlanAmount({
       <span className="text-3xl font-black">{formatSar(displayPrice)}</span>
       <span className="text-xs text-[#8A8A8A]">
         ر.س / شهر
-        {cycle === "yearly" && plan.yearlyPrice ? `، تدفع ${formatSar(plan.yearlyPrice)} سنويًا` : ""}
+        {cycle === "yearly" && plan.yearlyPrice ? `، تدفع ${formatSar(plan.yearlyPrice)} سنويًا وتوفر ${getYearlySavings(plan)}٪` : ""}
       </span>
     </>
   );
 }
 
+function CellValue({ value }: { value: string }) {
+  if (value === "نعم") return <CheckCircle2 className="mx-auto h-5 w-5 text-[#2ECC71]" />;
+  if (value === "لا") return <span className="text-[#5A5A5A]">-</span>;
+  return <span>{value}</span>;
+}
+
 export default function Subscription() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
-  const [fleetVehicles, setFleetVehicles] = useState(30);
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
 
   const currentPlanId: SubscriptionPlanId = "free";
   const currentPlan = getPlanById(currentPlanId);
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
-  const fleetPreview = getFleetPreview(fleetVehicles);
   const StatusIcon = stateCopy[paymentState].icon;
 
   return (
@@ -104,15 +100,11 @@ export default function Subscription() {
             <p className="text-sm font-bold text-[#FF6A00]">الاشتراك والباقات</p>
             <h1 className="mt-2 text-3xl font-black tracking-normal md:text-4xl">إدارة اشتراك موفك</h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">
-              اختر الخطة المناسبة، راجع الميزات المقفلة، وعاين تكلفة الأسطول قبل الانتقال للدفع.
+              الهيكل النهائي بثلاث باقات: مجاني، مفك، وأسطول تواصل مع المبيعات بدون تسعير ظاهر.
             </p>
           </div>
 
-          <div
-            className="inline-grid w-full grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1 sm:w-auto"
-            role="tablist"
-            aria-label="دورة الفوترة"
-          >
+          <div className="inline-grid w-full grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1 sm:w-auto" role="tablist" aria-label="دورة الفوترة">
             {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
               <button
                 key={cycle}
@@ -127,7 +119,7 @@ export default function Subscription() {
                 )}
               >
                 {cycle === "monthly" ? "شهري" : "سنوي"}
-                {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٠٪</span>}
+                {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٣٪</span>}
               </button>
             ))}
           </div>
@@ -142,11 +134,7 @@ export default function Subscription() {
                 <p className="mt-1 text-sm leading-6 opacity-85">{stateCopy[paymentState].body}</p>
               </div>
             </div>
-            {paymentState === "past_due" && (
-              <Button className="rounded-[12px] bg-[#FF6A00] hover:bg-[#E65C00]">
-                إعادة محاولة الدفع
-              </Button>
-            )}
+            {paymentState === "past_due" && <Button className="rounded-[12px] bg-[#FF6A00] hover:bg-[#E65C00]">إعادة محاولة الدفع</Button>}
           </div>
         </section>
 
@@ -173,7 +161,7 @@ export default function Subscription() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <section className="grid gap-4 md:grid-cols-3">
           {subscriptionPlans.map((plan) => {
             const selected = selectedPlanId === plan.id;
             const current = currentPlanId === plan.id;
@@ -185,7 +173,7 @@ export default function Subscription() {
                 onClick={() => setSelectedPlanId(plan.id)}
                 aria-pressed={selected}
                 className={cn(
-                  "flex min-h-[370px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  "flex min-h-[360px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
                   selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                 )}
               >
@@ -202,7 +190,7 @@ export default function Subscription() {
                 </div>
 
                 <div className="mt-5 space-y-3">
-                  {plan.included.slice(0, 3).map((feature) => (
+                  {plan.included.slice(0, 4).map((feature) => (
                     <div key={feature} className="flex items-start gap-2 text-sm leading-6">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
                       {feature}
@@ -212,7 +200,7 @@ export default function Subscription() {
 
                 <div className="mt-auto pt-5">
                   <div className={cn("rounded-[12px] px-4 py-3 text-center text-sm font-black", current ? "bg-[#2ECC71]/15 text-[#BDF2CC]" : "bg-[#0B0B0B] text-white")}>
-                    {current ? "باقتك الحالية" : selected ? "محددة" : "اختيار"}
+                    {current ? "باقتك الحالية" : plan.saleType === "sales-led" ? "تواصل مع المبيعات" : selected ? "محددة" : "اختيار"}
                   </div>
                 </div>
               </button>
@@ -229,7 +217,7 @@ export default function Subscription() {
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
               </div>
               <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
-                {selectedPlan.maxVehicles === "fleet" ? "مركبات حسب العقد" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
+                {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
               </div>
             </div>
 
@@ -253,9 +241,7 @@ export default function Subscription() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
-                    لا توجد ميزات مقفلة لهذه الباقة.
-                  </div>
+                  <div className="rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">لا توجد ميزات مقفلة لهذه الباقة.</div>
                 )}
               </div>
             </div>
@@ -265,39 +251,61 @@ export default function Subscription() {
             {selectedPlan.id === "free" && (
               <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
                 <h2 className="text-xl font-black">باقة البداية</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">
-                  يظهر هذا العرض فقط عند تحديد المجاني، حتى يكون مسار الترقية واضحًا وغير مزعج.
-                </p>
+                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">تجربة مجانية واضحة مع سجل دائم للصيانة والوقود.</p>
+              </div>
+            )}
+
+            {selectedPlan.id === "fleet" && (
+              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
+                <h2 className="text-xl font-black">الأسطول بلا حاسبة</h2>
+                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">التسعير بالكامل عبر المبيعات، ولا يوجد حقل عدد مركبات أو preview للأسطول.</p>
               </div>
             )}
 
             <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-[#FF6A00]" />
-                <h2 className="text-xl font-black">معاينة الأسطول</h2>
-              </div>
-              <div className="mt-5 space-y-5">
-                <div className="flex items-center justify-between rounded-[12px] bg-[#222] p-4">
-                  <span className="text-sm text-[#8A8A8A]">المركبات</span>
-                  <span className="text-2xl font-black">{formatVehicles(fleetVehicles)}</span>
-                </div>
-                <Slider
-                  min={5}
-                  max={120}
-                  step={1}
-                  value={[fleetVehicles]}
-                  onValueChange={(value) => setFleetVehicles(value[0] ?? 5)}
-                  aria-label="عدد مركبات الأسطول"
-                />
-                <div className="rounded-[12px] bg-[#222] p-4">
-                  <p className="text-sm text-[#8A8A8A]">{fleetPreview.label}</p>
-                  <p className="mt-2 text-2xl font-black">
-                    {fleetPreview.total === null ? "عرض خاص" : `${formatSar(fleetPreview.total)} ر.س / شهر`}
-                  </p>
-                </div>
+              <h2 className="text-xl font-black">الحصص والاحتفاظ</h2>
+              <div className="mt-4 space-y-3">
+                {selectedPlan.quotas.map((quota) => (
+                  <div key={quota} className="rounded-[12px] bg-[#222] p-3 text-sm leading-6 text-[#E6E6E6]">{quota}</div>
+                ))}
               </div>
             </div>
           </aside>
+        </section>
+
+        <section className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+          <div className="mb-6">
+            <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة الكامل</p>
+            <h2 className="mt-2 text-2xl font-black">كل الميزات في شاشة واحدة</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[780px] text-sm">
+              <thead>
+                <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
+                  <th className="p-3 text-right">الميزة</th>
+                  <th className="p-3 text-center">مجاني</th>
+                  <th className="p-3 text-center text-[#FF6A00]">مفك</th>
+                  <th className="p-3 text-center">أسطول</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonRows.map((row) =>
+                  row.type === "section" ? (
+                    <tr key={row.label}>
+                      <td colSpan={4} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                    </tr>
+                  ) : (
+                    <tr key={row.label} className="border-b border-[#2A2A2A]/80">
+                      <td className="p-3 font-bold">{row.label}</td>
+                      <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
+                      <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                      <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
       </div>
 
@@ -309,7 +317,7 @@ export default function Subscription() {
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
             <Button className="h-12 rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00]">
-              {selectedPlan.id === "fleet" ? "طلب عرض للأسطول" : "متابعة الدفع"}
+              {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "متابعة الدفع"}
             </Button>
           </div>
         </div>

@@ -1,33 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  Crown,
-  Lock,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, Crown, Lock, ShieldCheck, Sparkles } from "lucide-react";
 import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   BillingCycle,
   SubscriptionPlanId,
+  comparisonRows,
   formatSar,
   formatVehicles,
   getDisplayPrice,
-  getFleetPreview,
   getMonthlyEquivalent,
   getPlanById,
   getYearlySavings,
@@ -35,36 +20,31 @@ import {
 } from "@/data/subscriptionPlans";
 
 const statusMessages = [
-  { icon: Sparkles, title: "تجربة مجانية", body: "يمكنك البدء الآن، وسجل الصيانة اليدوي يبقى محفوظًا دائمًا." },
-  { icon: ShieldCheck, title: "مشترك حالي", body: "سنظهر باقتك الحالية ونقترح الترقية المناسبة بدون إخفاء الميزات المقفلة." },
-  { icon: AlertCircle, title: "تعثر الدفع", body: "إذا فشل الدفع ستظهر رسالة واضحة مع زر إعادة المحاولة قبل إيقاف الميزات." },
+  { icon: Sparkles, title: "تجربة مجانية", body: "ابدأ بإدارة السيارة والوقود والصيانة، مع تجربة AI كاملة مرة شهريًا." },
+  { icon: ShieldCheck, title: "مفك يجمع كل شيء", body: "تم دمج Plus وPro والعائلة في باقة واحدة بسعر أبسط وحتى ٣ مركبات." },
+  { icon: AlertCircle, title: "الأسطول بلا سعر", body: "الأسطول مبيعات فقط: لا سعر ظاهر، لا حاسبة، ولا تسعير لكل مركبة في الواجهة." },
 ];
 
-function PlanPrice({
-  planId,
-  cycle,
-}: {
-  planId: SubscriptionPlanId;
-  cycle: BillingCycle;
-}) {
+function PlanPrice({ planId, cycle }: { planId: SubscriptionPlanId; cycle: BillingCycle }) {
   const plan = getPlanById(planId);
 
-  if (plan.id === "fleet") {
+  if (plan.saleType === "sales-led") {
     return (
       <div className="space-y-1">
-        <div className="text-3xl font-black text-white">حسب العدد</div>
-        <p className="text-sm text-[#8A8A8A]">يبدأ من ٢١ ر.س لكل مركبة</p>
+        <div className="text-3xl font-black text-white">تواصل معنا</div>
+        <p className="text-sm text-[#8A8A8A]">٥ مركبات فأكثر، بدون سعر معلن</p>
       </div>
     );
   }
 
   const price = getDisplayPrice(plan, cycle) ?? 0;
   const monthlyEquivalent = getMonthlyEquivalent(plan);
+  const displayPrice = cycle === "yearly" && monthlyEquivalent ? monthlyEquivalent : price;
 
   return (
     <div className="space-y-1">
       <div className="flex items-end gap-2">
-        <span className="text-4xl font-black text-white">{formatSar(cycle === "yearly" && monthlyEquivalent ? monthlyEquivalent : price)}</span>
+        <span className="text-4xl font-black text-white">{formatSar(displayPrice)}</span>
         <span className="pb-1 text-sm text-[#8A8A8A]">ر.س / شهر</span>
       </div>
       {cycle === "yearly" && plan.yearlyPrice ? (
@@ -76,16 +56,19 @@ function PlanPrice({
   );
 }
 
+function CellValue({ value }: { value: string }) {
+  if (value === "نعم") return <CheckCircle2 className="mx-auto h-5 w-5 text-[#2ECC71]" />;
+  if (value === "لا") return <span className="text-[#5A5A5A]">-</span>;
+  return <span>{value}</span>;
+}
+
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
-  const [fleetOpen, setFleetOpen] = useState(false);
-  const [fleetVehicles, setFleetVehicles] = useState(30);
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
   const [isLoading] = useState(false);
   const [networkError] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
-  const fleetPreview = getFleetPreview(fleetVehicles);
 
   return (
     <div className="dark min-h-screen bg-[#0B0B0B] text-white" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
@@ -97,22 +80,18 @@ export default function Pricing() {
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#8A8A8A]">
                 <Crown className="h-4 w-4 text-[#FF6A00]" />
-                اشتراكات موفك الجديدة
+                هيكل الاشتراكات النهائي
               </div>
               <div className="space-y-4">
                 <h1 className="max-w-2xl text-4xl font-black leading-tight tracking-normal md:text-6xl">
-                  اختر الباقة التي تفهم سيارتك معك
+                  ثلاث باقات واضحة لموفك
                 </h1>
                 <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
-                  خطط واضحة للأفراد والعائلات والأساطيل، مع ميزات مقفلة ظاهرة بدل إخفائها حتى تعرف بالضبط ماذا ستحصل عند الترقية.
+                  مجاني للتجربة، مفك للاستخدام الكامل حتى ٣ مركبات، وأسطول للشركات عبر فريق المبيعات فقط.
                 </p>
               </div>
 
-              <div
-                className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1"
-                role="tablist"
-                aria-label="دورة الفوترة"
-              >
+              <div className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1" role="tablist" aria-label="دورة الفوترة">
                 {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
                   <button
                     key={cycle}
@@ -123,13 +102,11 @@ export default function Pricing() {
                     onClick={() => setBillingCycle(cycle)}
                     className={cn(
                       "rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
-                      billingCycle === cycle
-                        ? "bg-[#FF6A00] text-white"
-                        : "text-[#8A8A8A] hover:text-white",
+                      billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
                     )}
                   >
                     {cycle === "monthly" ? "شهري" : "سنوي"}
-                    {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٠٪</span>}
+                    {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٣٪</span>}
                   </button>
                 ))}
               </div>
@@ -156,13 +133,13 @@ export default function Pricing() {
           )}
 
           {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              {[1, 2, 3, 4, 5].map((item) => (
+            <div className="grid gap-4 md:grid-cols-3">
+              {[1, 2, 3].map((item) => (
                 <Skeleton key={item} className="h-[420px] rounded-[16px] bg-[#1A1A1A]" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-3">
               {subscriptionPlans.map((plan) => {
                 const selected = selectedPlanId === plan.id;
 
@@ -173,17 +150,11 @@ export default function Pricing() {
                     onClick={() => setSelectedPlanId(plan.id)}
                     aria-pressed={selected}
                     className={cn(
-                      "relative flex min-h-[440px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
-                      selected
-                        ? "border-[#FF6A00] bg-[#222]"
-                        : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
+                      "relative flex min-h-[430px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                      selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                     )}
                   >
-                    {plan.badge && (
-                      <span className="absolute left-4 top-4 rounded-full bg-[#FF6A00] px-3 py-1 text-xs font-black text-white">
-                        {plan.badge}
-                      </span>
-                    )}
+                    {plan.badge && <span className="absolute left-4 top-4 rounded-full bg-[#FF6A00] px-3 py-1 text-xs font-black text-white">{plan.badge}</span>}
 
                     <div className="space-y-3">
                       <h2 className="text-2xl font-black">{plan.name}</h2>
@@ -192,7 +163,7 @@ export default function Pricing() {
                     </div>
 
                     <div className="mt-6 space-y-3">
-                      {plan.included.slice(0, 4).map((feature) => (
+                      {plan.included.slice(0, 5).map((feature) => (
                         <div key={feature} className="flex items-start gap-2 text-sm leading-6">
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
                           <span>{feature}</span>
@@ -202,7 +173,7 @@ export default function Pricing() {
 
                     <div className="mt-auto pt-6">
                       <div className="rounded-[12px] border border-[#2A2A2A] bg-[#0B0B0B] px-4 py-3 text-center text-sm font-bold text-white">
-                        {selected ? "الباقة المحددة" : "اختيار الباقة"}
+                        {plan.saleType === "sales-led" ? "تواصل مع المبيعات" : selected ? "الباقة المحددة" : "اختيار الباقة"}
                       </div>
                     </div>
                   </button>
@@ -212,7 +183,7 @@ export default function Pricing() {
           )}
         </section>
 
-        <section className="mx-auto mt-6 grid w-full max-w-7xl gap-6 px-4 md:px-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="mx-auto mt-6 grid w-full max-w-7xl gap-6 px-4 md:px-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -221,7 +192,7 @@ export default function Pricing() {
                 <p className="mt-2 text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
               </div>
               <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
-                الحد: {selectedPlan.maxVehicles === "fleet" ? "حسب العقد" : `${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
+                {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
               </div>
             </div>
 
@@ -258,67 +229,61 @@ export default function Pricing() {
             {selectedPlan.id === "free" && (
               <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
                 <h2 className="text-xl font-black">باقة البداية</h2>
-                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">
-                  ابدأ بالمجاني ثم فعّل بلس عندما تحتاج تفسيرًا أوضح وتنبيهات صيانة ذكية.
-                </p>
+                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">ابدأ مجانًا، وجرب التشخيص الكامل مرة شهريًا قبل الترقية إلى مفك.</p>
               </div>
             )}
 
-            <Collapsible open={fleetOpen} onOpenChange={setFleetOpen}>
-              <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
-                <CollapsibleTrigger asChild>
-                  <button
-                    type="button"
-                    aria-expanded={fleetOpen}
-                    className="flex w-full items-center justify-between gap-4 text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]"
-                  >
-                    <span>
-                      <span className="flex items-center gap-2 text-xl font-black">
-                        <Users className="h-5 w-5 text-[#FF6A00]" />
-                        حاسبة الأسطول
-                      </span>
-                      <span className="mt-2 block text-sm text-[#8A8A8A]">مغلقة افتراضيًا، وافتحها لحساب تكلفة المركبات.</span>
-                    </span>
-                    <ChevronDown className={cn("h-5 w-5 transition", fleetOpen && "rotate-180")} />
-                  </button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-6">
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between rounded-[12px] bg-[#222] p-4">
-                      <span className="text-sm text-[#8A8A8A]">عدد المركبات</span>
-                      <span className="text-2xl font-black">{formatVehicles(fleetVehicles)}</span>
-                    </div>
-                    <Slider
-                      min={5}
-                      max={120}
-                      step={1}
-                      value={[fleetVehicles]}
-                      onValueChange={(value) => setFleetVehicles(value[0] ?? 5)}
-                      aria-label="عدد مركبات الأسطول"
-                    />
-                    <div className="rounded-[12px] border border-[#2A2A2A] bg-[#0B0B0B] p-4">
-                      <p className="text-sm text-[#8A8A8A]">{fleetPreview.label}</p>
-                      <p className="mt-2 text-3xl font-black">
-                        {fleetPreview.total === null ? "تواصل معنا" : `${formatSar(fleetPreview.total)} ر.س / شهر`}
-                      </p>
-                      <p className="mt-2 text-xs leading-6 text-[#8A8A8A]">
-                        التسعير مسطح حسب الشريحة وليس تراكميًا. مثال: ٣٠ مركبة × ٢٧ ر.س.
-                      </p>
-                    </div>
-                  </div>
-                </CollapsibleContent>
+            {selectedPlan.id === "fleet" && (
+              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
+                <h2 className="text-xl font-black">الأسطول مبيعات فقط</h2>
+                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">لا يوجد سعر أو حاسبة للأسطول. زر التواصل يفتح نموذج أو صفحة المبيعات.</p>
               </div>
-            </Collapsible>
+            )}
 
             <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
               <h2 className="text-xl font-black">الحصص والاحتفاظ</h2>
               <div className="mt-4 space-y-3">
                 {selectedPlan.quotas.map((quota) => (
-                  <div key={quota} className="rounded-[12px] bg-[#222] p-3 text-sm leading-6 text-[#E6E6E6]">
-                    {quota}
-                  </div>
+                  <div key={quota} className="rounded-[12px] bg-[#222] p-3 text-sm leading-6 text-[#E6E6E6]">{quota}</div>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
+            <div className="mb-6">
+              <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة الكامل</p>
+              <h2 className="mt-2 text-2xl font-black">كل الميزات في شاشة واحدة</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[780px] text-sm">
+                <thead>
+                  <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
+                    <th className="p-3 text-right">الميزة</th>
+                    <th className="p-3 text-center">مجاني</th>
+                    <th className="p-3 text-center text-[#FF6A00]">مفك</th>
+                    <th className="p-3 text-center">أسطول</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row) =>
+                    row.type === "section" ? (
+                      <tr key={row.label}>
+                        <td colSpan={4} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                      </tr>
+                    ) : (
+                      <tr key={row.label} className="border-b border-[#2A2A2A]/80">
+                        <td className="p-3 font-bold">{row.label}</td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
+                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
+                      </tr>
+                    ),
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
@@ -331,9 +296,9 @@ export default function Pricing() {
               <p className="text-sm text-[#8A8A8A]">الباقة المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
-            <Link href={selectedPlan.id === "fleet" ? "/contact" : "/register"}>
+            <Link href={selectedPlan.saleType === "sales-led" ? "/contact" : "/register"}>
               <Button className="h-12 w-full rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00] sm:w-auto">
-                {selectedPlan.id === "fleet" ? "طلب عرض للأسطول" : "ابدأ الاشتراك"}
+                {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "ابدأ الاشتراك"}
               </Button>
             </Link>
           </div>
