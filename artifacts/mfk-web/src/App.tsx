@@ -141,6 +141,7 @@ function AnimatedSwitch() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/pricing" component={Pricing} />
+          <Route path="/plans" component={Pricing} />
           <Route path="/onboarding" component={Onboarding} />
           <Route path="/checkout/:planId" component={Checkout} />
           <Route path="/payment/:orderId" component={Payment} />

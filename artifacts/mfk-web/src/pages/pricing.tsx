@@ -63,6 +63,12 @@ export default function Pricing() {
   const [networkError] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
+  const checkoutHrefByPlan: Record<SubscriptionPlanId, string> = {
+    free: "/onboarding?plan=free",
+    mofk: "/checkout/individual-basic",
+    family: "/checkout/individual-advanced",
+    fleet: "/fleet-contact",
+  };
 
   return (
     <div className="dark min-h-screen bg-[#0B0B0B] text-white" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
@@ -234,7 +240,7 @@ export default function Pricing() {
               <p className="text-sm text-[#8A8A8A]">الباقة المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
-            <Link href={selectedPlan.saleType === "sales-led" ? "/contact" : "/register"}>
+            <Link href={checkoutHrefByPlan[selectedPlan.id]}>
               <Button className="h-12 w-full rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00] sm:w-auto">
                 {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "ابدأ الاشتراك"}
               </Button>
