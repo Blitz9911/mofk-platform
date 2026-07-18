@@ -25,6 +25,9 @@ import {
   Zap,
   Fuel,
   MoreHorizontal,
+  Package,
+  Smartphone,
+  Building2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MfkLogo } from "@/components/MfkLogo";
@@ -210,6 +213,10 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
     { href: "/admin/diagnostics", label: "التشخيص الحي", shortLabel: "التشخيص", icon: Activity },
     { href: "/admin/issues", label: "الأعطال الشائعة", shortLabel: "الأعطال", icon: ShieldAlert },
+    { href: "/admin/orders", label: "الطلبات", shortLabel: "الطلبات", icon: Package },
+    { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
+    { href: "/admin/subscriptions", label: "الاشتراكات", shortLabel: "الاشتراكات", icon: CreditCard },
+    { href: "/admin/fleet-accounts", label: "حسابات الأسطول", shortLabel: "الأسطول", icon: Building2 },
     { href: "/admin/revenue", label: "المالية", shortLabel: "المالية", icon: CreditCard },
   ];
 

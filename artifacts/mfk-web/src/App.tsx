@@ -11,6 +11,14 @@ import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import Onboarding from "@/pages/onboarding";
+import Checkout from "@/pages/checkout";
+import Payment from "@/pages/payment";
+import PaymentResult from "@/pages/payment-result";
+import OrderDetail from "@/pages/order-detail";
+import DeviceActivation from "@/pages/device-activation";
+import FleetContact from "@/pages/fleet-contact";
+import FleetSetup from "@/pages/fleet-setup";
 
 // Company Pages
 import About from "@/pages/about";
@@ -44,6 +52,11 @@ import AdminVehicles from "@/pages/admin/vehicles";
 import AdminDiagnostics from "@/pages/admin/diagnostics";
 import AdminIssues from "@/pages/admin/issues";
 import AdminRevenue from "@/pages/admin/revenue";
+import AdminOrders from "@/pages/admin/orders";
+import AdminOrderDetail from "@/pages/admin/order-detail";
+import AdminDevices from "@/pages/admin/devices";
+import AdminSubscriptions from "@/pages/admin/subscriptions";
+import AdminFleetAccounts from "@/pages/admin/fleet-accounts";
 
 import { Shell } from "@/components/layout/Shell";
 
@@ -81,6 +94,11 @@ function AdminRoutes() {
         <Route path="/admin/vehicles" component={AdminVehicles} />
         <Route path="/admin/diagnostics" component={AdminDiagnostics} />
         <Route path="/admin/issues" component={AdminIssues} />
+        <Route path="/admin/orders" component={AdminOrders} />
+        <Route path="/admin/orders/:orderId" component={AdminOrderDetail} />
+        <Route path="/admin/devices" component={AdminDevices} />
+        <Route path="/admin/subscriptions" component={AdminSubscriptions} />
+        <Route path="/admin/fleet-accounts" component={AdminFleetAccounts} />
         <Route path="/admin/revenue" component={AdminRevenue} />
         <Route component={NotFound} />
       </Switch>
@@ -123,6 +141,14 @@ function AnimatedSwitch() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/pricing" component={Pricing} />
+          <Route path="/onboarding" component={Onboarding} />
+          <Route path="/checkout/:planId" component={Checkout} />
+          <Route path="/payment/:orderId" component={Payment} />
+          <Route path="/payment-result" component={PaymentResult} />
+          <Route path="/orders/:orderId" component={OrderDetail} />
+          <Route path="/device-activation" component={DeviceActivation} />
+          <Route path="/fleet-contact" component={FleetContact} />
+          <Route path="/fleet/setup" component={FleetSetup} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/about" component={About} />

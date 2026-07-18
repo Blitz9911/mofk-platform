@@ -722,7 +722,7 @@ export default function Dashboard() {
               <div>
                 <p className="font-semibold">راجع توصيات الصيانة</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  لديك {overview?.activeRecommendationsCount || 0} توصية تحتاج متابعة.
+                  لديك {overview?.upcomingMaintenanceCount || 0} توصية تحتاج متابعة.
                 </p>
               </div>
             </div>

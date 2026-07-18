@@ -1319,7 +1319,7 @@ export default function Vehicles() {
 
                     <p className="text-sm text-muted-foreground">
                       {v.make} {v.model} • {v.year} •{" "}
-                      {FUEL_LABEL[v.fuelType] || v.fuelType}
+                      {FUEL_LABEL[v.fuelType ?? "petrol"] || v.fuelType || "petrol"}
                     </p>
                   </div>
 
