@@ -7,7 +7,6 @@ import {
   Car,
   Activity,
   Wrench,
-  MapPin,
   Calendar,
   MessageSquare,
   Lightbulb,
@@ -211,7 +210,6 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
     { href: "/admin/diagnostics", label: "التشخيص الحي", shortLabel: "التشخيص", icon: Activity },
     { href: "/admin/issues", label: "الأعطال الشائعة", shortLabel: "الأعطال", icon: ShieldAlert },
-    { href: "/admin/workshops", label: "الورش والعوائد", shortLabel: "الورش", icon: MapPin },
     { href: "/admin/revenue", label: "المالية", shortLabel: "المالية", icon: CreditCard },
   ];
 

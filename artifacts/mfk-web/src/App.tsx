@@ -9,8 +9,6 @@ import NotFound from "@/pages/not-found";
 // Public Pages
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
-import WorkshopsPublic from "@/pages/workshops";
-import WorkshopDetailPublic from "@/pages/workshop-detail";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 
@@ -33,8 +31,6 @@ import Diagnostics from "@/pages/app/diagnostics";
 import DiagnosticSession from "@/pages/app/diagnostic-session";
 import Dtc from "@/pages/app/dtc";
 import Maintenance from "@/pages/app/maintenance";
-import WorkshopsApp from "@/pages/app/workshops-app";
-import Bookings from "@/pages/app/bookings";
 import Assistant from "@/pages/app/assistant";
 import Recommendations from "@/pages/app/recommendations";
 import Subscription from "@/pages/app/subscription";
@@ -47,7 +43,6 @@ import AdminUsers from "@/pages/admin/users";
 import AdminVehicles from "@/pages/admin/vehicles";
 import AdminDiagnostics from "@/pages/admin/diagnostics";
 import AdminIssues from "@/pages/admin/issues";
-import AdminWorkshops from "@/pages/admin/workshops";
 import AdminRevenue from "@/pages/admin/revenue";
 
 import { Shell } from "@/components/layout/Shell";
@@ -66,8 +61,6 @@ function AppRoutes() {
         <Route path="/app/diagnostics/:sessionId" component={DiagnosticSession} />
         <Route path="/app/dtc" component={Dtc} />
         <Route path="/app/maintenance" component={Maintenance} />
-        <Route path="/app/workshops" component={WorkshopsApp} />
-        <Route path="/app/bookings" component={Bookings} />
         <Route path="/app/assistant" component={Assistant} />
         <Route path="/app/recommendations" component={Recommendations} />
         <Route path="/app/profile" component={ProfilePage} />
@@ -88,7 +81,6 @@ function AdminRoutes() {
         <Route path="/admin/vehicles" component={AdminVehicles} />
         <Route path="/admin/diagnostics" component={AdminDiagnostics} />
         <Route path="/admin/issues" component={AdminIssues} />
-        <Route path="/admin/workshops" component={AdminWorkshops} />
         <Route path="/admin/revenue" component={AdminRevenue} />
         <Route component={NotFound} />
       </Switch>
@@ -131,8 +123,6 @@ function AnimatedSwitch() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/pricing" component={Pricing} />
-          <Route path="/workshops" component={WorkshopsPublic} />
-          <Route path="/workshops/:id" component={WorkshopDetailPublic} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/about" component={About} />

@@ -886,7 +886,6 @@ async function handleDashboard(
               item.status === "overdue",
           ).length,
         avgHealthScore,
-        upcomingBookingCount: 0,
         totalSessionsLast30d: 0,
         kmDrivenLast30d: 0,
         estimatedSavingsSar: 0,
@@ -1314,28 +1313,6 @@ async function handleRequest(
 
   if (
     path.startsWith("/api/dtc") &&
-    method === "GET"
-  ) {
-    await requireSession();
-
-    return {
-      handled: true,
-      data: [],
-    };
-  }
-
-  if (
-    path === "/api/workshops" &&
-    method === "GET"
-  ) {
-    return {
-      handled: true,
-      data: [],
-    };
-  }
-
-  if (
-    path === "/api/bookings" &&
     method === "GET"
   ) {
     await requireSession();

@@ -160,57 +160,6 @@ export const maintenanceTable = pgTable(
   }),
 );
 
-export const workshopsTable = pgTable("workshops", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 120 }).notNull(),
-  nameAr: varchar("name_ar", { length: 120 }).notNull(),
-  phone: varchar("phone", { length: 20 }),
-  city: varchar("city", { length: 60 }).notNull(),
-  district: varchar("district", { length: 80 }),
-  address: text("address"),
-  addressAr: text("address_ar"),
-  description: text("description"),
-  descriptionAr: text("description_ar"),
-  openingHours: varchar("opening_hours", { length: 80 }),
-  rating: numeric("rating", { precision: 2, scale: 1 }).notNull().default("0"),
-  reviewsCount: integer("reviews_count").notNull().default(0),
-  services: jsonb("services").$type<string[]>().notNull().default([]),
-  servicesAr: jsonb("services_ar").$type<string[]>().notNull().default([]),
-  isVerified: boolean("is_verified").notNull().default(false),
-  imageUrl: text("image_url"),
-  priceLevel: varchar("price_level", { length: 20 }).notNull().default("standard"),
-  commissionPct: smallint("commission_pct").notNull().default(10),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const bookingsTable = pgTable(
-  "bookings",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => usersTable.id),
-    vehicleId: uuid("vehicle_id")
-      .notNull()
-      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
-    workshopId: uuid("workshop_id")
-      .notNull()
-      .references(() => workshopsTable.id),
-    serviceType: varchar("service_type", { length: 50 }).notNull(),
-    serviceTypeAr: varchar("service_type_ar", { length: 100 }).notNull(),
-    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
-    status: varchar("status", { length: 20 }).notNull().default("pending"),
-    estimatedCost: integer("estimated_cost"),
-    finalCost: integer("final_cost"),
-    notes: text("notes"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({
-    userIdx: index("idx_bookings_user").on(t.userId, t.scheduledAt),
-    workshopIdx: index("idx_bookings_workshop").on(t.workshopId, t.scheduledAt),
-  }),
-);
-
 export const recommendationsTable = pgTable(
   "recommendations",
   {

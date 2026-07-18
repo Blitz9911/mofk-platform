@@ -7,7 +7,6 @@ import {
   Activity, 
   CreditCard, 
   Star, 
-  Calendar, 
   TrendingUp, 
   TrendingDown,
   AlertTriangle,
@@ -133,16 +132,6 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">حجوزات آخر 7 أيام</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overview.bookingsLast7d || 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">مؤشر رضا العملاء (NPS)</CardTitle>
               <Heart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -204,7 +193,6 @@ export default function AdminDashboard() {
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="subscriptionRevenue" name="إيرادات الاشتراكات" stackId="a" fill="hsl(var(--primary))" radius={[0, 0, 4, 4]} />
-                  <Bar dataKey="commissionRevenue" name="عمولات الورش" stackId="a" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

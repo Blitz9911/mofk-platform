@@ -49,7 +49,7 @@ export default function Login() {
             بكل سهولة وذكاء.
           </h1>
           <p className="text-xl text-muted-foreground leading-relaxed mb-10">
-            سجل دخولك للوصول إلى لوحة التحكم الخاصة بك، ومتابعة التقارير الحية، وحجز مواعيد الصيانة.
+            سجل دخولك للوصول إلى لوحة التحكم الخاصة بك، ومتابعة التقارير الحية، وتسجيل مواعيد الصيانة.
           </p>
           <div className="flex gap-4">
             <div className="flex -space-x-4 rtl:space-x-reverse">

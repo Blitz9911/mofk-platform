@@ -78,7 +78,7 @@ router.get(
 function generateReply(message: string, ctx: string): string {
   const m = message.toLowerCase();
   if (m.includes("حرارة") || m.includes("سخن")) {
-    return `ارتفاع حرارة المحرك${ctx} له عدة أسباب محتملة: نقص في سائل التبريد، خلل في المروحة أو الترموستات، أو انسداد في الرديتر. أنصحك بإيقاف السيارة فوراً إن كان المؤشر في الأحمر، وفحص مستوى السائل بعد أن يبرد المحرك. إذا تكررت المشكلة، احجز فحصاً عاجلاً في ورشة معتمدة.`;
+    return `ارتفاع حرارة المحرك${ctx} له عدة أسباب محتملة: نقص في سائل التبريد، خلل في المروحة أو الترموستات، أو انسداد في الرديتر. أنصحك بإيقاف السيارة فوراً إن كان المؤشر في الأحمر، وفحص مستوى السائل بعد أن يبرد المحرك. إذا تكررت المشكلة، سجّل صيانة عاجلة وراجع فني مختص.`;
   }
   if (m.includes("زيت")) {
     return `تغيير الزيت يعتمد على نوع الزيت ونمط القيادة. عموماً، الزيت الاصطناعي يتحمّل بين 8,000 و10,000 كم، والزيت العادي بين 5,000 و7,000 كم${ctx}. أوصي بالالتزام بدورة التغيير الموصى بها من الشركة المصنّعة، خاصة في المناخ الحار.`;
@@ -89,26 +89,26 @@ function generateReply(message: string, ctx: string): string {
   if (m.includes("dtc") || m.includes("كود") || m.includes("p0")) {
     return `أكواد DTC هي إشارات يرسلها كمبيوتر السيارة عند اكتشاف مشكلة. كل كود يبدأ بحرف (P للمحرك، B للجسم، C للهيكل، U للشبكة). MFK يفسّرها لك بلغة بسيطة ويوصي بالخطوة المناسبة. شارك الكود معي وسأشرحه لك.`;
   }
-  if (m.includes("حجز") || m.includes("ورشة")) {
-    return `لحجز موعد، اذهب إلى صفحة الورش، اختر مدينتك ونوع الخدمة، ثم اختر الورشة المناسبة. اضغط "احجز" واختر الوقت المناسب لك. ستصلك رسالة تأكيد فور موافقة الورشة.`;
+  if (m.includes("موعد")) {
+    return `أقدر أساعدك بتسجيل الصيانة، تجهيز قائمة فحص، أو شرح العطل قبل مراجعة فني مختص.`;
   }
-  return `شكراً لسؤالك${ctx}. أنا مساعد MFK الذكي، أستطيع مساعدتك في فهم أعطال سيارتك، اقتراح صيانة، تفسير أكواد DTC، أو حجز ورشة. اطرح سؤالاً محدداً لأتمكن من مساعدتك بشكل أفضل.`;
+  return `شكراً لسؤالك${ctx}. أنا مساعد MFK الذكي، أستطيع مساعدتك في فهم أعطال سيارتك، اقتراح صيانة، أو تفسير أكواد DTC. اطرح سؤالاً محدداً لأتمكن من مساعدتك بشكل أفضل.`;
 }
 
 function suggestActions(
   message: string,
-): { labelAr: string; kind: "book_workshop" | "view_dtc" | "schedule_maintenance" | "view_vehicle"; targetId?: string }[] {
+): { labelAr: string; kind: "view_dtc" | "schedule_maintenance" | "view_vehicle"; targetId?: string }[] {
   const m = message.toLowerCase();
-  const out: { labelAr: string; kind: "book_workshop" | "view_dtc" | "schedule_maintenance" | "view_vehicle" }[] = [];
+  const out: { labelAr: string; kind: "view_dtc" | "schedule_maintenance" | "view_vehicle" }[] = [];
   if (m.includes("حرارة") || m.includes("سخن")) {
-    out.push({ labelAr: "احجز فحصاً عاجلاً", kind: "book_workshop" });
+    out.push({ labelAr: "سجّل صيانة عاجلة", kind: "schedule_maintenance" });
     out.push({ labelAr: "اعرض أكواد الأعطال", kind: "view_dtc" });
   } else if (m.includes("زيت")) {
     out.push({ labelAr: "جدولة تغيير الزيت", kind: "schedule_maintenance" });
   } else if (m.includes("dtc") || m.includes("كود")) {
     out.push({ labelAr: "اعرض جميع الأكواد", kind: "view_dtc" });
-  } else if (m.includes("ورشة") || m.includes("حجز")) {
-    out.push({ labelAr: "تصفّح الورش المعتمدة", kind: "book_workshop" });
+  } else if (m.includes("موعد")) {
+    out.push({ labelAr: "فتح الصيانة", kind: "schedule_maintenance" });
   }
   return out;
 }

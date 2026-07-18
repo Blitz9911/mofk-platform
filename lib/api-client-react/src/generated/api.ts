@@ -24,9 +24,7 @@ import type {
   AdminVehicle,
   AiChatBody,
   AiChatResponse,
-  Booking,
   CommonIssue,
-  CreateBookingBody,
   CreateVehicleBody,
   DashboardOverview,
   DiagnosticSession,
@@ -40,7 +38,6 @@ import type {
   ListAdminUsersParams,
   ListDiagnosticSessionsParams,
   ListDtcCodesParams,
-  ListWorkshopsParams,
   LiveTelemetry,
   LogMaintenanceBody,
   MaintenanceItem,
@@ -52,14 +49,10 @@ import type {
   TelemetryPoint,
   TrendingDtc,
   UpcomingMaintenanceItem,
-  UpdateBookingBody,
   UpdateVehicleBody,
   UserSubscription,
   Vehicle,
   VehicleDetail,
-  Workshop,
-  WorkshopDetail,
-  WorkshopPipeline,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -222,7 +215,7 @@ export function useGetDashboardOverview<
 }
 
 /**
- * @summary Recent diagnostic / maintenance / booking activity feed
+ * @summary Recent diagnostic / maintenance activity feed
  */
 export const getGetRecentActivityUrl = (params?: GetRecentActivityParams) => {
   const normalizedParams = new URLSearchParams();
@@ -295,7 +288,7 @@ export type GetRecentActivityQueryResult = NonNullable<
 export type GetRecentActivityQueryError = ErrorType<unknown>;
 
 /**
- * @summary Recent diagnostic / maintenance / booking activity feed
+ * @summary Recent diagnostic / maintenance activity feed
  */
 
 export function useGetRecentActivity<
@@ -2033,402 +2026,6 @@ export function useGetUpcomingMaintenance<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-export const getListWorkshopsUrl = (params?: ListWorkshopsParams) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : value.toString());
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/api/workshops?${stringifiedParams}`
-    : `/api/workshops`;
-};
-
-export const listWorkshops = async (
-  params?: ListWorkshopsParams,
-  options?: RequestInit,
-): Promise<Workshop[]> => {
-  return customFetch<Workshop[]>(getListWorkshopsUrl(params), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getListWorkshopsQueryKey = (params?: ListWorkshopsParams) => {
-  return [`/api/workshops`, ...(params ? [params] : [])] as const;
-};
-
-export const getListWorkshopsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listWorkshops>>,
-  TError = ErrorType<unknown>,
->(
-  params?: ListWorkshopsParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listWorkshops>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListWorkshopsQueryKey(params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkshops>>> = ({
-    signal,
-  }) => listWorkshops(params, { signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listWorkshops>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListWorkshopsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listWorkshops>>
->;
-export type ListWorkshopsQueryError = ErrorType<unknown>;
-
-export function useListWorkshops<
-  TData = Awaited<ReturnType<typeof listWorkshops>>,
-  TError = ErrorType<unknown>,
->(
-  params?: ListWorkshopsParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof listWorkshops>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListWorkshopsQueryOptions(params, options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-export const getGetWorkshopUrl = (workshopId: string) => {
-  return `/api/workshops/${workshopId}`;
-};
-
-export const getWorkshop = async (
-  workshopId: string,
-  options?: RequestInit,
-): Promise<WorkshopDetail> => {
-  return customFetch<WorkshopDetail>(getGetWorkshopUrl(workshopId), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetWorkshopQueryKey = (workshopId: string) => {
-  return [`/api/workshops/${workshopId}`] as const;
-};
-
-export const getGetWorkshopQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWorkshop>>,
-  TError = ErrorType<unknown>,
->(
-  workshopId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getWorkshop>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetWorkshopQueryKey(workshopId);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkshop>>> = ({
-    signal,
-  }) => getWorkshop(workshopId, { signal, ...requestOptions });
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: !!workshopId,
-    ...queryOptions,
-  } as UseQueryOptions<
-    Awaited<ReturnType<typeof getWorkshop>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetWorkshopQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWorkshop>>
->;
-export type GetWorkshopQueryError = ErrorType<unknown>;
-
-export function useGetWorkshop<
-  TData = Awaited<ReturnType<typeof getWorkshop>>,
-  TError = ErrorType<unknown>,
->(
-  workshopId: string,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof getWorkshop>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetWorkshopQueryOptions(workshopId, options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-export const getListBookingsUrl = () => {
-  return `/api/bookings`;
-};
-
-export const listBookings = async (
-  options?: RequestInit,
-): Promise<Booking[]> => {
-  return customFetch<Booking[]>(getListBookingsUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getListBookingsQueryKey = () => {
-  return [`/api/bookings`] as const;
-};
-
-export const getListBookingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listBookings>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listBookings>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListBookingsQueryKey();
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listBookings>>> = ({
-    signal,
-  }) => listBookings({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listBookings>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type ListBookingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listBookings>>
->;
-export type ListBookingsQueryError = ErrorType<unknown>;
-
-export function useListBookings<
-  TData = Awaited<ReturnType<typeof listBookings>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listBookings>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListBookingsQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-export const getCreateBookingUrl = () => {
-  return `/api/bookings`;
-};
-
-export const createBooking = async (
-  createBookingBody: CreateBookingBody,
-  options?: RequestInit,
-): Promise<Booking> => {
-  return customFetch<Booking>(getCreateBookingUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createBookingBody),
-  });
-};
-
-export const getCreateBookingMutationOptions = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createBooking>>,
-    TError,
-    { data: BodyType<CreateBookingBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof createBooking>>,
-  TError,
-  { data: BodyType<CreateBookingBody> },
-  TContext
-> => {
-  const mutationKey = ["createBooking"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createBooking>>,
-    { data: BodyType<CreateBookingBody> }
-  > = (props) => {
-    const { data } = props ?? {};
-
-    return createBooking(data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type CreateBookingMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createBooking>>
->;
-export type CreateBookingMutationBody = BodyType<CreateBookingBody>;
-export type CreateBookingMutationError = ErrorType<unknown>;
-
-export const useCreateBooking = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createBooking>>,
-    TError,
-    { data: BodyType<CreateBookingBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof createBooking>>,
-  TError,
-  { data: BodyType<CreateBookingBody> },
-  TContext
-> => {
-  return useMutation(getCreateBookingMutationOptions(options));
-};
-
-export const getUpdateBookingUrl = (bookingId: string) => {
-  return `/api/bookings/${bookingId}`;
-};
-
-export const updateBooking = async (
-  bookingId: string,
-  updateBookingBody: UpdateBookingBody,
-  options?: RequestInit,
-): Promise<Booking> => {
-  return customFetch<Booking>(getUpdateBookingUrl(bookingId), {
-    ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(updateBookingBody),
-  });
-};
-
-export const getUpdateBookingMutationOptions = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateBooking>>,
-    TError,
-    { bookingId: string; data: BodyType<UpdateBookingBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationOptions<
-  Awaited<ReturnType<typeof updateBooking>>,
-  TError,
-  { bookingId: string; data: BodyType<UpdateBookingBody> },
-  TContext
-> => {
-  const mutationKey = ["updateBooking"];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation &&
-      "mutationKey" in options.mutation &&
-      options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-
-  const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateBooking>>,
-    { bookingId: string; data: BodyType<UpdateBookingBody> }
-  > = (props) => {
-    const { bookingId, data } = props ?? {};
-
-    return updateBooking(bookingId, data, requestOptions);
-  };
-
-  return { mutationFn, ...mutationOptions };
-};
-
-export type UpdateBookingMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateBooking>>
->;
-export type UpdateBookingMutationBody = BodyType<UpdateBookingBody>;
-export type UpdateBookingMutationError = ErrorType<unknown>;
-
-export const useUpdateBooking = <
-  TError = ErrorType<unknown>,
-  TContext = unknown,
->(options?: {
-  mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateBooking>>,
-    TError,
-    { bookingId: string; data: BodyType<UpdateBookingBody> },
-    TContext
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseMutationResult<
-  Awaited<ReturnType<typeof updateBooking>>,
-  TError,
-  { bookingId: string; data: BodyType<UpdateBookingBody> },
-  TContext
-> => {
-  return useMutation(getUpdateBookingMutationOptions(options));
-};
-
 export const getAiChatUrl = () => {
   return `/api/ai/chat`;
 };
@@ -3194,84 +2791,6 @@ export function useGetCommonIssues<
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-/**
- * @summary Workshop bookings pipeline + commission tracking
- */
-export const getGetWorkshopPipelineUrl = () => {
-  return `/api/admin/workshops/pipeline`;
-};
-
-export const getWorkshopPipeline = async (
-  options?: RequestInit,
-): Promise<WorkshopPipeline[]> => {
-  return customFetch<WorkshopPipeline[]>(getGetWorkshopPipelineUrl(), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getGetWorkshopPipelineQueryKey = () => {
-  return [`/api/admin/workshops/pipeline`] as const;
-};
-
-export const getGetWorkshopPipelineQueryOptions = <
-  TData = Awaited<ReturnType<typeof getWorkshopPipeline>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWorkshopPipeline>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetWorkshopPipelineQueryKey();
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getWorkshopPipeline>>
-  > = ({ signal }) => getWorkshopPipeline({ signal, ...requestOptions });
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getWorkshopPipeline>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type GetWorkshopPipelineQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getWorkshopPipeline>>
->;
-export type GetWorkshopPipelineQueryError = ErrorType<unknown>;
-
-/**
- * @summary Workshop bookings pipeline + commission tracking
- */
-
-export function useGetWorkshopPipeline<
-  TData = Awaited<ReturnType<typeof getWorkshopPipeline>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getWorkshopPipeline>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetWorkshopPipelineQueryOptions(options);
-
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-/**
- * @summary Subscription + booking revenue, last 12 months
- */
 export const getGetRevenueBreakdownUrl = () => {
   return `/api/admin/revenue`;
 };
@@ -3321,7 +2840,7 @@ export type GetRevenueBreakdownQueryResult = NonNullable<
 export type GetRevenueBreakdownQueryError = ErrorType<unknown>;
 
 /**
- * @summary Subscription + booking revenue, last 12 months
+ * @summary Subscription revenue, last 12 months
  */
 
 export function useGetRevenueBreakdown<

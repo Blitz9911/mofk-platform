@@ -606,7 +606,7 @@ function toAiRecommendation(item: any) {
           ? 85
           : 70,
     suggestedAction: isOverdue
-      ? `احجز أو سجل ${label} الآن.`
+      ? `سجل ${label} الآن.`
       : isUpcoming
         ? `خطط لتنفيذ ${label} قريبًا.`
         : `تابع ${label} حسب العداد أو التاريخ القادم.`,
@@ -1197,7 +1197,6 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
         completedMaintenanceCount: completedMaintenance.length,
         activeRecommendationsCount: maintenanceRecommendations.length,
         avgHealthScore,
-        upcomingBookingCount: 0,
         totalSessionsLast30d: 0,
         kmDrivenLast30d: 0,
         estimatedSavingsSar: 0,
@@ -1559,15 +1558,6 @@ async function handleRequest(
     return { handled: true, data: [] };
   }
 
-  if (path === "/api/workshops" && method === "GET") {
-    return { handled: true, data: [] };
-  }
-
-  if (path === "/api/bookings" && method === "GET") {
-    await requireSession();
-    return { handled: true, data: [] };
-  }
-
  if (path === "/api/ai/chat" && method === "POST") {
   const session = await requireSession();
   const body = await readJsonBody(input, init);
@@ -1685,7 +1675,7 @@ async function handleRequest(
         "تجنب القيادة القوية",
         "افحص زيت القير إذا كان مسموح حسب نوع السيارة",
         "اقرأ أكواد القير التفصيلية بجهاز يدعم TCM",
-        "إذا فيه نتعة قوية أو تأخير تعشيق، راجع ورشة متخصصة",
+        "إذا فيه نتعة قوية أو تأخير تعشيق، راجع فني قير متخصص",
       ],
     },
   };
@@ -1828,7 +1818,7 @@ async function handleRequest(
       "- شرح أكواد الأعطال مثل P0300 و P0420 و P0171",
       "- تحليل البنزين والصرفية",
       "- متابعة الصيانة القادمة",
-      "- إعطاء خطوات فحص أولية قبل الورشة",
+      "- إعطاء خطوات فحص أولية قبل مراجعة فني مختص",
       "",
       vehicle
         ? `أنت الآن تسأل عن **${vehicleName}**.`

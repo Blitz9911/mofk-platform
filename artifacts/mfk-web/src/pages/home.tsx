@@ -54,7 +54,7 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
-                سيارتك تعطيك لمبات كثير… بس قليل يفهمها صح. مع مفك تعرف وش فيها قبل لا تدخل الورشة، ويفهمك المشكلة ولا احد يلعب عليك
+                سيارتك تعطيك لمبات كثير… بس قليل يفهمها صح. مع مفك تعرف وش فيها قبل لا تدفع على فحص غير واضح، ويفهمك المشكلة ولا احد يربكك
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/register">
@@ -179,7 +179,7 @@ export default function Home() {
                 <ul className="space-y-3">
                   <li className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-destructive/50" />
-                    <span>تشخيص مكلف في الورش (150-300 ريال)</span>
+                    <span>تشخيص مكلف خارجي (150-300 ريال)</span>
                   </li>
                   <li className="flex items-center gap-3 text-muted-foreground">
                     <div className="w-2 h-2 rounded-full bg-destructive/50" />
@@ -408,7 +408,7 @@ export default function Home() {
                   <tr>
                     <th className="p-6 text-right w-1/3 bg-muted/50 rounded-tr-2xl border-b border-border">الميزة</th>
                     <th className="p-6 text-center w-1/5 bg-primary/10 text-primary font-bold text-xl border-b border-primary/20">MFK</th>
-                    <th className="p-6 text-center w-1/5 bg-muted/30 font-semibold border-b border-border">زيارة الورشة</th>
+                    <th className="p-6 text-center w-1/5 bg-muted/30 font-semibold border-b border-border">الفحص التقليدي</th>
                     <th className="p-6 text-center w-1/5 bg-muted/30 font-semibold rounded-tl-2xl border-b border-border">أجهزة عامة</th>
                   </tr>
                 </thead>
@@ -417,7 +417,7 @@ export default function Home() {
                     ["التشخيص باللغة العربية", true, false, false],
                     ["تكلفة الفحص", "مجاني ودائم", "150-300 ريال", "مجاني"],
                     ["توضيح خطورة العطل", true, true, false],
-                    ["اقتراح ورش معتمدة للحل", true, false, false],
+                    ["اقتراح خطوات واضحة للحل", true, false, false],
                     ["تقدير تكلفة الإصلاح", true, "غير مضمون", false],
                     ["تتبع صحة المحرك المباشرة", true, false, true],
                   ].map((row, i) => (
@@ -480,8 +480,8 @@ export default function Home() {
             
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                { name: "أحمد الدوسري", role: "الرياض", quote: "وفر علي الجهاز أكثر من 500 ريال قيمة فحوصات كمبيوتر. أول ما تظهر اللمبة أعرف المشكلة مباشرة وأروح للورشة وأنا فاهم." },
-                { name: "سارة خالد", role: "جدة", quote: "كنت أخاف أروح الورش ويستغلون عدم معرفتي بالسيارات. الآن مع MFK أفتح التطبيق ويعطيني وش المشكلة وكم تكلفتها التقريبية، ارتحت جداً." },
+                { name: "أحمد الدوسري", role: "الرياض", quote: "وفر علي الجهاز أكثر من 500 ريال قيمة فحوصات كمبيوتر. أول ما تظهر اللمبة أعرف المشكلة مباشرة وأراجع الفني وأنا فاهم." },
+                { name: "سارة خالد", role: "جدة", quote: "كنت أخاف من اختلاف التشخيص وعدم معرفتي بالسيارات. الآن مع MFK أفتح التطبيق ويعطيني وش المشكلة وكم تكلفتها التقريبية، ارتحت جداً." },
                 { name: "محمد العتيبي", role: "الدمام", quote: "ميزة تذكير الصيانة ومتابعة حرارة القير والماكينة في الخطوط الطويلة ممتازة جداً. تطبيق متعوب عليه صراحة." },
               ].map((t, i) => (
                 <motion.div

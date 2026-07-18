@@ -236,8 +236,6 @@ export default function Dashboard() {
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case "maintenance_done":
         return <Wrench className="h-4 w-4 text-amber-500" />;
-      case "booking_created":
-        return <Calendar className="h-4 w-4 text-primary" />;
       default:
         return severity === "critical" ? (
           <AlertTriangle className="h-4 w-4 text-destructive" />

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Sparkles, AlertTriangle, Calendar, Wrench, Car, Search, Copy, Check, Mic, MicOff, ImagePlus, X, Trash2, ChevronDown } from "lucide-react";
+import { Send, Bot, User, Sparkles, AlertTriangle, Wrench, Car, Search, Copy, Check, Mic, MicOff, ImagePlus, X, Trash2, ChevronDown } from "lucide-react";
 import {
   useListVehicles,
   useAiChat,
@@ -204,7 +204,6 @@ function CopyButton({ text }: { text: string }) {
 
 function getActionIcon(kind?: string) {
   switch (kind) {
-    case "book_workshop": return <Calendar className="w-3.5 h-3.5" />;
     case "view_dtc": return <AlertTriangle className="w-3.5 h-3.5" />;
     case "schedule_maintenance": return <Wrench className="w-3.5 h-3.5" />;
     case "view_vehicle": return <Car className="w-3.5 h-3.5" />;
@@ -223,8 +222,6 @@ function getActionHref(kind?: string) {
       return "/app/vehicles";
     case "view_fuel":
       return "/app/fuel";
-    case "book_workshop":
-      return "/app/maintenance";
     default:
       return "/app";
   }
@@ -244,7 +241,7 @@ const SUGGESTION_GROUPS = [
   },
   {
     label: "صيانة وخدمات",
-    items: ["وش جدول الصيانة الدورية؟", "متى أغيّر الفرامل؟", "أبي أحجز ورشة"],
+    items: ["وش جدول الصيانة الدورية؟", "متى أغيّر الفرامل؟", "أبي أسجل صيانة"],
   },
 ];
 

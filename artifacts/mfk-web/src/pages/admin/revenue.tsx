@@ -24,7 +24,7 @@ export default function AdminRevenue() {
     return new Intl.NumberFormat("ar-SA").format(value) + " ر.س";
   };
 
-  const totalRevenue = revenueData?.reduce((sum, item) => sum + item.subscriptionRevenue + item.commissionRevenue, 0) || 0;
+  const totalRevenue = revenueData?.reduce((sum, item) => sum + item.subscriptionRevenue, 0) || 0;
   const avgMonthly = revenueData?.length ? totalRevenue / revenueData.length : 0;
   const totalNewSubscribers = revenueData?.reduce((sum, item) => sum + (item.newSubscribers || 0), 0) || 0;
   
@@ -32,8 +32,8 @@ export default function AdminRevenue() {
   if (revenueData && revenueData.length >= 2) {
     const current = revenueData[revenueData.length - 1];
     const prior = revenueData[revenueData.length - 2];
-    const currentTotal = current.subscriptionRevenue + current.commissionRevenue;
-    const priorTotal = prior.subscriptionRevenue + prior.commissionRevenue;
+    const currentTotal = current.subscriptionRevenue;
+    const priorTotal = prior.subscriptionRevenue;
     if (priorTotal > 0) {
       growthPct = Math.round(((currentTotal - priorTotal) / priorTotal) * 100);
     }
@@ -122,7 +122,6 @@ export default function AdminRevenue() {
                   />
                   <Legend wrapperStyle={{ paddingTop: '20px' }} />
                   <Bar dataKey="subscriptionRevenue" name="الاشتراكات" stackId="a" fill="hsl(var(--primary))" radius={[0, 0, 4, 4]} />
-                  <Bar dataKey="commissionRevenue" name="عمولات الورش" stackId="a" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -147,7 +146,6 @@ export default function AdminRevenue() {
                 <TableRow>
                   <TableHead>الشهر</TableHead>
                   <TableHead>إيرادات الاشتراكات</TableHead>
-                  <TableHead>عمولات الورش</TableHead>
                   <TableHead>المشتركين الجدد</TableHead>
                   <TableHead className="text-left font-bold">الإجمالي</TableHead>
                 </TableRow>
@@ -157,10 +155,9 @@ export default function AdminRevenue() {
                   <TableRow key={idx}>
                     <TableCell className="font-medium">{item.month}</TableCell>
                     <TableCell>{formatSAR(item.subscriptionRevenue)}</TableCell>
-                    <TableCell>{formatSAR(item.commissionRevenue)}</TableCell>
                     <TableCell>{item.newSubscribers || 0}</TableCell>
                     <TableCell className="text-left font-bold text-primary">
-                      {formatSAR(item.subscriptionRevenue + item.commissionRevenue)}
+                      {formatSAR(item.subscriptionRevenue)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -169,7 +166,6 @@ export default function AdminRevenue() {
                 <TableRow>
                   <TableCell className="font-bold">الإجمالي العام</TableCell>
                   <TableCell>{formatSAR(revenueData.reduce((sum, item) => sum + item.subscriptionRevenue, 0))}</TableCell>
-                  <TableCell>{formatSAR(revenueData.reduce((sum, item) => sum + item.commissionRevenue, 0))}</TableCell>
                   <TableCell>{totalNewSubscribers}</TableCell>
                   <TableCell className="text-left font-bold text-primary">{formatSAR(totalRevenue)}</TableCell>
                 </TableRow>

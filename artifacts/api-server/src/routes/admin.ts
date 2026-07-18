@@ -6,8 +6,6 @@ import {
   vehiclesTable,
   diagnosticSessionsTable,
   dtcCodesTable,
-  bookingsTable,
-  workshopsTable,
   revenueTable,
 } from "@workspace/db";
 import {
@@ -17,7 +15,6 @@ import {
   ListAdminVehiclesResponse,
   ListLiveDiagnosticsResponse,
   GetCommonIssuesResponse,
-  GetWorkshopPipelineResponse,
   GetRevenueBreakdownResponse,
 } from "@workspace/api-zod";
 
@@ -30,8 +27,6 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
 
   const since1d = new Date();
   since1d.setHours(since1d.getHours() - 24);
-  const since7d = new Date();
-  since7d.setDate(since7d.getDate() - 7);
 
   const [{ activeVehiclesToday }] = await db
     .select({
@@ -66,19 +61,13 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
     .from(usersTable)
     .where(sql`${usersTable.subscriptionTier} IN ('premium','fleet')`);
 
-  const [{ bookingsLast7d }] = await db
-    .select({ bookingsLast7d: sql<number>`count(*)::int` })
-    .from(bookingsTable)
-    .where(gte(bookingsTable.createdAt, since7d));
-
   const [{ avgHealthScore }] = await db
     .select({
       avgHealthScore: sql<number>`coalesce(avg(${vehiclesTable.healthScore}),0)::int`,
     })
     .from(vehiclesTable);
 
-  const revenueMtd =
-    (thisMonth?.subscriptionRevenue ?? 0) + (thisMonth?.commissionRevenue ?? 0);
+  const revenueMtd = thisMonth?.subscriptionRevenue ?? 0;
 
   res.json(
     GetAdminOverviewResponse.parse({
@@ -91,7 +80,6 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
       revenueTrendPct: 18,
       nps: 67,
       premiumSubscribers,
-      bookingsLast7d,
       avgHealthScore,
     }),
   );
@@ -226,38 +214,6 @@ router.get("/admin/issues/common", async (_req, res): Promise<void> => {
     }),
   );
   res.json(GetCommonIssuesResponse.parse(enriched));
-});
-
-router.get("/admin/workshops/pipeline", async (_req, res): Promise<void> => {
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const rows = await db
-    .select({
-      workshopId: workshopsTable.id,
-      name: workshopsTable.name,
-      nameAr: workshopsTable.nameAr,
-      city: workshopsTable.city,
-      rating: workshopsTable.rating,
-      commissionPct: workshopsTable.commissionPct,
-      pendingBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'pending')::int`,
-      confirmedBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'confirmed')::int`,
-      completedBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'completed' AND ${bookingsTable.scheduledAt} >= ${since})::int`,
-      revenue30d: sql<number>`coalesce(sum(${bookingsTable.finalCost}) FILTER (WHERE ${bookingsTable.status} = 'completed' AND ${bookingsTable.scheduledAt} >= ${since}), 0)::int`,
-    })
-    .from(workshopsTable)
-    .leftJoin(bookingsTable, eq(bookingsTable.workshopId, workshopsTable.id))
-    .groupBy(workshopsTable.id)
-    .orderBy(desc(sql`count(*) FILTER (WHERE ${bookingsTable.status} = 'completed')`));
-
-  res.json(
-    GetWorkshopPipelineResponse.parse(
-      rows.map((r) => ({
-        ...r,
-        rating: Number(r.rating),
-        commission30d: Math.round(r.revenue30d * (r.commissionPct / 100)),
-      })),
-    ),
-  );
 });
 
 router.get("/admin/revenue", async (_req, res): Promise<void> => {
