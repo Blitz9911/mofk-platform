@@ -40,7 +40,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const AUTH_SCREENS = ["login", "register"];
+const AUTH_SCREENS = ["welcome", "login", "register", "verify", "onboarding", "pair-device"];
+const ONBOARDING_SCREENS = ["verify", "onboarding", "pair-device"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -56,11 +57,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   const inAuthScreen = AUTH_SCREENS.includes(segments[0] as string);
 
+  const inOnboardingScreen = ONBOARDING_SCREENS.includes(segments[0] as string);
+
   if (!user && !inAuthScreen) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/welcome" />;
   }
 
-  if (user && inAuthScreen) {
+  if (user && inAuthScreen && !inOnboardingScreen) {
     return <Redirect href="/(tabs)" />;
   }
 
@@ -71,8 +74,12 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="welcome" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="register" options={{ headerShown: false }} />
+      <Stack.Screen name="verify" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="pair-device" options={{ headerShown: false }} />
       <Stack.Screen name="vehicle/[id]" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="add-vehicle" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="bookings" options={{ headerShown: false, presentation: "card" }} />

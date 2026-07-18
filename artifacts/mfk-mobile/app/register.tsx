@@ -49,6 +49,7 @@ export default function RegisterScreen() {
 );
 
 await login(user);
+router.replace("/verify");
     } catch (err: any) {
       setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {
