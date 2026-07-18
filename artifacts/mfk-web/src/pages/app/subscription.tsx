@@ -1,196 +1,319 @@
-import { useState } from "react";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
-import { CheckCircle2, CreditCard, Calendar, Zap, ShieldCheck } from "lucide-react";
-import { 
-  useGetMySubscription, 
-  useListSubscriptionPlans,
-  UserSubscriptionTier,
-  UserSubscriptionStatus
-} from "@workspace/api-client-react";
+import { useMemo, useState } from "react";
+import {
+  AlertCircle,
+  CalendarClock,
+  CheckCircle2,
+  CreditCard,
+  Lock,
+  LucideIcon,
+  ReceiptText,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import {
+  BillingCycle,
+  SubscriptionPlanId,
+  formatSar,
+  formatVehicles,
+  getDisplayPrice,
+  getFleetPreview,
+  getMonthlyEquivalent,
+  getPlanById,
+  getYearlySavings,
+  subscriptionPlans,
+} from "@/data/subscriptionPlans";
 
-export default function Subscription() {
-  const { data: subscription, isLoading: subLoading } = useGetMySubscription();
-  const { data: plans, isLoading: plansLoading } = useListSubscriptionPlans();
-  
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+type PaymentState = "success" | "pending" | "past_due";
 
-  const getTierName = (tier: UserSubscriptionTier | undefined) => {
-    if (tier === "premium") return "الباقة الاحترافية (Premium)";
-    if (tier === "fleet") return "باقة الأسطول (Fleet)";
-    return "الباقة الأساسية (Free)";
-  };
+const paymentState: PaymentState = "success";
 
-  const getStatusBadge = (status: UserSubscriptionStatus | undefined) => {
-    if (status === "active") return <Badge className="bg-green-500 hover:bg-green-600">نشط</Badge>;
-    if (status === "expired") return <Badge variant="destructive">منتهي</Badge>;
-    if (status === "cancelled") return <Badge variant="secondary">ملغى</Badge>;
-    return null;
-  };
+const stateCopy: Record<PaymentState, { title: string; body: string; tone: string; icon: LucideIcon }> = {
+  success: {
+    title: "اشتراكك نشط",
+    body: "يمكنك تغيير الباقة أو دورة الفوترة، وسيتم تطبيق الصلاحيات من الخادم عند الربط.",
+    tone: "border-[#2ECC71]/30 bg-[#2ECC71]/10 text-[#DFF8E8]",
+    icon: CheckCircle2,
+  },
+  pending: {
+    title: "الدفع قيد المعالجة",
+    body: "سنحدث حالة الاشتراك تلقائيًا بعد اكتمال عملية الدفع.",
+    tone: "border-[#FF6A00]/40 bg-[#FF6A00]/10 text-white",
+    icon: RefreshCw,
+  },
+  past_due: {
+    title: "تعذر تحصيل الدفعة",
+    body: "حدث مشكلة في الدفع. أعد المحاولة لتجنب فقدان ميزات الباقة.",
+    tone: "border-red-500/40 bg-red-500/10 text-red-100",
+    icon: AlertCircle,
+  },
+};
+
+function PlanAmount({
+  planId,
+  cycle,
+}: {
+  planId: SubscriptionPlanId;
+  cycle: BillingCycle;
+}) {
+  const plan = getPlanById(planId);
+
+  if (plan.id === "fleet") {
+    return (
+      <>
+        <span className="text-2xl font-black">حسب العدد</span>
+        <span className="text-xs text-[#8A8A8A]">يبدأ من ٢١ ر.س لكل مركبة</span>
+      </>
+    );
+  }
+
+  const price = getDisplayPrice(plan, cycle) ?? 0;
+  const monthlyEquivalent = getMonthlyEquivalent(plan);
+  const displayPrice = cycle === "yearly" && monthlyEquivalent ? monthlyEquivalent : price;
 
   return (
-    <div className="space-y-8 pb-12 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">الاشتراك والباقات</h1>
-        <p className="text-muted-foreground mt-1">إدارة اشتراكك وترقية الباقة للحصول على ميزات إضافية</p>
-      </div>
+    <>
+      <span className="text-3xl font-black">{formatSar(displayPrice)}</span>
+      <span className="text-xs text-[#8A8A8A]">
+        ر.س / شهر
+        {cycle === "yearly" && plan.yearlyPrice ? `، تدفع ${formatSar(plan.yearlyPrice)} سنويًا` : ""}
+      </span>
+    </>
+  );
+}
 
-      {subLoading ? (
-        <Skeleton className="h-48 w-full" />
-      ) : (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="pb-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  <ShieldCheck className="w-6 h-6 text-primary" />
-                  {getTierName(subscription?.tier)}
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  الباقة الحالية الخاصة بك
-                </CardDescription>
-              </div>
-              {getStatusBadge(subscription?.status)}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground block">تاريخ البدء</span>
-                <span className="font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  {subscription?.startedAt ? format(new Date(subscription.startedAt), "d MMMM yyyy", { locale: ar }) : "—"}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground block">تاريخ الانتهاء</span>
-                <span className="font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-destructive" />
-                  {subscription?.endsAt ? format(new Date(subscription.endsAt), "d MMMM yyyy", { locale: ar }) : "—"}
-                </span>
-              </div>
-              <div className="space-y-1 sm:col-span-2 md:col-span-2 flex flex-col justify-center">
-                <div className="flex items-center justify-between bg-background p-3 rounded-lg border border-border">
-                  <div className="space-y-0.5">
-                    <span className="font-medium block">التجديد التلقائي</span>
-                    <span className="text-xs text-muted-foreground">سيتم تجديد اشتراكك تلقائياً لتجنب انقطاع الخدمة</span>
-                  </div>
-                  <Switch checked={subscription?.autoRenew} />
-                </div>
-              </div>
-            </div>
-            
-            <div className="pt-4 border-t border-border/50 flex gap-3">
-              <Button variant="outline" className="gap-2">
-                <CreditCard className="w-4 h-4" /> إدارة طريقة الدفع
-              </Button>
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                عرض الفواتير السابقة
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+export default function Subscription() {
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
+  const [fleetVehicles, setFleetVehicles] = useState(30);
 
-      <div className="space-y-6 pt-6">
-        <div className="flex flex-col items-center text-center space-y-4">
-          <h2 className="text-2xl font-bold">ارتقِ بتجربة القيادة والصيانة</h2>
-          <p className="text-muted-foreground max-w-xl">
-            اختر الباقة التي تناسب احتياجاتك. وفر حتى 20% عند الاشتراك السنوي.
-          </p>
-          
-          <div className="flex items-center bg-muted p-1 rounded-full border border-border mt-4">
-            <button
-              onClick={() => setBillingCycle("monthly")}
-              className={cn(
-                "px-6 py-2 rounded-full text-sm font-medium transition-all",
-                billingCycle === "monthly" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              شهري
-            </button>
-            <button
-              onClick={() => setBillingCycle("yearly")}
-              className={cn(
-                "px-6 py-2 rounded-full text-sm font-medium transition-all",
-                billingCycle === "yearly" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              سنوي <span className="text-[10px] ml-1 bg-white/20 px-1.5 py-0.5 rounded">-20%</span>
-            </button>
+  const currentPlanId: SubscriptionPlanId = "free";
+  const currentPlan = getPlanById(currentPlanId);
+  const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
+  const fleetPreview = getFleetPreview(fleetVehicles);
+  const StatusIcon = stateCopy[paymentState].icon;
+
+  return (
+    <div className="dark -m-4 min-h-screen bg-[#0B0B0B] p-4 text-white md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
+      <div className="mx-auto max-w-7xl space-y-6 pb-28">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#FF6A00]">الاشتراك والباقات</p>
+            <h1 className="mt-2 text-3xl font-black tracking-normal md:text-4xl">إدارة اشتراك موفك</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">
+              اختر الخطة المناسبة، راجع الميزات المقفلة، وعاين تكلفة الأسطول قبل الانتقال للدفع.
+            </p>
+          </div>
+
+          <div
+            className="inline-grid w-full grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1 sm:w-auto"
+            role="tablist"
+            aria-label="دورة الفوترة"
+          >
+            {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
+              <button
+                key={cycle}
+                type="button"
+                role="tab"
+                aria-selected={billingCycle === cycle}
+                aria-pressed={billingCycle === cycle}
+                onClick={() => setBillingCycle(cycle)}
+                className={cn(
+                  "rounded-[10px] px-5 py-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
+                )}
+              >
+                {cycle === "monthly" ? "شهري" : "سنوي"}
+                {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر ٤٠٪</span>}
+              </button>
+            ))}
           </div>
         </div>
 
-        {plansLoading ? (
-          <div className="grid md:grid-cols-3 gap-6 pt-4">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-[500px] w-full rounded-xl" />)}
+        <section className={cn("rounded-[16px] border p-5", stateCopy[paymentState].tone)}>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <StatusIcon className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <h2 className="text-lg font-black">{stateCopy[paymentState].title}</h2>
+                <p className="mt-1 text-sm leading-6 opacity-85">{stateCopy[paymentState].body}</p>
+              </div>
+            </div>
+            {paymentState === "past_due" && (
+              <Button className="rounded-[12px] bg-[#FF6A00] hover:bg-[#E65C00]">
+                إعادة محاولة الدفع
+              </Button>
+            )}
           </div>
-        ) : (
-          <div className="grid md:grid-cols-3 gap-6 pt-4 items-center">
-            {Array.isArray(plans) && plans.map((plan) => {
-              const isCurrent = subscription?.tier === plan.tier;
-              const price = billingCycle === "monthly" ? plan.priceMonthlySar : (plan.priceYearlySar ? Math.round(plan.priceYearlySar / 12) : plan.priceMonthlySar);
-              const yearlyTotal = plan.priceYearlySar || (plan.priceMonthlySar * 12);
-              
-              return (
-                <Card 
-                  key={plan.id} 
-                  className={cn(
-                    "relative flex flex-col transition-all duration-200",
-                    plan.isPopular ? "border-primary shadow-md scale-105 z-10" : "border-border hover:border-primary/30",
-                    isCurrent && !plan.isPopular && "border-primary/50 bg-primary/5"
-                  )}
-                >
-                  {plan.isPopular && (
-                    <div className="absolute -top-4 inset-x-0 flex justify-center">
-                      <span className="bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
-                        <Zap className="w-3 h-3 fill-current" /> الأكثر طلباً
-                      </span>
-                    </div>
-                  )}
-                  <CardHeader className={cn("text-center pb-2", plan.isPopular && "pt-8")}>
-                    <CardTitle className="text-xl">{plan.nameAr}</CardTitle>
-                    <CardDescription>{plan.descriptionAr}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 text-center space-y-6">
-                    <div className="mt-4">
-                      <span className="text-4xl font-bold">{price}</span>
-                      <span className="text-muted-foreground font-medium text-sm ml-1">ر.س / شهر</span>
-                      {billingCycle === "yearly" && price > 0 && (
-                        <p className="text-xs text-muted-foreground mt-2">يُدفع {yearlyTotal} ر.س سنوياً</p>
-                      )}
-                    </div>
-                    
-                    <ul className="space-y-3 text-right">
-                      {(plan.featuresAr || plan.features).map((feature, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm">
-                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-                          <span className="text-foreground/90">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      className="w-full" 
-                      variant={isCurrent ? "outline" : (plan.isPopular ? "default" : "secondary")}
-                      disabled={isCurrent}
-                    >
-                      {isCurrent ? "باقتك الحالية" : (price === 0 ? "ابدأ مجاناً" : "ترقية الباقة")}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              );
-            })}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-4">
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+            <ShieldCheck className="h-5 w-5 text-[#FF6A00]" />
+            <p className="mt-4 text-sm text-[#8A8A8A]">الباقة الحالية</p>
+            <h2 className="mt-1 text-2xl font-black">{currentPlan.name}</h2>
           </div>
-        )}
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+            <CalendarClock className="h-5 w-5 text-[#FF6A00]" />
+            <p className="mt-4 text-sm text-[#8A8A8A]">حالة التجربة</p>
+            <h2 className="mt-1 text-2xl font-black">٧ أيام متبقية</h2>
+          </div>
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+            <ReceiptText className="h-5 w-5 text-[#FF6A00]" />
+            <p className="mt-4 text-sm text-[#8A8A8A]">الفوترة المختارة</p>
+            <h2 className="mt-1 text-2xl font-black">{billingCycle === "yearly" ? "سنوي" : "شهري"}</h2>
+          </div>
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+            <CreditCard className="h-5 w-5 text-[#FF6A00]" />
+            <p className="mt-4 text-sm text-[#8A8A8A]">الدفع</p>
+            <h2 className="mt-1 text-2xl font-black">جاهز للربط</h2>
+          </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {subscriptionPlans.map((plan) => {
+            const selected = selectedPlanId === plan.id;
+            const current = currentPlanId === plan.id;
+
+            return (
+              <button
+                key={plan.id}
+                type="button"
+                onClick={() => setSelectedPlanId(plan.id)}
+                aria-pressed={selected}
+                className={cn(
+                  "flex min-h-[370px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-2xl font-black">{plan.name}</h2>
+                    <p className="mt-2 text-sm leading-6 text-[#8A8A8A]">{plan.subtitle}</p>
+                  </div>
+                  {plan.badge && <span className="rounded-full bg-[#FF6A00] px-2 py-1 text-xs font-black">الأكثر</span>}
+                </div>
+
+                <div className="mt-5 flex flex-col">
+                  <PlanAmount planId={plan.id} cycle={billingCycle} />
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {plan.included.slice(0, 3).map((feature) => (
+                    <div key={feature} className="flex items-start gap-2 text-sm leading-6">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                      {feature}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto pt-5">
+                  <div className={cn("rounded-[12px] px-4 py-3 text-center text-sm font-black", current ? "bg-[#2ECC71]/15 text-[#BDF2CC]" : "bg-[#0B0B0B] text-white")}>
+                    {current ? "باقتك الحالية" : selected ? "محددة" : "اختيار"}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-bold text-[#FF6A00]">مقارنة الصلاحيات</p>
+                <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
+              </div>
+              <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
+                {selectedPlan.maxVehicles === "fleet" ? "مركبات حسب العقد" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <h3 className="font-black">مفعلة</h3>
+                {selectedPlan.included.map((feature) => (
+                  <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <h3 className="font-black">مقفلة</h3>
+                {selectedPlan.locked.length ? (
+                  selectedPlan.locked.map((feature) => (
+                    <div key={feature} className="flex items-start gap-3 rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
+                      <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#5A5A5A]" />
+                      <span>{feature}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-[12px] border border-[#2A2A2A] p-3 text-sm leading-6 text-[#8A8A8A]">
+                    لا توجد ميزات مقفلة لهذه الباقة.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <aside className="space-y-4">
+            {selectedPlan.id === "free" && (
+              <div className="rounded-[16px] border border-[#FF6A00]/40 bg-[#FF6A00]/10 p-5">
+                <h2 className="text-xl font-black">باقة البداية</h2>
+                <p className="mt-2 text-sm leading-7 text-[#E6E6E6]">
+                  يظهر هذا العرض فقط عند تحديد المجاني، حتى يكون مسار الترقية واضحًا وغير مزعج.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#FF6A00]" />
+                <h2 className="text-xl font-black">معاينة الأسطول</h2>
+              </div>
+              <div className="mt-5 space-y-5">
+                <div className="flex items-center justify-between rounded-[12px] bg-[#222] p-4">
+                  <span className="text-sm text-[#8A8A8A]">المركبات</span>
+                  <span className="text-2xl font-black">{formatVehicles(fleetVehicles)}</span>
+                </div>
+                <Slider
+                  min={5}
+                  max={120}
+                  step={1}
+                  value={[fleetVehicles]}
+                  onValueChange={(value) => setFleetVehicles(value[0] ?? 5)}
+                  aria-label="عدد مركبات الأسطول"
+                />
+                <div className="rounded-[12px] bg-[#222] p-4">
+                  <p className="text-sm text-[#8A8A8A]">{fleetPreview.label}</p>
+                  <p className="mt-2 text-2xl font-black">
+                    {fleetPreview.total === null ? "عرض خاص" : `${formatSar(fleetPreview.total)} ر.س / شهر`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
       </div>
+
+      {selectedPlan.id !== "free" && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-4 pb-4 pt-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-[#8A8A8A]">الترقية المحددة</p>
+              <p className="text-lg font-black">{selectedPlan.name}</p>
+            </div>
+            <Button className="h-12 rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00]">
+              {selectedPlan.id === "fleet" ? "طلب عرض للأسطول" : "متابعة الدفع"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
