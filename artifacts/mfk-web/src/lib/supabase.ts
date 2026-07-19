@@ -260,6 +260,27 @@ async function getProfileRow(user: SupabaseAuthUser, accessToken: string): Promi
   }
 }
 
+async function touchLastActiveAt(userId: string, accessToken: string) {
+  try {
+    await supabaseRequest(
+      `/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          last_active_at: new Date().toISOString(),
+        }),
+      },
+      accessToken,
+    );
+  } catch {
+    // Last activity should never block login.
+  }
+}
+
 export const authApi = {
   async register(name: string, phone: string, email: string, password: string): Promise<AuthUser> {
     const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
@@ -281,6 +302,7 @@ export const authApi = {
 
     saveSupabaseSession(session);
     const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
     return toAuthUser(session.user, row);
   },
 
@@ -299,6 +321,7 @@ export const authApi = {
 
     saveSupabaseSession(session);
     const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
     return toAuthUser(session.user, row);
   },
 
@@ -313,6 +336,7 @@ export const authApi = {
         session.access_token,
       );
       const row = await getProfileRow(authUser, session.access_token);
+      await touchLastActiveAt(authUser.id, session.access_token);
       return toAuthUser(authUser, row);
     } catch {
       clearSupabaseSession();
