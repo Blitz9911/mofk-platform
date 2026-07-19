@@ -46,7 +46,7 @@ export interface AuthUser {
 
 export function getSupabaseConfig() {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
-  const url = env.VITE_SUPABASE_URL?.replace(/\/+$/, "");
+  const url = env.VITE_SUPABASE_URL?.replace(/\/+$/, "").replace(/\/(?:rest|auth)\/v1$/, "");
   const anonKey = env.VITE_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
@@ -56,6 +56,11 @@ export function getSupabaseConfig() {
   }
 
   return { url, anonKey };
+}
+
+function buildSupabaseUrl(baseUrl: string, path: string) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
 }
 
 function getStorage(): Storage | null {
@@ -136,7 +141,7 @@ export async function supabaseRequest<T>(
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(`${url}${path}`, {
+  const response = await fetch(buildSupabaseUrl(url, path), {
     ...options,
     headers,
   });
