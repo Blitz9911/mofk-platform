@@ -11,12 +11,21 @@ import { Badge } from "@/components/ui/badge";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty";
+import { fallbackAdminUsers } from "@/data/adminMockData";
 
 export default function AdminUsers() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   
-  const { data: users, isLoading } = useListAdminUsers({ search: debouncedSearch });
+  const { data: apiUsers, isLoading, isError } = useListAdminUsers({ search: debouncedSearch });
+  const users = apiUsers?.length ? apiUsers : fallbackAdminUsers.filter((user) => {
+    const term = debouncedSearch.trim().toLowerCase();
+    if (!term) return true;
+    return [user.name, user.phone, user.email ?? "", user.city ?? ""].some((value) =>
+      value.toLowerCase().includes(term),
+    );
+  });
+  const usingFallback = isError || !apiUsers?.length;
 
   const getTierColor = (tier: string) => {
     switch (tier) {
@@ -53,6 +62,11 @@ export default function AdminUsers() {
       </div>
 
       <div className="border rounded-xl bg-card overflow-hidden">
+        {usingFallback && !isLoading && (
+          <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+            يتم عرض بيانات إدارية احتياطية إلى أن يكتمل اتصال API.
+          </div>
+        )}
         {isLoading ? (
           <div className="p-4 space-y-4">
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}

@@ -9,12 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fallbackAdminVehicles } from "@/data/adminMockData";
 
 export default function AdminVehicles() {
-  const { data: vehicles, isLoading } = useListAdminVehicles();
+  const { data: apiVehicles, isLoading, isError } = useListAdminVehicles();
   const [filter, setFilter] = useState("all");
+  const vehicles = apiVehicles?.length ? apiVehicles : fallbackAdminVehicles;
+  const usingFallback = isError || !apiVehicles?.length;
 
-  const filteredVehicles = vehicles?.filter(v => {
+  const filteredVehicles = vehicles.filter(v => {
     if (filter === "all") return true;
     if (filter === "healthy") return v.healthScore >= 80;
     if (filter === "warning") return v.healthScore >= 60 && v.healthScore < 80;
@@ -47,6 +50,11 @@ export default function AdminVehicles() {
       </div>
 
       <div className="border rounded-xl bg-card overflow-hidden">
+        {usingFallback && !isLoading && (
+          <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+            يتم عرض بيانات مركبات احتياطية إلى أن يكتمل اتصال API.
+          </div>
+        )}
         {isLoading ? (
           <div className="p-4 space-y-4">
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}

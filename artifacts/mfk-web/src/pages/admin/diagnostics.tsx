@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty";
 import { Card, CardContent } from "@/components/ui/card";
+import { fallbackLiveDiagnostics } from "@/data/adminMockData";
 
 export default function AdminDiagnostics() {
-  const { data: diagnostics, isLoading } = useListLiveDiagnostics();
+  const { data: apiDiagnostics, isLoading, isError } = useListLiveDiagnostics();
+  const diagnostics = apiDiagnostics?.length ? apiDiagnostics : fallbackLiveDiagnostics;
+  const usingFallback = isError || !apiDiagnostics?.length;
 
   return (
     <div className="space-y-6">
@@ -23,6 +26,11 @@ export default function AdminDiagnostics() {
 
       <Card>
         <CardContent className="p-0">
+          {usingFallback && !isLoading && (
+            <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+              يتم عرض جلسات تشخيص احتياطية إلى أن يكتمل اتصال API.
+            </div>
+          )}
           {isLoading ? (
             <div className="p-4 space-y-4">
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}

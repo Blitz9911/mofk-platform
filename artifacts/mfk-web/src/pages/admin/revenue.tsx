@@ -15,9 +15,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty";
+import { fallbackRevenueData } from "@/data/adminMockData";
 
 export default function AdminRevenue() {
-  const { data: revenueData, isLoading } = useGetRevenueBreakdown();
+  const { data: apiRevenueData, isLoading, isError } = useGetRevenueBreakdown();
+  const revenueData = apiRevenueData?.length ? apiRevenueData : fallbackRevenueData;
+  const usingFallback = isError || !apiRevenueData?.length;
 
   const formatSAR = (value: number | undefined) => {
     if (value === undefined) return "0 ر.س";
@@ -47,6 +50,12 @@ export default function AdminRevenue() {
           <p className="text-muted-foreground">تحليل الإيرادات والنمو</p>
         </div>
       </div>
+
+      {usingFallback && !isLoading && (
+        <div className="rounded-md bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+          يتم عرض بيانات مالية احتياطية إلى أن يكتمل اتصال API.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>

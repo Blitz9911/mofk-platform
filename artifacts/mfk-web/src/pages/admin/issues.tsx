@@ -16,9 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger } from "@/components/ui/drawer";
+import { fallbackCommonIssues } from "@/data/adminMockData";
 
 export default function AdminIssues() {
-  const { data: issues, isLoading } = useGetCommonIssues();
+  const { data: apiIssues, isLoading, isError } = useGetCommonIssues();
+  const issues = apiIssues?.length ? apiIssues : fallbackCommonIssues;
+  const usingFallback = isError || !apiIssues?.length;
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -59,6 +62,11 @@ export default function AdminIssues() {
           <CardTitle>أكثر 15 عطل تكراراً</CardTitle>
         </CardHeader>
         <CardContent>
+          {usingFallback && !isLoading && (
+            <div className="mb-4 rounded-md bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+              يتم عرض بيانات أعطال احتياطية إلى أن يكتمل اتصال API.
+            </div>
+          )}
           {isLoading ? (
             <Skeleton className="w-full h-64" />
           ) : issues && issues.length > 0 ? (
@@ -85,6 +93,11 @@ export default function AdminIssues() {
 
       <Card>
         <CardContent className="p-0">
+          {usingFallback && !isLoading && (
+            <div className="border-b bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+              يتم عرض جدول أعطال احتياطي إلى أن يكتمل اتصال API.
+            </div>
+          )}
           {isLoading ? (
             <div className="p-4 space-y-4">
               {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
