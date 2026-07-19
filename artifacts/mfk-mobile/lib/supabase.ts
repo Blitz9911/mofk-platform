@@ -48,7 +48,7 @@ export interface AuthUser {
 }
 
 export function getSupabaseConfig() {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "");
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "").replace(/\/(?:rest|auth)\/v1$/, "");
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
@@ -61,6 +61,11 @@ export function getSupabaseConfig() {
     url,
     anonKey,
   };
+}
+
+function buildSupabaseUrl(baseUrl: string, path: string): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
 }
 
 function getErrorMessage(data: unknown, fallback: string): string {
@@ -106,7 +111,7 @@ export async function supabaseRequest<T>(
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(`${url}${path}`, {
+  const response = await fetch(buildSupabaseUrl(url, path), {
     ...options,
     headers,
   });
@@ -342,6 +347,20 @@ async function getUserRow(
   return rows?.[0] ?? null;
 }
 
+async function getProfileRow(
+  user: SupabaseAuthUser,
+  accessToken: string,
+): Promise<UserRow | null> {
+  try {
+    return (
+      (await getUserRow(user.id, accessToken)) ??
+      (await upsertUserRow(user, accessToken))
+    );
+  } catch {
+    return null;
+  }
+}
+
 export const authApi = {
   async register(
     name: string,
@@ -381,10 +400,7 @@ export const authApi = {
 
     await saveSupabaseSession(session);
 
-    const row = await upsertUserRow(
-      session.user,
-      session.access_token,
-    );
+    const row = await getProfileRow(session.user, session.access_token);
 
     return toAuthUser(session.user, row);
   },
@@ -417,10 +433,7 @@ export const authApi = {
 
     await saveSupabaseSession(session);
 
-    const row = await upsertUserRow(
-      session.user,
-      session.access_token,
-    );
+    const row = await getProfileRow(session.user, session.access_token);
 
     return toAuthUser(session.user, row);
   },
@@ -441,15 +454,7 @@ export const authApi = {
         session.access_token,
       );
 
-      const row =
-        (await getUserRow(
-          authUser.id,
-          session.access_token,
-        )) ??
-        (await upsertUserRow(
-          authUser,
-          session.access_token,
-        ));
+      const row = await getProfileRow(authUser, session.access_token);
 
       return toAuthUser(authUser, row);
     } catch {

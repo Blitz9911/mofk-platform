@@ -252,6 +252,14 @@ async function getUserRow(userId: string, accessToken: string): Promise<UserRow 
   return rows?.[0] ?? null;
 }
 
+async function getProfileRow(user: SupabaseAuthUser, accessToken: string): Promise<UserRow | null> {
+  try {
+    return (await getUserRow(user.id, accessToken)) ?? (await upsertUserRow(user, accessToken));
+  } catch {
+    return null;
+  }
+}
+
 export const authApi = {
   async register(name: string, phone: string, email: string, password: string): Promise<AuthUser> {
     const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
@@ -272,7 +280,7 @@ export const authApi = {
     }
 
     saveSupabaseSession(session);
-    const row = await upsertUserRow(session.user, session.access_token);
+    const row = await getProfileRow(session.user, session.access_token);
     return toAuthUser(session.user, row);
   },
 
@@ -290,7 +298,7 @@ export const authApi = {
     if (!session) throw new Error("تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.");
 
     saveSupabaseSession(session);
-    const row = await upsertUserRow(session.user, session.access_token);
+    const row = await getProfileRow(session.user, session.access_token);
     return toAuthUser(session.user, row);
   },
 
@@ -304,8 +312,7 @@ export const authApi = {
         { method: "GET" },
         session.access_token,
       );
-      const row = (await getUserRow(authUser.id, session.access_token)) ??
-        (await upsertUserRow(authUser, session.access_token));
+      const row = await getProfileRow(authUser, session.access_token);
       return toAuthUser(authUser, row);
     } catch {
       clearSupabaseSession();
