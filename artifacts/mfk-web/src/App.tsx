@@ -3,6 +3,8 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { AnimatePresence, motion } from "framer-motion";
 import NotFound from "@/pages/not-found";
 
@@ -67,6 +69,7 @@ import AdminReports from "@/pages/admin/reports";
 import AdminSettings from "@/pages/admin/settings";
 
 import { Shell } from "@/components/layout/Shell";
+import { useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -96,6 +99,46 @@ function AppRoutes() {
 }
 
 function AdminRoutes() {
+  const { user, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation(`/login?next=${encodeURIComponent(location)}`);
+    }
+  }, [isLoading, location, setLocation, user]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background" dir="rtl">
+        <div className="text-sm text-muted-foreground">جاري التحقق من الصلاحية...</div>
+      </div>
+    );
+  }
+
+  if (user.role !== "admin") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6" dir="rtl">
+        <Card className="w-full max-w-md">
+          <CardContent className="space-y-4 p-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              !
+            </div>
+            <div>
+              <h1 className="text-2xl font-black">صلاحية الأدمن مطلوبة</h1>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                هذا المسار مخصص لحسابات الإدارة فقط.
+              </p>
+            </div>
+            <Button className="w-full" onClick={() => setLocation("/app")}>
+              العودة للتطبيق
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <Shell isAdmin>
       <Switch>

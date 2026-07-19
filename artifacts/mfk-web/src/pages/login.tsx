@@ -11,6 +11,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const params = new URLSearchParams(window.location.search);
+  const hasNextPath = params.has("next");
   const nextPath = params.get("next") || "/app";
   const selectedPlan = params.get("plan");
 
@@ -29,7 +30,13 @@ export default function Login() {
     try {
       const user = await authApi.login(email.trim(), password);
       login(user);
-      setLocation(selectedPlan ? `${nextPath}?plan=${selectedPlan}` : nextPath);
+      const destination =
+        !hasNextPath && user.role === "admin"
+          ? "/admin"
+          : selectedPlan
+            ? `${nextPath}?plan=${selectedPlan}`
+            : nextPath;
+      setLocation(destination);
     } catch (err: any) {
       setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {
