@@ -22,6 +22,10 @@ type AuthTokenPayload = {
   exp: number;
 };
 
+type SupabaseJwtPayload = {
+  sub?: string;
+};
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const hash = scryptSync(password, salt, SCRYPT_KEYLEN).toString("hex");
@@ -74,6 +78,17 @@ export function verifyAuthToken(token: string): AuthTokenPayload | null {
   }
 }
 
+function decodeSupabaseJwt(token: string): SupabaseJwtPayload | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+
+  try {
+    return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as SupabaseJwtPayload;
+  } catch {
+    return null;
+  }
+}
+
 export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) {
@@ -88,6 +103,13 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
     if (token === DEMO_ADMIN_ID) {
       req.userId = DEMO_ADMIN_ID;
       req.userRole = "admin";
+      next();
+      return;
+    }
+    const supabasePayload = decodeSupabaseJwt(token);
+    if (supabasePayload?.sub) {
+      req.userId = supabasePayload.sub;
+      req.userRole = "user";
       next();
       return;
     }
