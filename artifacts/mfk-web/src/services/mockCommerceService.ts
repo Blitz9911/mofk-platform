@@ -161,8 +161,8 @@ function defaultSubscriptions(): MockSubscription[] {
     {
       id: "sub-demo-001",
       customer: "عميل تجريبي",
-      planId: "individual-basic",
-      cycle: "yearly",
+      planId: "plus",
+      cycle: "annual",
       status: "pending_activation",
       activationState: "waiting_device",
       startDate: now().slice(0, 10),
@@ -184,7 +184,9 @@ export const commerceService = {
     shippingAddress: ShippingAddress;
   }) {
     const orders = readStore<MockOrder[]>(ORDERS_KEY, []);
-    const amount = getPlanPrice(input.plan, input.billingCycle) ?? 0;
+    const subscriptionAmount = getPlanPrice(input.plan, input.billingCycle) ?? 0;
+    const deviceAmount = input.plan.includesDevice ? input.plan.devicePriceSar : 0;
+    const amount = subscriptionAmount + deviceAmount;
     const shippingSar = 0;
     const vatSar = Math.round(amount * 0.15);
     const totalSar = amount + vatSar + shippingSar;
@@ -202,7 +204,7 @@ export const commerceService = {
       vatSar,
       shippingSar,
       totalSar,
-      deviceQuantity: input.plan.includedDeviceQuantity,
+      deviceQuantity: input.plan.includesDevice ? 1 : 0,
       internalNotes: [],
       createdAt: now(),
       updatedAt: now(),

@@ -23,7 +23,7 @@ export default function AdminOrders() {
   const refresh = () => setOrders(commerceService.getOrders());
 
   const createDemoOrder = () => {
-    const plan = getPlanById("individual-basic");
+    const plan = getPlanById("plus");
     if (!plan) return;
 
     const order = commerceService.createMockOrder({

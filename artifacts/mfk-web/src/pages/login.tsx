@@ -10,6 +10,9 @@ import { useAuth, authApi } from "@/contexts/AuthContext";
 export default function Login() {
   const [, setLocation] = useLocation();
   const { login } = useAuth();
+  const params = new URLSearchParams(window.location.search);
+  const nextPath = params.get("next") || "/app";
+  const selectedPlan = params.get("plan");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +29,7 @@ export default function Login() {
     try {
       const user = await authApi.login(email.trim(), password);
       login(user);
-      setLocation("/app");
+      setLocation(selectedPlan ? `${nextPath}?plan=${selectedPlan}` : nextPath);
     } catch (err: any) {
       setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {

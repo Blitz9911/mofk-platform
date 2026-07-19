@@ -203,12 +203,133 @@ export const subscriptionPlansTable = pgTable("subscription_plans", {
   descriptionAr: text("description_ar").notNull(),
   priceMonthlySar: integer("price_monthly_sar").notNull(),
   priceYearlySar: integer("price_yearly_sar").notNull(),
+  devicePriceSar: integer("device_price_sar").notNull().default(0),
   tier: varchar("tier", { length: 20 }).notNull(),
   features: jsonb("features").$type<string[]>().notNull().default([]),
   featuresAr: jsonb("features_ar").$type<string[]>().notNull().default([]),
   isPopular: boolean("is_popular").notNull().default(false),
   sortOrder: smallint("sort_order").notNull().default(0),
 });
+
+export const subscriptionsTable = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    planId: varchar("plan_id", { length: 30 }).notNull().references(() => subscriptionPlansTable.id),
+    billingCycle: varchar("billing_cycle", { length: 12 }).notNull().default("monthly"),
+    status: varchar("status", { length: 20 }).notNull().default("inactive"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("idx_subscriptions_user").on(t.userId),
+    planIdx: index("idx_subscriptions_plan").on(t.planId),
+  }),
+);
+
+export const ordersTable = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+    planId: varchar("plan_id", { length: 30 }).notNull().references(() => subscriptionPlansTable.id),
+    billingCycle: varchar("billing_cycle", { length: 12 }).notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("created"),
+    subtotal: integer("subtotal").notNull().default(0),
+    vat: integer("vat").notNull().default(0),
+    total: integer("total").notNull().default(0),
+    shippingAddress: jsonb("shipping_address").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("idx_orders_user").on(t.userId, t.createdAt),
+    statusIdx: index("idx_orders_status").on(t.status),
+  }),
+);
+
+export const orderItemsTable = pgTable(
+  "order_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull().references(() => ordersTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 20 }).notNull(),
+    description: text("description").notNull(),
+    amount: integer("amount").notNull(),
+  },
+  (t) => ({
+    orderIdx: index("idx_order_items_order").on(t.orderId),
+  }),
+);
+
+export const paymentsTable = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull().references(() => ordersTable.id, { onDelete: "cascade" }),
+    moyasarPaymentId: varchar("moyasar_payment_id", { length: 120 }),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    amount: integer("amount").notNull(),
+    rawWebhook: jsonb("raw_webhook").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orderIdx: index("idx_payments_order").on(t.orderId),
+    moyasarIdx: index("idx_payments_moyasar_id").on(t.moyasarPaymentId),
+  }),
+);
+
+export const shipmentsTable = pgTable(
+  "shipments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id").notNull().references(() => ordersTable.id, { onDelete: "cascade" }),
+    carrier: varchar("carrier", { length: 80 }).notNull().default("Manual"),
+    trackingNumber: varchar("tracking_number", { length: 120 }),
+    status: varchar("status", { length: 20 }).notNull().default("preparing"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orderIdx: index("idx_shipments_order").on(t.orderId),
+  }),
+);
+
+export const devicesTable = pgTable(
+  "devices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    serial: varchar("serial", { length: 80 }).notNull().unique(),
+    userId: uuid("user_id").references(() => usersTable.id, { onDelete: "set null" }),
+    subscriptionId: uuid("subscription_id").references(() => subscriptionsTable.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 20 }).notNull().default("shipped"),
+    pairedAt: timestamp("paired_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("idx_devices_user").on(t.userId),
+    subscriptionIdx: index("idx_devices_subscription").on(t.subscriptionId),
+  }),
+);
+
+export const fleetAccountsTable = pgTable(
+  "fleet_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    companyName: varchar("company_name", { length: 160 }).notNull(),
+    contact: jsonb("contact").$type<Record<string, unknown>>().notNull().default({}),
+    vehiclesCount: integer("vehicles_count").notNull().default(5),
+    status: varchar("status", { length: 20 }).notNull().default("new"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    statusIdx: index("idx_fleet_accounts_status").on(t.status),
+  }),
+);
 
 export const activityTable = pgTable(
   "activity",

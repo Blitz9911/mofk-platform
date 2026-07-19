@@ -109,12 +109,12 @@ export function PlanCard({
             <div className="flex items-end gap-2">
               <span className="text-4xl font-black">{formatSar(price)}</span>
               <span className="pb-1 text-sm text-muted-foreground">
-                {plan.isFree ? "ر.س" : cycle === "yearly" ? "ر.س / سنة" : "ر.س / شهر"}
+                {plan.isFree ? "ر.س" : cycle === "annual" ? "ر.س / سنة" : "ر.س / شهر"}
               </span>
             </div>
           )}
           <p className="mt-1 text-xs text-muted-foreground">
-            {plan.includesDevice ? `يشمل ${plan.includedDeviceQuantity || "حسب العقد"} جهاز` : "بدون جهاز"}
+            {plan.includesDevice ? "يشمل جهاز مفك OBD برسوم مرة واحدة" : "بدون جهاز"}
           </p>
         </div>
       </CardHeader>
@@ -173,7 +173,7 @@ export function BillingCycleSelector({
 }) {
   const cycles: BillingCycle[] = [
     ...(plan.supportsMonthly ? (["monthly"] as BillingCycle[]) : []),
-    ...(plan.supportsYearly ? (["yearly"] as BillingCycle[]) : []),
+    ...(plan.supportsAnnual ? (["annual"] as BillingCycle[]) : []),
   ];
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -196,8 +196,10 @@ export function BillingCycleSelector({
 }
 
 export function CheckoutSummary({ plan, cycle }: { plan: PlanConfig; cycle: BillingCycle }) {
-  const amount = getPlanPrice(plan, cycle) ?? 0;
-  const vat = Math.round(amount * 0.15);
+  const subscriptionAmount = getPlanPrice(plan, cycle) ?? 0;
+  const deviceAmount = plan.includesDevice ? plan.devicePriceSar : 0;
+  const subtotal = subscriptionAmount + deviceAmount;
+  const vat = Math.round(subtotal * 0.15);
   return (
     <Card className="sticky top-20 rounded-2xl">
       <CardHeader>
@@ -206,12 +208,12 @@ export function CheckoutSummary({ plan, cycle }: { plan: PlanConfig; cycle: Bill
       <CardContent className="space-y-3 text-sm">
         <SummaryRow label="الباقة" value={plan.nameAr} />
         <SummaryRow label="دورة الفوترة" value={cycle === "monthly" ? "شهري" : "سنوي"} />
-        <SummaryRow label="قيمة الاشتراك" value={`${formatSar(amount)} ر.س`} />
-        <SummaryRow label="الجهاز" value={plan.includesDevice ? "مشمول" : "غير مطلوب"} />
+        <SummaryRow label="قيمة الاشتراك" value={`${formatSar(subscriptionAmount)} ر.س`} />
+        <SummaryRow label="الجهاز" value={plan.includesDevice ? `${formatSar(deviceAmount)} ر.س رسوم مرة واحدة` : "غير مطلوب"} />
         <SummaryRow label="الشحن" value="0 ر.س" />
         <SummaryRow label="ضريبة القيمة المضافة" value={`${formatSar(vat)} ر.س`} />
         <div className="border-t pt-3">
-          <SummaryRow label="الإجمالي" value={`${formatSar(amount + vat)} ر.س`} strong />
+          <SummaryRow label="الإجمالي" value={`${formatSar(subtotal + vat)} ر.س`} strong />
         </div>
       </CardContent>
     </Card>

@@ -28,6 +28,8 @@ import {
   Package,
   Smartphone,
   Building2,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MfkLogo } from "@/components/MfkLogo";
@@ -217,6 +219,8 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
     { href: "/admin/subscriptions", label: "الاشتراكات", shortLabel: "الاشتراكات", icon: CreditCard },
     { href: "/admin/fleet-accounts", label: "حسابات الأسطول", shortLabel: "الأسطول", icon: Building2 },
+    { href: "/admin/reports", label: "التقارير", shortLabel: "التقارير", icon: BarChart3 },
+    { href: "/admin/settings", label: "الإعدادات", shortLabel: "الإعدادات", icon: Settings },
     { href: "/admin/revenue", label: "المالية", shortLabel: "المالية", icon: CreditCard },
   ];
 

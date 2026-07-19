@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, or } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
-import { hashPassword, verifyPassword } from "../lib/auth";
+import { hashPassword, issueAuthToken, verifyPassword } from "../lib/auth";
 import { DEMO_USER_ID, DEMO_ADMIN_ID } from "../lib/demo";
 
 const router: IRouter = Router();
@@ -47,7 +47,14 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       role: "user",
     }).returning();
 
-    res.status(201).json({ userId: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+    res.status(201).json({
+      token: issueAuthToken(user.id, "user"),
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+    });
   } catch (err: any) {
     console.error("[auth/register]", err);
     res.status(500).json({ error: "خطأ في الخادم" });
@@ -81,7 +88,14 @@ router.post("/auth/login", async (req, res): Promise<void> => {
       return;
     }
 
-    res.json({ userId: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+    res.json({
+      token: issueAuthToken(user.id, (user.role as "user" | "admin" | "fleet") ?? "user"),
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+    });
   } catch (err: any) {
     console.error("[auth/login]", err);
     res.status(500).json({ error: "خطأ في الخادم" });
@@ -99,18 +113,18 @@ router.get("/auth/me", async (req, res): Promise<void> => {
   const userId = header.slice(7).trim();
 
   if (userId === DEMO_USER_ID) {
-    res.json({ userId: DEMO_USER_ID, name: "مستخدم تجريبي", email: "demo@mfk.sa", phone: "+966501234567", role: "user" });
+    res.json({ token: issueAuthToken(DEMO_USER_ID, "user"), userId: DEMO_USER_ID, name: "مستخدم تجريبي", email: "demo@mfk.sa", phone: "+966501234567", role: "user" });
     return;
   }
   if (userId === DEMO_ADMIN_ID) {
-    res.json({ userId: DEMO_ADMIN_ID, name: "مدير النظام", email: "admin@mfk.sa", phone: "+966502345678", role: "admin" });
+    res.json({ token: issueAuthToken(DEMO_ADMIN_ID, "admin"), userId: DEMO_ADMIN_ID, name: "مدير النظام", email: "admin@mfk.sa", phone: "+966502345678", role: "admin" });
     return;
   }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     if (!user) { res.status(404).json({ error: "المستخدم غير موجود" }); return; }
-    res.json({ userId: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
+    res.json({ token: issueAuthToken(user.id, (user.role as "user" | "admin" | "fleet") ?? "user"), userId: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role });
   } catch {
     res.status(500).json({ error: "خطأ في الخادم" });
   }

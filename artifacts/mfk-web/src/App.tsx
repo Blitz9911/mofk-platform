@@ -9,10 +9,14 @@ import NotFound from "@/pages/not-found";
 // Public Pages
 import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
+import Auth from "@/pages/auth";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Onboarding from "@/pages/onboarding";
 import Checkout from "@/pages/checkout";
+import CheckoutPlan from "@/pages/checkout-plan";
+import CheckoutPayment from "@/pages/checkout-payment";
+import CheckoutResult from "@/pages/checkout-result";
 import Payment from "@/pages/payment";
 import PaymentResult from "@/pages/payment-result";
 import OrderDetail from "@/pages/order-detail";
@@ -44,6 +48,8 @@ import Recommendations from "@/pages/app/recommendations";
 import Subscription from "@/pages/app/subscription";
 import FuelPage from "@/pages/app/fuel";
 import ProfilePage from "@/pages/app/profile";
+import DevicePending from "@/pages/app/device-pending";
+import AppDeviceActivate from "@/pages/app/device-activate";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -57,6 +63,8 @@ import AdminOrderDetail from "@/pages/admin/order-detail";
 import AdminDevices from "@/pages/admin/devices";
 import AdminSubscriptions from "@/pages/admin/subscriptions";
 import AdminFleetAccounts from "@/pages/admin/fleet-accounts";
+import AdminReports from "@/pages/admin/reports";
+import AdminSettings from "@/pages/admin/settings";
 
 import { Shell } from "@/components/layout/Shell";
 
@@ -78,6 +86,8 @@ function AppRoutes() {
         <Route path="/app/recommendations" component={Recommendations} />
         <Route path="/app/profile" component={ProfilePage} />
         <Route path="/app/subscription" component={Subscription} />
+        <Route path="/app/device/pending" component={DevicePending} />
+        <Route path="/app/device/activate" component={AppDeviceActivate} />
         <Route path="/app/fuel" component={FuelPage} />
         <Route component={NotFound} />
       </Switch>
@@ -99,6 +109,8 @@ function AdminRoutes() {
         <Route path="/admin/devices" component={AdminDevices} />
         <Route path="/admin/subscriptions" component={AdminSubscriptions} />
         <Route path="/admin/fleet-accounts" component={AdminFleetAccounts} />
+        <Route path="/admin/reports" component={AdminReports} />
+        <Route path="/admin/settings" component={AdminSettings} />
         <Route path="/admin/revenue" component={AdminRevenue} />
         <Route component={NotFound} />
       </Switch>
@@ -142,7 +154,11 @@ function AnimatedSwitch() {
           <Route path="/" component={Home} />
           <Route path="/pricing" component={Pricing} />
           <Route path="/plans" component={Pricing} />
+          <Route path="/auth" component={Auth} />
           <Route path="/onboarding" component={Onboarding} />
+          <Route path="/checkout/plan" component={CheckoutPlan} />
+          <Route path="/checkout/payment" component={CheckoutPayment} />
+          <Route path="/checkout/result" component={CheckoutResult} />
           <Route path="/checkout/:planId" component={Checkout} />
           <Route path="/payment/:orderId" component={Payment} />
           <Route path="/payment-result" component={PaymentResult} />

@@ -1,32 +1,26 @@
-export type PlanId =
-  | "free"
-  | "individual-basic"
-  | "individual-advanced"
-  | "fleet";
+export type PlanId = "free" | "plus" | "pro" | "fleet";
 
-export type BillingCycle = "monthly" | "yearly";
+export type BillingCycle = "monthly" | "annual";
 
 export type PlanConfig = {
   id: PlanId;
   name: string;
   nameAr: string;
   descriptionAr: string;
-  tier: "free" | "individual" | "fleet";
+  tier: "free" | "paid" | "fleet";
   isFree: boolean;
   isFleet: boolean;
   includesDevice: boolean;
-  includedDeviceQuantity: number;
+  devicePriceSar: number;
   requiresShipping: boolean;
   supportsMonthly: boolean;
-  supportsYearly: boolean;
+  supportsAnnual: boolean;
   priceMonthlySar: number | null;
-  priceYearlySar: number | null;
+  priceAnnualSar: number | null;
   maxVehicles: number | null;
   featuresAr: string[];
   ctaLabelAr: string;
   supportLevelAr: string;
-  aiUsageAr: string;
-  historyRetentionAr: string;
   popular?: boolean;
 };
 
@@ -34,126 +28,101 @@ export const plans: PlanConfig[] = [
   {
     id: "free",
     name: "Free",
-    nameAr: "المجانية",
-    descriptionAr: "ابدأ بإدارة مركبة واحدة بدون دفع وبدون جهاز.",
+    nameAr: "Free",
+    descriptionAr: "إدارة مركبة واحدة بدون جهاز وبدون دفع.",
     tier: "free",
     isFree: true,
     isFleet: false,
     includesDevice: false,
-    includedDeviceQuantity: 0,
+    devicePriceSar: 0,
     requiresShipping: false,
     supportsMonthly: false,
-    supportsYearly: false,
+    supportsAnnual: false,
     priceMonthlySar: 0,
-    priceYearlySar: 0,
+    priceAnnualSar: 0,
     maxVehicles: 1,
-    featuresAr: [
-      "مركبة واحدة",
-      "سجل صيانة وتكاليف",
-      "تسجيل تعبئات البنزين",
-      "متابعة مواعيد الصيانة",
-      "بدون مساعد ذكي",
-    ],
+    featuresAr: ["مركبة واحدة", "سجل الصيانة والتكاليف", "تسجيل الوقود", "بدون مساعد ذكي"],
     ctaLabelAr: "ابدأ مجانًا",
     supportLevelAr: "دعم أساسي",
-    aiUsageAr: "غير متاح",
-    historyRetentionAr: "سجل أساسي",
   },
   {
-    id: "individual-basic",
-    name: "Individual Basic",
-    nameAr: "الأفراد الأساسية",
-    descriptionAr: "اشتراك فردي يتضمن جهاز مفك لمركبة واحدة.",
-    tier: "individual",
+    id: "plus",
+    name: "Plus",
+    nameAr: "Plus",
+    descriptionAr: "اشتراك لمركبة واحدة مع جهاز مفك OBD ورسائل ذكية غير محدودة.",
+    tier: "paid",
     isFree: false,
     isFleet: false,
     includesDevice: true,
-    includedDeviceQuantity: 1,
+    devicePriceSar: 149,
     requiresShipping: true,
     supportsMonthly: true,
-    supportsYearly: true,
+    supportsAnnual: true,
     priceMonthlySar: 29,
-    priceYearlySar: 299,
+    priceAnnualSar: 290,
     maxVehicles: 1,
-    featuresAr: [
-      "جهاز مفك OBD مشمول",
-      "تشخيص مباشر لمركبة واحدة",
-      "تنبيهات الأعطال الحرجة",
-      "رسائل المساعد الذكي غير محدودة",
-      "تصدير تقارير PDF",
-    ],
+    featuresAr: ["جهاز مفك OBD برسوم مرة واحدة", "تشخيص مباشر", "رسائل المساعد الذكي غير محدودة", "تصدير PDF"],
     ctaLabelAr: "اشترك الآن",
     supportLevelAr: "دعم أولوية",
-    aiUsageAr: "غير محدود",
-    historyRetentionAr: "سجل تفصيلي",
     popular: true,
   },
   {
-    id: "individual-advanced",
-    name: "Individual Advanced",
-    nameAr: "الأفراد المتقدمة",
-    descriptionAr: "كل مزايا الأساسية مع سعة مركبات أعلى وتحليلات أعمق.",
-    tier: "individual",
+    id: "pro",
+    name: "Pro",
+    nameAr: "Pro",
+    descriptionAr: "اشتراك متقدم لعدة مركبات مع تقارير أعمق وتصدير Excel.",
+    tier: "paid",
     isFree: false,
     isFleet: false,
     includesDevice: true,
-    includedDeviceQuantity: 2,
+    devicePriceSar: 149,
     requiresShipping: true,
     supportsMonthly: true,
-    supportsYearly: true,
+    supportsAnnual: true,
     priceMonthlySar: 59,
-    priceYearlySar: 599,
+    priceAnnualSar: 590,
     maxVehicles: 3,
-    featuresAr: [
-      "جهازان مفك OBD مشمولان",
-      "حتى 3 مركبات",
-      "تقارير صحية متقدمة",
-      "رسائل المساعد الذكي غير محدودة",
-      "تصدير البيانات Excel",
-    ],
+    featuresAr: ["حتى 3 مركبات", "جهاز مفك OBD برسوم مرة واحدة", "تقارير صحة متقدمة", "تصدير البيانات Excel"],
     ctaLabelAr: "اشترك الآن",
     supportLevelAr: "دعم أولوية موسع",
-    aiUsageAr: "غير محدود",
-    historyRetentionAr: "سجل تفصيلي ممتد",
   },
   {
     id: "fleet",
     name: "Fleet",
-    nameAr: "الأسطول",
-    descriptionAr: "حل للشركات يبدأ بطلب مبيعات ثم إعداد تشغيلي.",
+    nameAr: "Fleet",
+    descriptionAr: "حل للشركات يبدأ بطلب مبيعات وتسعير مخصص.",
     tier: "fleet",
     isFree: false,
     isFleet: true,
     includesDevice: true,
-    includedDeviceQuantity: 0,
+    devicePriceSar: 0,
     requiresShipping: true,
     supportsMonthly: false,
-    supportsYearly: false,
+    supportsAnnual: false,
     priceMonthlySar: null,
-    priceYearlySar: null,
+    priceAnnualSar: null,
     maxVehicles: null,
-    featuresAr: [
-      "5 مركبات فأكثر",
-      "لوحة تشغيل الأسطول",
-      "إدارة المستخدمين والصلاحيات",
-      "تصدير البيانات Excel",
-      "دعم خاص",
-    ],
+    featuresAr: ["5 مركبات فأكثر", "لوحة تشغيل الأسطول", "تصدير البيانات Excel", "دعم خاص"],
     ctaLabelAr: "تواصل مع المبيعات",
     supportLevelAr: "دعم خاص",
-    aiUsageAr: "حسب العقد",
-    historyRetentionAr: "حسب العقد",
   },
 ];
 
 export const planIds = plans.map((plan) => plan.id) as PlanId[];
 
 export function getPlanById(id?: string | null) {
-  return plans.find((plan) => plan.id === id) ?? null;
+  const aliases: Record<string, PlanId> = {
+    mofk: "plus",
+    "individual-basic": "plus",
+    family: "pro",
+    "individual-advanced": "pro",
+  };
+  const normalized = id && aliases[id] ? aliases[id] : id;
+  return plans.find((plan) => plan.id === normalized) ?? null;
 }
 
 export function getPlanPrice(plan: PlanConfig, cycle: BillingCycle) {
-  return cycle === "yearly" ? plan.priceYearlySar : plan.priceMonthlySar;
+  return cycle === "annual" ? plan.priceAnnualSar : plan.priceMonthlySar;
 }
 
 export function formatSar(value: number | null | undefined) {

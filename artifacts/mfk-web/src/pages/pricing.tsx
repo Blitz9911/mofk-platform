@@ -58,15 +58,15 @@ function CellValue({ value }: { value: string }) {
 
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
   const [isLoading] = useState(false);
   const [networkError] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
   const checkoutHrefByPlan: Record<SubscriptionPlanId, string> = {
     free: "/onboarding?plan=free",
-    mofk: "/checkout/individual-basic",
-    family: "/checkout/individual-advanced",
+    plus: "/auth?next=/checkout/plan&plan=plus",
+    pro: "/auth?next=/checkout/plan&plan=pro",
     fleet: "/fleet-contact",
   };
 
@@ -220,8 +220,8 @@ export default function Pricing() {
                       <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                         <td className="p-3 font-bold">{row.label}</td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
-                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
-                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
+                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.plus} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.pro} /></td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                       </tr>
                     ),

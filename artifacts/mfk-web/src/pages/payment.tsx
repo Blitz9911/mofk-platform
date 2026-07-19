@@ -32,8 +32,13 @@ export default function Payment() {
     setProcessing(true);
     setFailed(false);
     window.setTimeout(() => {
-      commerceService.markPayment(order.id, "paid");
-      setLocation(`/payment-result?status=success&orderId=${order.id}`);
+      commerceService.updateMockOrder(order.id, {
+        paymentStatus: "pending",
+        orderStatus: "pending_payment",
+        internalNotes: [...order.internalNotes, "بانتظار webhook موقّع من Moyasar لاعتماد الدفع."],
+      });
+      window.sessionStorage.setItem("mfk-current-order-id", order.id);
+      setLocation("/checkout/result");
     }, 900);
   };
 
