@@ -1903,6 +1903,8 @@ function toProfile(row: UserRow) {
     email: row.email ?? undefined,
     phone: row.phone,
     role: row.role || "user",
+    subscriptionTier: row.subscription_tier || "free",
+    isActive: row.is_active ?? true,
   };
 }
 
@@ -1918,7 +1920,7 @@ async function handleProfile(
 
   if (method === "GET") {
     const rows = await supabaseRequest<UserRow[]>(
-      `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(session.user.id)}&limit=1`,
+      `/rest/v1/users?select=id,name,email,phone,role,subscription_tier,is_active&id=eq.${encodeURIComponent(session.user.id)}&limit=1`,
       { method: "GET" },
       session.access_token,
     );
@@ -1942,7 +1944,7 @@ async function handleProfile(
     if (!phone) throw new ApiBridgeError("رقم الجوال مطلوب.", 400);
 
     const rows = await supabaseRequest<UserRow[]>(
-      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role`,
+      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role,subscription_tier,is_active`,
       {
         method: "PATCH",
         headers: {

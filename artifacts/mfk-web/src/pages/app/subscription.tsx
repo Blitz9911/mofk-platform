@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   BillingCycle,
@@ -27,6 +28,22 @@ import {
 type PaymentState = "success" | "pending" | "past_due";
 
 const paymentState: PaymentState = "success";
+
+function normalizePlanId(tier?: string | null): SubscriptionPlanId {
+  switch (tier) {
+    case "mofk":
+    case "plus":
+      return "plus";
+    case "premium":
+    case "pro":
+    case "family":
+      return "pro";
+    case "fleet":
+      return "fleet";
+    default:
+      return "free";
+  }
+}
 
 const stateCopy: Record<PaymentState, { title: string; body: string; tone: string; icon: LucideIcon }> = {
   success: {
@@ -83,10 +100,11 @@ function CellValue({ value }: { value: string }) {
 }
 
 export default function Subscription() {
+  const { user } = useAuth();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
 
-  const currentPlanId: SubscriptionPlanId = "free";
+  const currentPlanId = normalizePlanId(user?.subscriptionTier);
   const currentPlan = getPlanById(currentPlanId);
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
   const StatusIcon = stateCopy[paymentState].icon;

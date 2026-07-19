@@ -34,6 +34,11 @@ type UserRow = {
   email?: string | null;
   phone: string;
   role?: string | null;
+  subscription_tier?: string | null;
+  subscription_started_at?: string | null;
+  subscription_ends_at?: string | null;
+  subscription_auto_renew?: boolean | null;
+  is_active?: boolean | null;
 };
 
 export interface AuthUser {
@@ -42,6 +47,11 @@ export interface AuthUser {
   email?: string;
   phone: string;
   role: string;
+  subscriptionTier: string;
+  subscriptionStartedAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  subscriptionAutoRenew?: boolean | null;
+  isActive?: boolean | null;
 }
 
 export function getSupabaseConfig() {
@@ -214,6 +224,11 @@ function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
     email: row?.email || user.email || undefined,
     phone: row?.phone || fallbackPhone(user),
     role: row?.role || "user",
+    subscriptionTier: row?.subscription_tier || "free",
+    subscriptionStartedAt: row?.subscription_started_at ?? null,
+    subscriptionEndsAt: row?.subscription_ends_at ?? null,
+    subscriptionAutoRenew: row?.subscription_auto_renew ?? true,
+    isActive: row?.is_active ?? true,
   };
 }
 
@@ -227,7 +242,7 @@ async function upsertUserRow(user: SupabaseAuthUser, accessToken: string): Promi
   };
 
   const rows = await supabaseRequest<UserRow[]>(
-    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role",
+    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active",
     {
       method: "POST",
       headers: {
@@ -244,7 +259,7 @@ async function upsertUserRow(user: SupabaseAuthUser, accessToken: string): Promi
 
 async function getUserRow(userId: string, accessToken: string): Promise<UserRow | null> {
   const rows = await supabaseRequest<UserRow[]>(
-    `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    `/rest/v1/users?select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(userId)}&limit=1`,
     { method: "GET" },
     accessToken,
   );
