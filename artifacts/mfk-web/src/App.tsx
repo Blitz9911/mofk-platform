@@ -57,8 +57,6 @@ import AppDeviceActivate from "@/pages/app/device-activate";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminVehicles from "@/pages/admin/vehicles";
-import AdminDiagnostics from "@/pages/admin/diagnostics";
-import AdminIssues from "@/pages/admin/issues";
 import AdminRevenue from "@/pages/admin/revenue";
 import AdminOrders from "@/pages/admin/orders";
 import AdminOrderDetail from "@/pages/admin/order-detail";
@@ -145,8 +143,6 @@ function AdminRoutes() {
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/vehicles" component={AdminVehicles} />
-        <Route path="/admin/diagnostics" component={AdminDiagnostics} />
-        <Route path="/admin/issues" component={AdminIssues} />
         <Route path="/admin/orders" component={AdminOrders} />
         <Route path="/admin/orders/:orderId" component={AdminOrderDetail} />
         <Route path="/admin/devices" component={AdminDevices} />

@@ -3,8 +3,6 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import { Link } from "wouter";
 import {
-  Activity,
-  AlertTriangle,
   BarChart3,
   Building2,
   Car,
@@ -31,9 +29,7 @@ import {
 
 import {
   useGetAdminOverview,
-  useGetCommonIssues,
   useGetRevenueBreakdown,
-  useListLiveDiagnostics,
 } from "@workspace/api-client-react";
 import {
   DeviceStatusBadge,
@@ -162,8 +158,6 @@ export default function AdminDashboard() {
   const [snapshotKey, setSnapshotKey] = useState(0);
   const { data: overview, isLoading: isOverviewLoading } = useGetAdminOverview();
   const { data: revenueData, isLoading: isRevenueLoading } = useGetRevenueBreakdown();
-  const { data: issuesData, isLoading: isIssuesLoading } = useGetCommonIssues();
-  const { data: diagnosticsData, isLoading: isDiagnosticsLoading } = useListLiveDiagnostics();
 
   const today = format(new Date(), "EEEE d MMMM yyyy", { locale: ar });
 
@@ -193,8 +187,6 @@ export default function AdminDashboard() {
   const paidRevenue = sumOrders(paidOrders);
   const totalUsers = overview?.totalUsers ?? Math.max(orders.length + subscriptions.length + fleets.length, 1);
   const activeVehicles = overview?.activeVehiclesToday ?? subscriptions.length + activeSubscriptions.length;
-  const criticalIssues = overview?.criticalDtcsLast24h ?? 0;
-  const dtcsLast24h = overview?.dtcsLast24h ?? 0;
   const activationRate = subscriptions.length
     ? Math.round((activeSubscriptions.length / subscriptions.length) * 100)
     : 0;
@@ -230,8 +222,6 @@ export default function AdminDashboard() {
   };
 
   const latestOrders = orders.slice(0, 5);
-  const latestDiagnostics = diagnosticsData?.slice(0, 5) ?? [];
-  const topIssues = issuesData?.slice(0, 5) ?? [];
 
   return (
     <div className="space-y-6">
@@ -256,7 +246,6 @@ export default function AdminDashboard() {
         <StatCard title="المستخدمون" value={formatNumber(totalUsers)} icon={Users} isLoading={isOverviewLoading} subtitle="إجمالي الحسابات النشطة والمتوقعة" />
         <StatCard title="المركبات النشطة" value={formatNumber(activeVehicles)} icon={Car} isLoading={isOverviewLoading} subtitle="حركة اليوم والتفعيلات الحالية" />
         <StatCard title="إيراد مؤكد" value={formatSar(overview?.revenueMtd ?? paidRevenue)} icon={CreditCard} isLoading={isOverviewLoading} subtitle={`${paidOrders.length} طلب مدفوع`} />
-        <StatCard title="أعطال آخر 24 ساعة" value={formatNumber(dtcsLast24h)} icon={Activity} isLoading={isOverviewLoading} subtitle={`${criticalIssues} حالة حرجة`} tone={kpiTone(criticalIssues, true)} />
         <StatCard title="طلبات بانتظار الدفع" value={formatNumber(pendingPayments.length)} icon={Timer} subtitle="تحتاج متابعة دفع" tone={kpiTone(pendingPayments.length, true)} />
         <StatCard title="قيد التشغيل" value={formatNumber(processingOrders.length)} icon={Wrench} subtitle="تجهيز، ربط جهاز، أو شحن" />
         <StatCard title="أجهزة جاهزة" value={formatNumber(availableDevices.length)} icon={Smartphone} subtitle={`${reservedDevices.length} محجوز أو مخصص`} />
@@ -367,7 +356,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>المخزون</CardTitle>
@@ -399,39 +388,6 @@ export default function AdminDashboard() {
                 <SubscriptionStatusBadge status={sub.status} />
               </div>
             ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>التشخيص والأعطال</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isIssuesLoading || isDiagnosticsLoading ? (
-              Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-14 w-full" />)
-            ) : topIssues.length ? (
-              topIssues.map((issue, index) => (
-                <div key={`${issue.code}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-2">
-                  <div>
-                    <div className="font-bold" dir="ltr">{issue.code}</div>
-                    <div className="line-clamp-1 text-xs text-muted-foreground">{issue.descriptionAr}</div>
-                  </div>
-                  <Badge variant={issue.severity === "critical" ? "destructive" : "outline"}>{issue.count}</Badge>
-                </div>
-              ))
-            ) : latestDiagnostics.length ? (
-              latestDiagnostics.map((session, index) => (
-                <div key={`${session.plateNumber}-${session.startedAt}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-2">
-                  <div>
-                    <div className="font-bold">{session.vehicleMake} {session.vehicleModel}</div>
-                    <div className="text-xs text-muted-foreground">{session.plateNumber}</div>
-                  </div>
-                  <Badge variant={(session.criticalDtcCount ?? 0) > 0 ? "destructive" : "outline"}>{session.dtcCount ?? 0} عطل</Badge>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">لا توجد أعطال أو جلسات تشخيص نشطة.</div>
-            )}
           </CardContent>
         </Card>
       </div>
@@ -494,12 +450,6 @@ export default function AdminDashboard() {
         <QuickLink href="/admin/settings" icon={CheckCircle2} title="إعدادات الإدارة" subtitle="بوابات الدفع والشحن والتشغيل" />
       </div>
 
-      {criticalIssues > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          <AlertTriangle className="h-5 w-5" />
-          توجد حالات حرجة في آخر 24 ساعة. راجع صفحة التشخيص والأعطال قبل إغلاق اليوم التشغيلي.
-        </div>
-      )}
     </div>
   );
 }

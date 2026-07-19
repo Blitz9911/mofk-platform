@@ -73,6 +73,17 @@ create table if not exists public.activity (
 
 create index if not exists idx_activity_user on public.activity(user_id, occurred_at);
 
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  plan text default 'free',
+  status text default 'active',
+  started_at timestamptz default now(),
+  ends_at timestamptz
+);
+
+create index if not exists idx_subscriptions_user on public.subscriptions(user_id);
+
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
@@ -138,6 +149,7 @@ alter table public.users enable row level security;
 alter table public.vehicles enable row level security;
 alter table public.fuel_logs enable row level security;
 alter table public.activity enable row level security;
+alter table public.subscriptions enable row level security;
 
 create or replace function public.current_user_is_admin()
 returns boolean
@@ -341,6 +353,12 @@ on public.vehicles for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "Admins can read all vehicles" on public.vehicles;
+create policy "Admins can read all vehicles"
+on public.vehicles for select
+to authenticated
+using (public.current_user_is_admin());
+
 drop policy if exists "Users can manage own fuel logs" on public.fuel_logs;
 create policy "Users can manage own fuel logs"
 on public.fuel_logs for all
@@ -353,3 +371,16 @@ on public.activity for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view their own subscription" on public.subscriptions;
+create policy "Users can view their own subscription"
+on public.subscriptions for select
+using (auth.uid() = user_id);
+
+drop policy if exists "Admins can read all subscriptions" on public.subscriptions;
+create policy "Admins can read all subscriptions"
+on public.subscriptions for select
+to authenticated
+using (public.current_user_is_admin());
+
+grant select on public.vehicles to authenticated;
+grant select on public.subscriptions to authenticated;

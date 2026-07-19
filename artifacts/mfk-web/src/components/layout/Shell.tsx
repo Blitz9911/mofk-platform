@@ -213,8 +213,6 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin", label: "نظرة عامة", shortLabel: "الرئيسية", icon: LayoutDashboard },
     { href: "/admin/users", label: "المستخدمين", shortLabel: "المستخدمين", icon: Users },
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
-    { href: "/admin/diagnostics", label: "التشخيص الحي", shortLabel: "التشخيص", icon: Activity },
-    { href: "/admin/issues", label: "الأعطال الشائعة", shortLabel: "الأعطال", icon: ShieldAlert },
     { href: "/admin/orders", label: "الطلبات", shortLabel: "الطلبات", icon: Package },
     { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
     { href: "/admin/subscriptions", label: "الاشتراكات", shortLabel: "الاشتراكات", icon: CreditCard },
