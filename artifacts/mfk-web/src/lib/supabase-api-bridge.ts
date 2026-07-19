@@ -57,6 +57,8 @@ type UserRow = {
   email?: string | null;
   phone: string;
   role?: string | null;
+  subscription_tier?: string | null;
+  is_active?: boolean | null;
 };
 
 type NotificationRow = {
@@ -170,6 +172,54 @@ async function listVehicleRows(accessToken: string) {
     { method: "GET" },
     accessToken,
   );
+}
+
+async function getCurrentUserAccess(userId: string, accessToken: string) {
+  const rows = await supabaseRequest<UserRow[]>(
+    `/rest/v1/users?select=id,role,subscription_tier,is_active&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    { method: "GET" },
+    accessToken,
+  );
+
+  return rows[0] ?? null;
+}
+
+function vehicleLimitForTier(tier?: string | null) {
+  switch (tier) {
+    case "fleet":
+      return null;
+    case "family":
+      return 5;
+    case "premium":
+    case "pro":
+      return 3;
+    case "plus":
+    case "mofk":
+    case "free":
+    default:
+      return 1;
+  }
+}
+
+async function assertCanCreateVehicle(session: Awaited<ReturnType<typeof requireSession>>) {
+  const access = await getCurrentUserAccess(session.user.id, session.access_token);
+
+  if (access?.is_active === false) {
+    throw new ApiBridgeError("حسابك غير نشط حالياً. تواصل مع الدعم.", 403);
+  }
+
+  if (access?.role === "admin") return;
+
+  const limit = vehicleLimitForTier(access?.subscription_tier);
+  if (limit === null) return;
+
+  const rows = await listVehicleRows(session.access_token);
+  if (rows.length >= limit) {
+    throw new ApiBridgeError(
+      `وصلت للحد الأقصى للمركبات في باقتك الحالية (${limit}). غيّر الباقة لإضافة مركبة أخرى.`,
+      403,
+    );
+  }
 }
 
 async function getVehicleRow(vehicleId: string, accessToken: string) {
@@ -1070,6 +1120,8 @@ async function handleVehicles(
       if (!payload.make || !payload.model || !payload.year) {
         throw new ApiBridgeError("بيانات المركبة ناقصة.", 400);
       }
+
+      await assertCanCreateVehicle(session);
 
       const rows = await supabaseRequest<VehicleRow[]>(
         "/rest/v1/vehicles?select=*",
