@@ -79,21 +79,52 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  profile_name text;
+  profile_phone text;
 begin
+  profile_name := coalesce(
+    nullif(new.raw_user_meta_data->>'name', ''),
+    nullif(new.raw_user_meta_data->>'full_name', ''),
+    split_part(new.email, '@', 1),
+    'مستخدم مفك'
+  );
+
+  profile_phone := coalesce(
+    nullif(new.raw_user_meta_data->>'phone', ''),
+    concat('user-', substring(new.id::text, 1, 12))
+  );
+
+  if exists (
+    select 1 from public.users
+    where phone = profile_phone and id <> new.id
+  ) then
+    profile_phone := concat('user-', substring(new.id::text, 1, 12));
+  end if;
+
   insert into public.users (id, name, phone, email)
-  values (
-    new.id,
-    coalesce(nullif(new.raw_user_meta_data->>'name', ''), nullif(new.raw_user_meta_data->>'full_name', ''), split_part(new.email, '@', 1), 'مستخدم مفك'),
-    coalesce(nullif(new.raw_user_meta_data->>'phone', ''), concat('user-', substring(new.id::text, 1, 12))),
-    new.email
-  )
+  values (new.id, profile_name, profile_phone, new.email)
   on conflict (id) do update
   set
     name = excluded.name,
-    phone = excluded.phone,
+    phone = case
+      when exists (
+        select 1 from public.users u
+        where u.phone = excluded.phone and u.id <> public.users.id
+      ) then public.users.phone
+      else excluded.phone
+    end,
     email = excluded.email;
 
   return new;
+  exception
+    when unique_violation then
+      insert into public.users (id, name, phone, email)
+      values (new.id, profile_name, concat('user-', substring(new.id::text, 1, 12)), new.email)
+      on conflict (id) do update
+      set name = excluded.name,
+          email = excluded.email;
+      return new;
 end;
 $$;
 
@@ -123,6 +154,19 @@ create policy "Users can update own profile"
 on public.users for update
 using (auth.uid() = id)
 with check (auth.uid() = id);
+
+drop policy if exists "Admins can read all profiles" on public.users;
+create policy "Admins can read all profiles"
+on public.users for select
+to authenticated
+using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+drop policy if exists "Admins can update all profiles" on public.users;
+create policy "Admins can update all profiles"
+on public.users for update
+to authenticated
+using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin')
+with check ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
 
 drop policy if exists "Users can manage own vehicles" on public.vehicles;
 create policy "Users can manage own vehicles"
