@@ -56,6 +56,11 @@ function CellValue({ value }: { value: string }) {
   return <span>{value}</span>;
 }
 
+function authCheckoutHref(plan: "plus" | "pro") {
+  const params = new URLSearchParams({ next: "/checkout/plan", plan });
+  return `/auth?${params.toString()}`;
+}
+
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
@@ -65,8 +70,8 @@ export default function Pricing() {
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
   const checkoutHrefByPlan: Record<SubscriptionPlanId, string> = {
     free: "/onboarding?plan=free",
-    plus: "/auth?next=/checkout/plan&plan=plus",
-    pro: "/auth?next=/checkout/plan&plan=pro",
+    plus: authCheckoutHref("plus"),
+    pro: authCheckoutHref("pro"),
     fleet: "/fleet-contact",
   };
 
