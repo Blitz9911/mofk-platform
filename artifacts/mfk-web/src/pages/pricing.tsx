@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
-import { AlertCircle, CheckCircle2, Crown } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
 import { Button } from "@/components/ui/button";
@@ -82,10 +82,6 @@ export default function Pricing() {
       <main className="pb-32 pt-28 md:pt-32">
         <section className="mx-auto w-full max-w-7xl px-4 md:px-6">
           <div className="max-w-3xl space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-2 text-sm text-[#8A8A8A]">
-              <Crown className="h-4 w-4 text-[#FF6A00]" />
-              باقات موفك
-            </div>
             <div className="space-y-4">
               <h1 className="text-4xl font-black leading-tight tracking-normal md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
               <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
