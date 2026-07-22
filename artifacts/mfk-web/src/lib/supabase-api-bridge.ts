@@ -201,6 +201,17 @@ function vehicleLimitForTier(tier?: string | null) {
   }
 }
 
+function upgradeRequiredMessage(tier?: string | null, limit = 1) {
+  const currentPlan =
+    tier === "plus" || tier === "mofk"
+      ? "باقة مفك"
+      : tier === "free"
+        ? "الباقة المجانية"
+        : "باقتك الحالية";
+
+  return `لا يمكن إضافة مركبة جديدة. ${currentPlan} تسمح بـ ${limit} مركبة فقط، وتحتاج ترقية الباقة لإضافة مركبة أخرى.`;
+}
+
 async function assertCanCreateVehicle(session: Awaited<ReturnType<typeof requireSession>>) {
   const access = await getCurrentUserAccess(session.user.id, session.access_token);
 
@@ -216,7 +227,7 @@ async function assertCanCreateVehicle(session: Awaited<ReturnType<typeof require
   const rows = await listVehicleRows(session.access_token);
   if (rows.length >= limit) {
     throw new ApiBridgeError(
-      `وصلت للحد الأقصى للمركبات في باقتك الحالية (${limit}). غيّر الباقة لإضافة مركبة أخرى.`,
+      upgradeRequiredMessage(access?.subscription_tier, limit),
       403,
     );
   }

@@ -236,6 +236,7 @@ declare
   owner_tier text;
   allowed_count integer;
   existing_count integer;
+  plan_label text;
 begin
   select u.role, u.subscription_tier
     into owner_role, owner_tier
@@ -262,7 +263,14 @@ begin
   where v.user_id = new.user_id;
 
   if existing_count >= allowed_count then
-    raise exception 'وصلت للحد الأقصى للمركبات في باقتك الحالية.' using errcode = 'P0001';
+    plan_label := case coalesce(owner_tier, 'free')
+      when 'free' then 'الباقة المجانية'
+      when 'mofk' then 'باقة مفك'
+      when 'plus' then 'باقة مفك'
+      else 'باقتك الحالية'
+    end;
+
+    raise exception 'لا يمكن إضافة مركبة جديدة. % تسمح بـ % مركبة فقط، وتحتاج ترقية الباقة لإضافة مركبة أخرى.', plan_label, allowed_count using errcode = 'P0001';
   end if;
 
   return new;
