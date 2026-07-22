@@ -89,7 +89,7 @@ export default function Pricing() {
             <div className="space-y-4">
               <h1 className="text-4xl font-black leading-tight tracking-normal md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
               <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
-                مجاني للأساسيات، مفك لمركبة واحدة، العائلة لعدة مركبات، والأسطول للشركات عبر المبيعات.
+                باقة مجانية للأساسيات، باقة مفك لمركبة واحدة، باقة العائلة لعدة مركبات، وباقة الاسطول للشركات عبر المبيعات.
               </p>
             </div>
 
@@ -103,12 +103,16 @@ export default function Pricing() {
                   aria-pressed={billingCycle === cycle}
                   onClick={() => setBillingCycle(cycle)}
                   className={cn(
-                    "rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                    "min-w-[112px] rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
                     billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
                   )}
                 >
-                  {cycle === "monthly" ? "شهري" : "سنوي"}
-                  {cycle === "yearly" && <span className="me-2 rounded-full bg-white/15 px-2 py-0.5 text-xs">وفر أكثر</span>}
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <span>{cycle === "monthly" ? "شهري" : "سنوي"}</span>
+                    {cycle === "yearly" && (
+                      <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs leading-none">وفر أكثر</span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>
@@ -209,10 +213,10 @@ export default function Pricing() {
                 <thead>
                   <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
                     <th className="p-3 text-right">الميزة</th>
-                    <th className="p-3 text-center">مجاني</th>
-                    <th className="p-3 text-center text-[#FF6A00]">مفك</th>
-                    <th className="p-3 text-center">العائلة</th>
-                    <th className="p-3 text-center">أسطول</th>
+                    <th className="p-3 text-center">باقة مجانية</th>
+                    <th className="p-3 text-center text-[#FF6A00]">باقة مفك</th>
+                    <th className="p-3 text-center">باقة العائلة</th>
+                    <th className="p-3 text-center">باقة الاسطول</th>
                   </tr>
                 </thead>
                 <tbody>

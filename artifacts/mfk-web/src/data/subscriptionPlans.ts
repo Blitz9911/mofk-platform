@@ -30,7 +30,7 @@ export type ComparisonRow =
 export const subscriptionPlans: SubscriptionPlan[] = [
   {
     id: "free",
-    name: "Free",
+    name: "باقة مجانية",
     subtitle: "إدارة مركبة واحدة بدون جهاز وبدون دفع",
     monthlyPrice: 0,
     yearlyPrice: 0,
@@ -48,7 +48,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   },
   {
     id: "plus",
-    name: "Plus",
+    name: "باقة مفك",
     subtitle: "اشتراك مدفوع لمركبة واحدة مع جهاز مفك OBD",
     monthlyPrice: 29,
     yearlyPrice: 290,
@@ -67,7 +67,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   },
   {
     id: "pro",
-    name: "Pro",
+    name: "باقة العائلة",
     subtitle: "لعدة مركبات مع تقارير أعمق وتصدير Excel",
     monthlyPrice: 59,
     yearlyPrice: 590,
@@ -85,7 +85,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   },
   {
     id: "fleet",
-    name: "Fleet",
+    name: "باقة الاسطول",
     subtitle: "للشركات: تسعير مخصص ومتابعة من المبيعات",
     monthlyPrice: null,
     yearlyPrice: null,
@@ -119,7 +119,7 @@ export const comparisonRows: ComparisonRow[] = [
   { type: "feature", label: "تصدير البيانات Excel", free: "لا", plus: "لا", pro: "نعم", fleet: "نعم" },
   { type: "section", label: "الإدارة والدعم" },
   { type: "feature", label: "لوحة تحكم الأسطول", free: "لا", plus: "لا", pro: "لا", fleet: "نعم" },
-  { type: "feature", label: "الدعم الفني", free: "أساسي", plus: "أولوية", pro: "أولوية موسعة", fleet: "دعم خاص" },
+  { type: "feature", label: "الدعم الفني", free: "أساسي", plus: "أولوية", pro: "أولوية", fleet: "دعم خاص" },
 ];
 
 export const getPlanById = (id: SubscriptionPlanId) =>
