@@ -103,8 +103,22 @@ export const subscriptionPlans: SubscriptionPlan[] = [
   },
 ];
 
+const formatVehicleLimitCell = (planId: SubscriptionPlanId) => {
+  const plan = subscriptionPlans.find((item) => item.id === planId);
+  if (!plan || plan.maxVehicles === "sales") return "5 فأكثر";
+  if (plan.maxVehicles === 1) return "مركبة واحدة";
+  return `حتى ${new Intl.NumberFormat("ar-SA").format(plan.maxVehicles)} مركبات`;
+};
+
 export const comparisonRows: ComparisonRow[] = [
-  { type: "feature", label: "عدد المركبات", free: "مركبة واحدة", mofk: "مركبة واحدة", family: "حتى 3 مركبات", fleet: "5 فأكثر" },
+  {
+    type: "feature",
+    label: "عدد المركبات",
+    free: formatVehicleLimitCell("free"),
+    mofk: formatVehicleLimitCell("mofk"),
+    family: formatVehicleLimitCell("family"),
+    fleet: formatVehicleLimitCell("fleet"),
+  },
   { type: "section", label: "الأساسيات" },
   { type: "feature", label: "تسجيل بيانات المركبة", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "feature", label: "سجل الصيانة والتكاليف", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },

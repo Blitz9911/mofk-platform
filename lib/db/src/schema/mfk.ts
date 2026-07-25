@@ -204,6 +204,7 @@ export const subscriptionPlansTable = pgTable("subscription_plans", {
   priceMonthlySar: integer("price_monthly_sar").notNull(),
   priceYearlySar: integer("price_yearly_sar").notNull(),
   devicePriceSar: integer("device_price_sar").notNull().default(0),
+  maxVehicles: integer("max_vehicles"),
   tier: varchar("tier", { length: 20 }).notNull(),
   features: jsonb("features").$type<string[]>().notNull().default([]),
   featuresAr: jsonb("features_ar").$type<string[]>().notNull().default([]),

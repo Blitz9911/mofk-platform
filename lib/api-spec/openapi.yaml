@@ -915,9 +915,12 @@ components:
         descriptionAr: { type: string }
         priceMonthlySar: { type: integer }
         priceYearlySar: { type: integer }
+        maxVehicles:
+          type: integer
+          nullable: true
         tier:
           type: string
-          enum: [free, premium, fleet]
+          enum: [free, plus, mofk, family, pro, premium, fleet]
         features:
           type: array
           items: { type: string }
@@ -932,7 +935,7 @@ components:
       properties:
         tier:
           type: string
-          enum: [free, premium, fleet]
+          enum: [free, plus, mofk, family, pro, premium, fleet]
         status:
           type: string
           enum: [active, expired, cancelled]
@@ -1005,7 +1008,7 @@ components:
         email: { type: string, nullable: true }
         subscriptionTier:
           type: string
-          enum: [free, premium, fleet]
+          enum: [free, plus, mofk, family, pro, premium, fleet]
         vehicleCount: { type: integer }
         sessionsCount: { type: integer }
         lastActiveAt: { type: string, format: date-time, nullable: true }

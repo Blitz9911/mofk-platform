@@ -183,7 +183,7 @@ as $$
     when 'plus' then 1
     when 'premium' then 3
     when 'pro' then 3
-    when 'family' then 5
+    when 'family' then 3
     when 'fleet' then null
     else 1
   end;
@@ -267,6 +267,9 @@ begin
       when 'free' then 'الباقة المجانية'
       when 'mofk' then 'باقة مفك'
       when 'plus' then 'باقة مفك'
+      when 'premium' then 'باقة العائلة'
+      when 'pro' then 'باقة العائلة'
+      when 'family' then 'باقة العائلة'
       else 'باقتك الحالية'
     end;
 

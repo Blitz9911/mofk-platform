@@ -340,6 +340,10 @@ export type SubscriptionPlanTier =
 
 export const SubscriptionPlanTier = {
   free: "free",
+  plus: "plus",
+  mofk: "mofk",
+  family: "family",
+  pro: "pro",
   premium: "premium",
   fleet: "fleet",
 } as const;
@@ -351,6 +355,7 @@ export interface SubscriptionPlan {
   descriptionAr?: string;
   priceMonthlySar: number;
   priceYearlySar?: number;
+  maxVehicles?: number | null;
   tier?: SubscriptionPlanTier;
   features: string[];
   featuresAr?: string[];
@@ -362,6 +367,10 @@ export type UserSubscriptionTier =
 
 export const UserSubscriptionTier = {
   free: "free",
+  plus: "plus",
+  mofk: "mofk",
+  family: "family",
+  pro: "pro",
   premium: "premium",
   fleet: "fleet",
 } as const;
@@ -450,6 +459,10 @@ export type AdminUserSubscriptionTier =
 
 export const AdminUserSubscriptionTier = {
   free: "free",
+  plus: "plus",
+  mofk: "mofk",
+  family: "family",
+  pro: "pro",
   premium: "premium",
   fleet: "fleet",
 } as const;

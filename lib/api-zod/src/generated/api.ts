@@ -599,7 +599,8 @@ export const ListSubscriptionPlansResponseItem = zod.object({
   descriptionAr: zod.string().optional(),
   priceMonthlySar: zod.number(),
   priceYearlySar: zod.number().optional(),
-  tier: zod.enum(["free", "premium", "fleet"]).optional(),
+  maxVehicles: zod.number().nullish(),
+  tier: zod.enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"]).optional(),
   features: zod.array(zod.string()),
   featuresAr: zod.array(zod.string()).optional(),
   isPopular: zod.boolean().optional(),
@@ -609,7 +610,7 @@ export const ListSubscriptionPlansResponse = zod.array(
 );
 
 export const GetMySubscriptionResponse = zod.object({
-  tier: zod.enum(["free", "premium", "fleet"]),
+  tier: zod.enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"]),
   status: zod.enum(["active", "expired", "cancelled"]),
   startedAt: zod.coerce.date().nullish(),
   endsAt: zod.coerce.date().nullish(),
@@ -641,7 +642,7 @@ export const ListAdminUsersResponseItem = zod.object({
   name: zod.string(),
   phone: zod.string(),
   email: zod.string().nullish(),
-  subscriptionTier: zod.enum(["free", "premium", "fleet"]),
+  subscriptionTier: zod.enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"]),
   vehicleCount: zod.number(),
   sessionsCount: zod.number().optional(),
   lastActiveAt: zod.coerce.date().nullish(),

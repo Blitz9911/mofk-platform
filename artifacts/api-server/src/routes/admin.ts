@@ -70,7 +70,7 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
   const [{ premiumSubscribers }] = await db
     .select({ premiumSubscribers: sql<number>`count(*)::int` })
     .from(usersTable)
-    .where(sql`${usersTable.subscriptionTier} IN ('premium','fleet')`);
+    .where(sql`${usersTable.subscriptionTier} IN ('plus','mofk','family','pro','premium','fleet')`);
 
   const [{ avgHealthScore }] = await db
     .select({

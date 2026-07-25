@@ -86,10 +86,12 @@ let installed = false;
 
 class ApiBridgeError extends Error {
   status: number;
+  code?: string;
 
-  constructor(message: string, status = 500) {
+  constructor(message: string, status = 500, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -204,6 +206,8 @@ function upgradeRequiredMessage(tier?: string | null, limit = 1) {
   const currentPlan =
     tier === "plus" || tier === "mofk"
       ? "باقة مفك"
+      : tier === "family" || tier === "premium" || tier === "pro"
+        ? "باقة العائلة"
       : tier === "free"
         ? "الباقة المجانية"
         : "باقتك الحالية";
@@ -228,6 +232,7 @@ async function assertCanCreateVehicle(session: Awaited<ReturnType<typeof require
     throw new ApiBridgeError(
       upgradeRequiredMessage(access?.subscription_tier, limit),
       403,
+      "VEHICLE_LIMIT_REACHED",
     );
   }
 }
@@ -2008,7 +2013,8 @@ export function installSupabaseApiBridge() {
       const status = error instanceof ApiBridgeError ? error.status : 500;
       const message =
         error instanceof Error ? error.message : "حدث خطأ غير متوقع";
-      return jsonResponse({ error: message }, status);
+      const code = error instanceof ApiBridgeError ? error.code : undefined;
+      return jsonResponse({ error: message, ...(code ? { code } : {}) }, status);
     }
 
     return originalFetch(input, init);

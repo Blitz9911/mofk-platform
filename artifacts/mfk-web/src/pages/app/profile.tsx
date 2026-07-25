@@ -49,9 +49,7 @@ function getTierLabel(tier?: string | null) {
     case "mofk":
       return "مفك";
     case "premium":
-      return "احترافي";
     case "pro":
-      return "متقدم";
     case "family":
       return "العائلة";
     case "fleet":
@@ -68,9 +66,8 @@ function getTierDescription(tier?: string | null) {
       return "مركبة واحدة مع تجهيز الربط بجهاز OBD.";
     case "premium":
     case "pro":
-      return "حتى 3 مركبات حسب صلاحيات الباقة.";
     case "family":
-      return "حتى 5 مركبات للعائلة.";
+      return "حتى 3 مركبات للعائلة.";
     case "fleet":
       return "حساب أسطول بصلاحيات موسعة ودعم خاص.";
     default:

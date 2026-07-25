@@ -14,6 +14,7 @@ export interface SubscriptionPlan {
   descriptionAr?: string;
   priceMonthlySar: number;
   priceYearlySar?: number;
+  maxVehicles?: number | null;
   tier?: SubscriptionPlanTier;
   features: string[];
   featuresAr?: string[];

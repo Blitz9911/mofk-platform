@@ -764,20 +764,53 @@ export default function Vehicles() {
     defaultValues: { adapterMac: "" },
   });
 
-  const normalizedTier = user?.subscriptionTier === "mofk" ? "plus" : user?.subscriptionTier ?? "free";
-  const vehicleLimit = normalizedTier === "free" || normalizedTier === "plus" ? 1 : normalizedTier === "fleet" ? null : 3;
+  const rawTier = user?.subscriptionTier ?? "free";
+  const normalizedTier =
+    rawTier === "mofk" || rawTier === "individual-basic"
+      ? "plus"
+      : rawTier === "premium" || rawTier === "pro" || rawTier === "individual-advanced"
+        ? "family"
+        : rawTier;
+  const vehicleLimit =
+    normalizedTier === "free" || normalizedTier === "plus"
+      ? 1
+      : normalizedTier === "fleet"
+        ? null
+        : 3;
   const vehicleCount = vehicles?.length ?? 0;
   const reachedVehicleLimit = vehicleLimit !== null && vehicleCount >= vehicleLimit;
+  const vehicleLimitLabel =
+    vehicleLimit === null
+      ? "بدون حد للمركبات"
+      : vehicleLimit === 1
+        ? "بحد مركبة واحدة"
+        : `بحد حتى ${vehicleLimit.toLocaleString("ar-SA")} مركبات`;
+  const upgradeDescription =
+    normalizedTier === "free"
+      ? "الباقة المجانية تسمح بمركبة واحدة فقط. رقّ إلى باقة مفك أو العائلة."
+      : normalizedTier === "plus"
+        ? "باقة مفك مخصصة لمركبة واحدة. رقّ إلى باقة العائلة لإضافة مركبات أكثر."
+        : "باقة العائلة تسمح حتى 3 مركبات. تواصل معنا لترقية الحساب إلى باقة الاسطول.";
+
+  const getMutationErrorMessage = (error: unknown) => {
+    if (error && typeof error === "object" && "data" in error) {
+      const data = (error as { data?: unknown }).data;
+      if (data && typeof data === "object" && "error" in data) {
+        const message = (data as { error?: unknown }).error;
+        if (typeof message === "string" && message.trim()) return message;
+      }
+    }
+
+    if (error instanceof Error && error.message.trim()) return error.message;
+    return "تعذر إضافة المركبة. حاول مرة أخرى.";
+  };
 
   const requestCreateVehicle = () => {
     if (reachedVehicleLimit) {
       setUpgradeNotice({
         open: true,
         title: "يجب الترقية لإضافة مركبة أخرى",
-        description:
-          normalizedTier === "free"
-            ? "الباقة المجانية تسمح بمركبة واحدة فقط. رقّ إلى باقة مفك أو العائلة."
-            : "باقة مفك مخصصة لمركبة واحدة. رقّ إلى باقة العائلة لإضافة مركبات أكثر.",
+        description: upgradeDescription,
       });
       return;
     }
@@ -801,6 +834,13 @@ export default function Vehicles() {
           form.reset();
           setSelectedMake("");
           setSelectedModel("");
+        },
+        onError: (error) => {
+          toast({
+            title: "لم يتم إضافة المركبة",
+            description: getMutationErrorMessage(error),
+            variant: "destructive",
+          });
         },
       },
     );
@@ -901,7 +941,7 @@ export default function Vehicles() {
           <h1 className="text-3xl font-bold tracking-tight">مركباتي</h1>
           <p className="text-muted-foreground mt-1">
             {vehicles?.length
-              ? `${vehicles.length} مركبة مسجلة في حسابك`
+              ? `${vehicles.length} مركبة مسجلة في حسابك ${vehicleLimitLabel}`
               : "أضف مركباتك وتحكم بها من مكان واحد"}
           </p>
         </div>
@@ -956,7 +996,7 @@ export default function Vehicles() {
         >
           <Button className="gap-2 shrink-0" onClick={requestCreateVehicle}>
             <Plus className="w-4 h-4" />
-            إضافة مركبة
+            {reachedVehicleLimit ? "ترقية الباقة" : "إضافة مركبة"}
           </Button>
 
           <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">

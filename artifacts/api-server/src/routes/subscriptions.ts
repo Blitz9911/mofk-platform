@@ -25,7 +25,15 @@ router.get("/subscriptions/me", async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  const tier = (u.subscriptionTier as "free" | "premium" | "fleet") ?? "free";
+  const tier =
+    (u.subscriptionTier as
+      | "free"
+      | "plus"
+      | "mofk"
+      | "family"
+      | "pro"
+      | "premium"
+      | "fleet") ?? "free";
   const status =
     u.subscriptionEndsAt && u.subscriptionEndsAt > new Date()
       ? "active"
