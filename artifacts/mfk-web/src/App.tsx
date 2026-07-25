@@ -67,6 +67,7 @@ import AdminReports from "@/pages/admin/reports";
 import AdminSettings from "@/pages/admin/settings";
 
 import { Shell } from "@/components/layout/Shell";
+import { CookieConsent } from "@/components/CookieConsent";
 import { useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -238,6 +239,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
+        <CookieConsent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
