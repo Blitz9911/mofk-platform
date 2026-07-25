@@ -23,6 +23,7 @@ import {
   getMonthlyEquivalent,
   getPlanById,
   getYearlySavings,
+  normalizeSubscriptionPlanId,
   subscriptionPlans,
 } from "@/data/subscriptionPlans";
 
@@ -31,19 +32,7 @@ type PaymentState = "success" | "pending" | "past_due";
 const paymentState: PaymentState = "success";
 
 function normalizePlanId(tier?: string | null): SubscriptionPlanId {
-  switch (tier) {
-    case "mofk":
-    case "plus":
-      return "plus";
-    case "premium":
-    case "pro":
-    case "family":
-      return "pro";
-    case "fleet":
-      return "fleet";
-    default:
-      return "free";
-  }
+  return normalizeSubscriptionPlanId(tier);
 }
 
 const stateCopy: Record<PaymentState, { title: string; body: string; tone: string; icon: LucideIcon }> = {
@@ -104,7 +93,7 @@ export default function Subscription() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
 
   const currentPlanId = normalizePlanId(user?.subscriptionTier);
   const currentPlan = getPlanById(currentPlanId);
@@ -286,8 +275,8 @@ export default function Subscription() {
                     <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                       <td className="p-3 font-bold">{row.label}</td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
-                      <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.plus} /></td>
-                      <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.pro} /></td>
+                      <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                      <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                     </tr>
                   ),

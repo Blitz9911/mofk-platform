@@ -31,7 +31,7 @@ const emptyShipping: ShippingAddress = {
 export default function CheckoutPlan() {
   const [, setLocation] = useLocation();
   const params = new URLSearchParams(window.location.search);
-  const plan = getPlanById(params.get("plan") || "plus");
+  const plan = getPlanById(params.get("plan") || "mofk");
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const [customer, setCustomer] = useState<CustomerInfo>(emptyCustomer);
   const [shipping, setShipping] = useState<ShippingAddress>(emptyShipping);

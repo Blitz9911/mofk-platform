@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 
-import { getPlanById } from "@/config/plans";
+import { getPlanById, getPublicPlanSlug } from "@/config/plans";
 import {
   PageHeader,
   PaymentGatewayPlaceholder,
@@ -58,7 +58,7 @@ export default function Payment() {
               <SummaryRow label="الجوال" value={order.customer.phone} />
               <SummaryRow label="الإجمالي" value={commerceService.describeOrderAmount(order)} strong />
               <div className="flex gap-2 pt-4">
-                <Link href={`/checkout/${order.planId}`}><Button variant="outline">رجوع</Button></Link>
+                <Link href={`/checkout/plan?plan=${getPublicPlanSlug(order.planId)}`}><Button variant="outline">رجوع</Button></Link>
                 <Button variant="ghost" onClick={() => setLocation("/pricing")}>إلغاء</Button>
               </div>
             </CardContent>

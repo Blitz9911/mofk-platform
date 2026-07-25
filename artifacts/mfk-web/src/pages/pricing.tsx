@@ -56,22 +56,22 @@ function CellValue({ value }: { value: string }) {
   return <span>{value}</span>;
 }
 
-function authCheckoutHref(plan: "plus" | "pro") {
+function authCheckoutHref(plan: "mofk" | "family") {
   const params = new URLSearchParams({ next: "/checkout/plan", plan });
   return `/auth?${params.toString()}`;
 }
 
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
-  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
   const [isLoading] = useState(false);
   const [networkError] = useState(false);
 
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
   const checkoutHrefByPlan: Record<SubscriptionPlanId, string> = {
     free: "/onboarding?plan=free",
-    plus: authCheckoutHref("plus"),
-    pro: authCheckoutHref("pro"),
+    mofk: authCheckoutHref("mofk"),
+    family: authCheckoutHref("family"),
     fleet: "/fleet-contact",
   };
 
@@ -225,8 +225,8 @@ export default function Pricing() {
                       <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                         <td className="p-3 font-bold">{row.label}</td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
-                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.plus} /></td>
-                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.pro} /></td>
+                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                       </tr>
                     ),

@@ -324,7 +324,7 @@ export default function AdminDashboard() {
                       <tr key={order.id} className="border-t">
                         <td className="p-3 font-bold">{order.orderNumber}</td>
                         <td className="p-3">{order.customer.fullName}</td>
-                        <td className="p-3">{getPlanById(order.planId)?.nameAr ?? order.planId}</td>
+                        <td className="p-3">{getPlanById(order.planId)?.nameAr ?? "باقة مفك"}</td>
                         <td className="p-3">{formatSar(order.totalSar)}</td>
                         <td className="p-3"><PaymentBadge status={order.paymentStatus} /></td>
                         <td className="p-3"><OrderStatusBadge status={order.orderStatus} /></td>
@@ -384,7 +384,7 @@ export default function AdminDashboard() {
               <div key={order.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <div>
                   <div className="font-bold">{order.customer.fullName}</div>
-                  <div className="text-xs text-muted-foreground">{getPlanById(order.planId)?.nameAr ?? order.planId}</div>
+                  <div className="text-xs text-muted-foreground">{getPlanById(order.planId)?.nameAr ?? "باقة مفك"}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold">{formatSar(order.totalSar)}</span>

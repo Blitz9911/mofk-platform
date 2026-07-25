@@ -121,6 +121,14 @@ export function getPlanById(id?: string | null) {
   return plans.find((plan) => plan.id === normalized) ?? null;
 }
 
+export function getPublicPlanSlug(id?: string | null) {
+  const plan = getPlanById(id);
+
+  if (plan?.id === "plus") return "mofk";
+  if (plan?.id === "pro") return "family";
+  return plan?.id ?? "mofk";
+}
+
 export function getPlanPrice(plan: PlanConfig, cycle: BillingCycle) {
   return cycle === "annual" ? plan.priceAnnualSar : plan.priceMonthlySar;
 }

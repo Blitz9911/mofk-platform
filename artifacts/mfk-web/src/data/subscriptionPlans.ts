@@ -1,6 +1,6 @@
 export type BillingCycle = "monthly" | "yearly";
 
-export type SubscriptionPlanId = "free" | "plus" | "pro" | "fleet";
+export type SubscriptionPlanId = "free" | "mofk" | "family" | "fleet";
 
 export type SubscriptionPlan = {
   id: SubscriptionPlanId;
@@ -22,8 +22,8 @@ export type ComparisonRow =
       type: "feature";
       label: string;
       free: string;
-      plus: string;
-      pro: string;
+      mofk: string;
+      family: string;
       fleet: string;
     };
 
@@ -47,7 +47,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     ],
   },
   {
-    id: "plus",
+    id: "mofk",
     name: "باقة مفك",
     subtitle: "اشتراك مدفوع لمركبة واحدة مع جهاز مفك OBD",
     monthlyPrice: 29,
@@ -66,7 +66,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     ],
   },
   {
-    id: "pro",
+    id: "family",
     name: "باقة العائلة",
     subtitle: "لعدة مركبات مع تقارير أعمق وتصدير Excel",
     monthlyPrice: 59,
@@ -74,7 +74,7 @@ export const subscriptionPlans: SubscriptionPlan[] = [
     devicePrice: 149,
     maxVehicles: 3,
     saleType: "self-serve",
-    summary: "كل مزايا Plus مع مساحة أكبر للعائلة أو المستخدم المتقدم.",
+    summary: "كل مزايا مفك مع مساحة أكبر للعائلة وتصدير بيانات Excel.",
     included: [
       "حتى 3 مركبات",
       "جهاز مفك OBD برسوم مرة واحدة",
@@ -104,26 +104,33 @@ export const subscriptionPlans: SubscriptionPlan[] = [
 ];
 
 export const comparisonRows: ComparisonRow[] = [
-  { type: "feature", label: "عدد المركبات", free: "مركبة واحدة", plus: "مركبة واحدة", pro: "حتى 3 مركبات", fleet: "5 فأكثر" },
+  { type: "feature", label: "عدد المركبات", free: "مركبة واحدة", mofk: "مركبة واحدة", family: "حتى 3 مركبات", fleet: "5 فأكثر" },
   { type: "section", label: "الأساسيات" },
-  { type: "feature", label: "تسجيل بيانات المركبة", free: "نعم", plus: "نعم", pro: "نعم", fleet: "نعم" },
-  { type: "feature", label: "سجل الصيانة والتكاليف", free: "نعم", plus: "نعم", pro: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تسجيل تعبئات البنزين", free: "نعم", plus: "نعم", pro: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تسجيل بيانات المركبة", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "سجل الصيانة والتكاليف", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تسجيل تعبئات البنزين", free: "نعم", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "section", label: "الجهاز والتشخيص" },
-  { type: "feature", label: "جهاز مفك OBD", free: "لا", plus: "رسوم مرة واحدة", pro: "رسوم مرة واحدة", fleet: "حسب العقد" },
-  { type: "feature", label: "البيانات الحية للمركبة", free: "لا", plus: "نعم", pro: "نعم", fleet: "نعم" },
-  { type: "feature", label: "اكتشاف الأعطال تلقائيًا", free: "لا", plus: "نعم", pro: "نعم", fleet: "نعم" },
+  { type: "feature", label: "جهاز مفك OBD", free: "لا", mofk: "رسوم مرة واحدة", family: "رسوم مرة واحدة", fleet: "حسب العقد" },
+  { type: "feature", label: "البيانات الحية للمركبة", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "اكتشاف الأعطال تلقائيًا", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
   { type: "section", label: "المساعد والتقارير" },
-  { type: "feature", label: "رسائل المساعد الذكي", free: "لا", plus: "غير محدود", pro: "غير محدود", fleet: "حسب العقد" },
-  { type: "feature", label: "تصدير PDF", free: "لا", plus: "نعم", pro: "نعم", fleet: "نعم" },
-  { type: "feature", label: "تصدير البيانات Excel", free: "لا", plus: "لا", pro: "نعم", fleet: "نعم" },
+  { type: "feature", label: "رسائل المساعد الذكي", free: "لا", mofk: "غير محدود", family: "غير محدود", fleet: "حسب العقد" },
+  { type: "feature", label: "تصدير PDF", free: "لا", mofk: "نعم", family: "نعم", fleet: "نعم" },
+  { type: "feature", label: "تصدير البيانات Excel", free: "لا", mofk: "لا", family: "نعم", fleet: "نعم" },
   { type: "section", label: "الإدارة والدعم" },
-  { type: "feature", label: "لوحة تحكم الأسطول", free: "لا", plus: "لا", pro: "لا", fleet: "نعم" },
-  { type: "feature", label: "الدعم الفني", free: "أساسي", plus: "أولوية", pro: "أولوية", fleet: "دعم خاص" },
+  { type: "feature", label: "لوحة تحكم الأسطول", free: "لا", mofk: "لا", family: "لا", fleet: "نعم" },
+  { type: "feature", label: "الدعم الفني", free: "أساسي", mofk: "أولوية", family: "أولوية", fleet: "دعم خاص" },
 ];
 
-export const getPlanById = (id: SubscriptionPlanId) =>
-  subscriptionPlans.find((plan) => plan.id === id) ?? subscriptionPlans[1];
+export const normalizeSubscriptionPlanId = (id?: string | null): SubscriptionPlanId => {
+  if (id === "plus" || id === "mofk" || id === "individual-basic") return "mofk";
+  if (id === "pro" || id === "premium" || id === "family" || id === "individual-advanced") return "family";
+  if (id === "fleet") return "fleet";
+  return "free";
+};
+
+export const getPlanById = (id: SubscriptionPlanId | string) =>
+  subscriptionPlans.find((plan) => plan.id === normalizeSubscriptionPlanId(id)) ?? subscriptionPlans[1];
 
 export const formatSar = (value: number) =>
   new Intl.NumberFormat("ar-SA", {

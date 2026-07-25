@@ -5,6 +5,7 @@ import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getPlanById } from "@/data/subscriptionPlans";
 
 function authTarget(path: "login" | "register") {
   const params = new URLSearchParams(window.location.search);
@@ -18,6 +19,7 @@ function authTarget(path: "login" | "register") {
 export default function Auth() {
   const params = new URLSearchParams(window.location.search);
   const plan = params.get("plan");
+  const selectedPlan = plan ? getPlanById(plan) : null;
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -33,7 +35,7 @@ export default function Auth() {
               </p>
               {plan && (
                 <div className="mt-5 rounded-xl border bg-muted/40 p-4 text-sm">
-                  الباقة المختارة: <span className="font-black" dir="ltr">{plan.toUpperCase()}</span>
+                  الباقة المختارة: <span className="font-black">{selectedPlan?.name ?? "باقة مفك"}</span>
                 </div>
               )}
             </div>

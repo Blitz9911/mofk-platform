@@ -15,6 +15,7 @@ import {
   PlanConfig,
   formatPlanVehicles,
   formatSar,
+  getPlanById,
   getPlanPrice,
 } from "@/config/plans";
 import {
@@ -539,21 +540,25 @@ export function AdminOrdersTable({ orders }: { orders: MockOrder[] }) {
           </tr>
         </thead>
         <tbody>
-          {orders.map((order) => (
-            <tr key={order.id} className="border-t">
-              <td className="p-3 font-bold">{order.orderNumber}</td>
-              <td className="p-3">{order.customer.fullName}</td>
-              <td className="p-3">{order.customer.phone}</td>
-              <td className="p-3">{order.planId}</td>
-              <td className="p-3">{order.billingCycle === "monthly" ? "شهري" : "سنوي"}</td>
-              <td className="p-3">{formatSar(order.totalSar)} ر.س</td>
-              <td className="p-3"><PaymentBadge status={order.paymentStatus} /></td>
-              <td className="p-3"><OrderStatusBadge status={order.orderStatus} /></td>
-              <td className="p-3">{new Date(order.createdAt).toLocaleDateString("ar-SA")}</td>
-              <td className="p-3">{order.assignedEmployee ?? "غير معين"}</td>
-              <td className="p-3"><Link href={`/admin/orders/${order.id}`}><Button size="sm" variant="outline">فتح</Button></Link></td>
-            </tr>
-          ))}
+          {orders.map((order) => {
+            const plan = getPlanById(order.planId);
+
+            return (
+              <tr key={order.id} className="border-t">
+                <td className="p-3 font-bold">{order.orderNumber}</td>
+                <td className="p-3">{order.customer.fullName}</td>
+                <td className="p-3">{order.customer.phone}</td>
+                <td className="p-3">{plan?.nameAr ?? "باقة مفك"}</td>
+                <td className="p-3">{order.billingCycle === "monthly" ? "شهري" : "سنوي"}</td>
+                <td className="p-3">{formatSar(order.totalSar)} ر.س</td>
+                <td className="p-3"><PaymentBadge status={order.paymentStatus} /></td>
+                <td className="p-3"><OrderStatusBadge status={order.orderStatus} /></td>
+                <td className="p-3">{new Date(order.createdAt).toLocaleDateString("ar-SA")}</td>
+                <td className="p-3">{order.assignedEmployee ?? "غير معين"}</td>
+                <td className="p-3"><Link href={`/admin/orders/${order.id}`}><Button size="sm" variant="outline">فتح</Button></Link></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
