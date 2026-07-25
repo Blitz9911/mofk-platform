@@ -18,6 +18,8 @@ const steps = ["اختيار الباقة", "البيانات", "الشحن", "�
 
 const emptyCustomer: CustomerInfo = { fullName: "", phone: "", email: "" };
 const emptyShipping: ShippingAddress = {
+  shortAddress: "",
+  mapUrl: "",
   city: "",
   district: "",
   street: "",
@@ -42,9 +44,12 @@ export default function Checkout() {
     if (!customer.fullName.trim()) customerErrors.fullName = "اكتب الاسم الكامل";
     if (!/^05\d{8}$/.test(customer.phone.trim())) customerErrors.phone = "اكتب رقم جوال سعودي صحيح";
     if (!/^\S+@\S+\.\S+$/.test(customer.email.trim())) customerErrors.email = "اكتب بريدًا إلكترونيًا صحيحًا";
-    (["city", "district", "street", "buildingNumber", "postalCode", "additionalNumber"] as const).forEach((key) => {
+    (["shortAddress", "mapUrl", "city", "district", "street", "buildingNumber", "postalCode", "additionalNumber"] as const).forEach((key) => {
       if (!shipping[key].trim()) shippingErrors[key] = "هذا الحقل مطلوب";
     });
+    if (shipping.mapUrl.trim() && !/^https?:\/\/\S+/i.test(shipping.mapUrl.trim())) {
+      shippingErrors.mapUrl = "أضف رابط الخريطة كاملًا";
+    }
     return { customerErrors, shippingErrors };
   }, [customer, shipping]);
 

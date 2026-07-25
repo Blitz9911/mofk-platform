@@ -33,9 +33,9 @@ export default function Payment() {
     setFailed(false);
     window.setTimeout(() => {
       commerceService.updateMockOrder(order.id, {
-        paymentStatus: "pending",
-        orderStatus: "pending_payment",
-        internalNotes: [...order.internalNotes, "بانتظار webhook موقّع من Moyasar لاعتماد الدفع."],
+        paymentStatus: "paid",
+        orderStatus: "processing",
+        internalNotes: [...order.internalNotes, "تم اعتماد الدفع بمحاكاة داخلية للتجربة فقط."],
       });
       window.sessionStorage.setItem("mfk-current-order-id", order.id);
       setLocation("/checkout/result");
@@ -45,7 +45,7 @@ export default function Payment() {
   return (
     <main className="min-h-screen p-4 md:p-8" dir="rtl">
       <div className="mx-auto max-w-6xl space-y-6">
-        <PageHeader title="الدفع الآمن" description="هذه صفحة shell جاهزة للتكامل، وليست بوابة دفع حقيقية." />
+        <PageHeader title="الدفع التجريبي" description="بوابة دفع محاكاة للتجربة فقط. عند المتابعة يتم اعتماد الطلب والانتقال لنتيجة النجاح." />
         <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
           <PaymentGatewayPlaceholder processing={processing} failed={failed} onPay={pay} />
           <Card className="rounded-2xl">

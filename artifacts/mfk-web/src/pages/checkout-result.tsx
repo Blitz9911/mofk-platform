@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Clock, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock, ShieldCheck } from "lucide-react";
 
 import { PageHeader, OrderStatusBadge, PaymentBadge } from "@/components/commerce/commerce-components";
 import { Button } from "@/components/ui/button";
@@ -9,18 +9,23 @@ import { commerceService } from "@/services/mockCommerceService";
 export default function CheckoutResult() {
   const orderId = window.sessionStorage.getItem("mfk-current-order-id");
   const order = commerceService.getMockOrder(orderId ?? undefined);
+  const paid = order?.paymentStatus === "paid";
+  const StatusIcon = paid ? CheckCircle2 : Clock;
 
   return (
     <main className="min-h-screen p-4 md:p-8" dir="rtl">
       <div className="mx-auto max-w-3xl space-y-6">
-        <PageHeader title="بانتظار تأكيد الدفع" description="هذه الصفحة مؤقتة فقط، ولا تفعل الاشتراك. التفعيل يتم بعد webhook موقّع من Moyasar على الخادم." />
+        <PageHeader
+          title={paid ? "تم الدفع بنجاح" : "بانتظار تأكيد الدفع"}
+          description={paid ? "تم اعتماد الدفع في المحاكاة، ويمكنك متابعة الشحنة الآن." : "هذه الصفحة مؤقتة فقط، ولا تفعل الاشتراك الحقيقي إلا بعد webhook موقّع من Moyasar على الخادم."}
+        />
         <Card className="rounded-2xl">
           <CardContent className="space-y-5 p-8 text-center">
-            <Clock className="mx-auto h-12 w-12 text-primary" />
+            <StatusIcon className={paid ? "mx-auto h-12 w-12 text-green-500" : "mx-auto h-12 w-12 text-primary"} />
             <div>
-              <h2 className="text-2xl font-black">جاري انتظار تأكيد Moyasar</h2>
+              <h2 className="text-2xl font-black">{paid ? "تمت محاكاة الدفع بنجاح" : "جاري انتظار تأكيد Moyasar"}</h2>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                بعد وصول webhook صحيح، سيتم تحويل الطلب إلى paid، تفعيل الاشتراك، وإنشاء الشحنة.
+                {paid ? "تم تحويل الطلب إلى مدفوع وقيد المعالجة داخل بيئة التجربة." : "بعد وصول webhook صحيح، سيتم تحويل الطلب إلى paid، تفعيل الاشتراك، وإنشاء الشحنة."}
               </p>
             </div>
             {order && (
@@ -31,7 +36,7 @@ export default function CheckoutResult() {
             )}
             <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
               <ShieldCheck className="h-4 w-4" />
-              لا توجد بيانات حساسة في الرابط، وحالة paid لا تأتي من العميل.
+              هذه محاكاة فقط. في الإنتاج يجب ألا تأتي حالة paid من العميل.
             </div>
             <div className="flex flex-col justify-center gap-2 sm:flex-row">
               <Link href="/app/device/pending"><Button>متابعة الشحنة</Button></Link>

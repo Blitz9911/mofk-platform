@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 import {
   BillingCycle,
   SubscriptionPlanId,
@@ -101,6 +102,7 @@ function CellValue({ value }: { value: string }) {
 
 export default function Subscription() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
   const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("plus");
 
@@ -108,6 +110,13 @@ export default function Subscription() {
   const currentPlan = getPlanById(currentPlanId);
   const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
   const StatusIcon = stateCopy[paymentState].icon;
+  const continueSelectedPlan = () => {
+    if (selectedPlan.saleType === "sales-led") {
+      setLocation("/fleet-contact");
+      return;
+    }
+    setLocation(`/checkout/plan?plan=${selectedPlan.id}`);
+  };
 
   return (
     <div className="dark -m-4 min-h-screen bg-[#0B0B0B] p-4 text-white md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
@@ -296,7 +305,7 @@ export default function Subscription() {
               <p className="text-sm text-[#8A8A8A]">الترقية المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
-            <Button className="h-12 rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00]">
+            <Button className="h-12 rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00]" onClick={continueSelectedPlan}>
               {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "متابعة الدفع"}
             </Button>
           </div>

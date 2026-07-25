@@ -46,6 +46,8 @@ export type CustomerInfo = {
 };
 
 export type ShippingAddress = {
+  shortAddress: string;
+  mapUrl: string;
   city: string;
   district: string;
   street: string;

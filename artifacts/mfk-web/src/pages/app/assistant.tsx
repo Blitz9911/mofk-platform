@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -270,6 +271,8 @@ export default function Assistant() {
   const aiChat = useAiChat();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isFreeTier = !user?.subscriptionTier || user.subscriptionTier === "free";
 
   // Persist messages
   useEffect(() => {
@@ -384,6 +387,30 @@ export default function Assistant() {
 
   const formatTime = (ts: number) =>
     new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+
+  if (isFreeTier) {
+    return (
+      <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4" dir="rtl">
+        <Card className="w-full max-w-xl rounded-3xl border-primary/20 bg-card/90 p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Sparkles className="h-8 w-8" />
+          </div>
+          <h1 className="text-2xl font-black">المساعد الذكي يحتاج ترقية</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-muted-foreground">
+            الباقة المجانية لا تشمل رسائل المساعد الذكي. رقّ إلى باقة مفك أو باقة العائلة لاستخدام AI بدون حد.
+          </p>
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <Button className="rounded-xl font-bold" onClick={() => setLocation("/app/subscription")}>
+              ترقية الباقة
+            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => setLocation("/app")}>
+              العودة للرئيسية
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
 <div className="flex flex-col h-[calc(100vh-6rem)] md:h-[calc(100vh-4rem)] max-w-6xl mx-auto w-full px-1 md:px-0">   

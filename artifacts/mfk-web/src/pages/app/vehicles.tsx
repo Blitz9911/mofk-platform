@@ -36,7 +36,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -55,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Car Brand / Model Data ──────────────────────────────── */
 const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
@@ -717,6 +717,7 @@ const FUEL_LABEL: Record<string, string> = {
 export default function Vehicles() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: vehicles, isLoading } = useListVehicles();
   const createVehicle = useCreateVehicle();
@@ -747,7 +748,34 @@ export default function Vehicles() {
     defaultValues: { adapterMac: "" },
   });
 
+  const normalizedTier = user?.subscriptionTier === "mofk" ? "plus" : user?.subscriptionTier ?? "free";
+  const vehicleLimit = normalizedTier === "free" || normalizedTier === "plus" ? 1 : normalizedTier === "fleet" ? null : 3;
+  const vehicleCount = vehicles?.length ?? 0;
+  const reachedVehicleLimit = vehicleLimit !== null && vehicleCount >= vehicleLimit;
+
+  const requestCreateVehicle = () => {
+    if (reachedVehicleLimit) {
+      toast({
+        title: "يجب الترقية لإضافة مركبة أخرى",
+        description:
+          normalizedTier === "free"
+            ? "الباقة المجانية تسمح بمركبة واحدة فقط. رقّ إلى باقة مفك أو العائلة."
+            : "باقة مفك مخصصة لمركبة واحدة. رقّ إلى باقة العائلة لإضافة مركبات أكثر.",
+        variant: "destructive",
+      });
+      setLocation("/app/subscription");
+      return;
+    }
+
+    setCreateOpen(true);
+  };
+
   const onSubmit = (values: z.infer<typeof createVehicleSchema>) => {
+    if (reachedVehicleLimit) {
+      requestCreateVehicle();
+      return;
+    }
+
     createVehicle.mutate(
       { data: values },
       {
@@ -874,12 +902,10 @@ export default function Vehicles() {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button className="gap-2 shrink-0">
-              <Plus className="w-4 h-4" />
-              إضافة مركبة
-            </Button>
-          </DialogTrigger>
+          <Button className="gap-2 shrink-0" onClick={requestCreateVehicle}>
+            <Plus className="w-4 h-4" />
+            إضافة مركبة
+          </Button>
 
           <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -1254,7 +1280,7 @@ export default function Vehicles() {
             </p>
           </div>
 
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Button onClick={requestCreateVehicle} className="gap-2">
             <Plus className="w-4 h-4" />
             أضف أول مركبة
           </Button>

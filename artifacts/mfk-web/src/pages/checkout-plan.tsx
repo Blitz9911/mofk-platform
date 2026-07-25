@@ -17,6 +17,8 @@ import { commerceService, CustomerInfo, ShippingAddress } from "@/services/mockC
 const steps = ["الباقة", "الحساب", "الشحن", "الدفع", "انتظار التأكيد"];
 const emptyCustomer: CustomerInfo = { fullName: "", phone: "", email: "" };
 const emptyShipping: ShippingAddress = {
+  shortAddress: "",
+  mapUrl: "",
   city: "",
   district: "",
   street: "",
@@ -41,9 +43,12 @@ export default function CheckoutPlan() {
     if (!customer.fullName.trim()) customerErrors.fullName = "اكتب الاسم الكامل";
     if (!/^05\d{8}$/.test(customer.phone.trim())) customerErrors.phone = "اكتب رقم جوال سعودي صحيح";
     if (!/^\S+@\S+\.\S+$/.test(customer.email.trim())) customerErrors.email = "اكتب بريدًا صحيحًا";
-    (["city", "district", "street", "buildingNumber", "postalCode", "additionalNumber"] as const).forEach((key) => {
+    (["shortAddress", "mapUrl", "city", "district", "street", "buildingNumber", "postalCode", "additionalNumber"] as const).forEach((key) => {
       if (!shipping[key].trim()) shippingErrors[key] = "هذا الحقل مطلوب";
     });
+    if (shipping.mapUrl.trim() && !/^https?:\/\/\S+/i.test(shipping.mapUrl.trim())) {
+      shippingErrors.mapUrl = "أضف رابط الخريطة كاملًا";
+    }
     return { customerErrors, shippingErrors };
   }, [customer, shipping]);
 
@@ -60,7 +65,7 @@ export default function CheckoutPlan() {
   if (!plan || plan.isFree || plan.isFleet) {
     return (
       <main className="min-h-screen p-4 md:p-8" dir="rtl">
-        <PageHeader title="مسار checkout غير متاح لهذه الباقة" description="اختر Plus أو Pro لإكمال الدفع الذاتي، أو استخدم مسار الأسطول للمبيعات." />
+        <PageHeader title="مسار checkout غير متاح لهذه الباقة" description="اختر باقة مفك أو باقة العائلة لإكمال الدفع الذاتي، أو استخدم مسار الأسطول للمبيعات." />
         <Link href="/pricing"><Button className="mt-4">العودة للباقات</Button></Link>
       </main>
     );
@@ -69,7 +74,7 @@ export default function CheckoutPlan() {
   return (
     <main className="min-h-screen bg-background p-4 md:p-8" dir="rtl">
       <div className="mx-auto max-w-7xl space-y-6">
-        <PageHeader title="تأكيد الخطة والشحن" description="الجهاز رسوم مرة واحدة، والاشتراك شهري أو سنوي حسب اختيارك." />
+        <PageHeader title="تأكيد الخطة والشحن" description="الاشتراك يحسب وحده، والقطعة تحسب وحدها كرسوم مرة واحدة." />
         <CheckoutStepper steps={steps} activeIndex={2} />
         <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">

@@ -207,6 +207,8 @@ export default function AdminDashboard() {
         email: "demo@mofk.app",
       },
       shippingAddress: {
+        shortAddress: "RDBA1234",
+        mapUrl: "https://maps.app.goo.gl/demo",
         city: "الرياض",
         district: "الملقا",
         street: "طريق الملك فهد",

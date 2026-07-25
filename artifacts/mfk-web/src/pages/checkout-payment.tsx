@@ -14,16 +14,16 @@ export default function CheckoutPayment() {
   const order = commerceService.getMockOrder(orderId ?? undefined);
   const plan = getPlanById(order?.planId);
 
-  const createPendingPayment = () => {
+  const simulateSuccessfulPayment = () => {
     if (!order) return;
     setProcessing(true);
     window.setTimeout(() => {
       commerceService.updateMockOrder(order.id, {
-        paymentStatus: "pending",
-        orderStatus: "pending_payment",
+        paymentStatus: "paid",
+        orderStatus: "processing",
         internalNotes: [
           ...order.internalNotes,
-          "تم إنشاء دفعة معلقة. لا يتم اعتماد paid إلا من webhook الخادم.",
+          "تم اعتماد الدفع بمحاكاة داخلية للتجربة فقط.",
         ],
       });
       setLocation("/checkout/result");
@@ -42,9 +42,9 @@ export default function CheckoutPayment() {
   return (
     <main className="min-h-screen p-4 md:p-8" dir="rtl">
       <div className="mx-auto max-w-6xl space-y-6">
-        <PageHeader title="الدفع عبر Moyasar" description="الدفعة تُنشأ من الخادم بمبلغ الطلب النهائي. هذه الواجهة لا تعتمد الطلب كمدفوع." />
+        <PageHeader title="الدفع التجريبي" description="بوابة دفع محاكاة للتجربة: عند المتابعة يتم اعتماد الطلب كمدفوع والانتقال لنتيجة النجاح." />
         <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-          <PaymentGatewayPlaceholder processing={processing} failed={false} onPay={createPendingPayment} />
+          <PaymentGatewayPlaceholder processing={processing} failed={false} onPay={simulateSuccessfulPayment} />
           <Card className="rounded-2xl">
             <CardHeader><CardTitle>ملخص الدفع</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -53,7 +53,7 @@ export default function CheckoutPayment() {
               <SummaryRow label="دورة الفوترة" value={order.billingCycle === "monthly" ? "شهري" : "سنوي"} />
               <SummaryRow label="الإجمالي" value={commerceService.describeOrderAmount(order)} strong />
               <p className="rounded-xl border border-dashed p-3 text-xs leading-6 text-muted-foreground">
-                ملاحظة أمان: حتى لو رجع المستخدم من Moyasar بنجاح، يبقى الطلب بانتظار webhook موقّع من الخادم.
+                هذه محاكاة مؤقتة لا تجمع بيانات بطاقة. عند الربط الحقيقي يجب اعتماد الدفع من webhook الخادم.
               </p>
             </CardContent>
           </Card>

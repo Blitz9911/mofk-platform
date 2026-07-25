@@ -114,7 +114,7 @@ export function PlanCard({
             </div>
           )}
           <p className="mt-1 text-xs text-muted-foreground">
-            {plan.includesDevice ? "يشمل جهاز مفك OBD برسوم مرة واحدة" : "بدون جهاز"}
+            {plan.includesDevice ? `القطعة منفصلة: ${formatSar(plan.devicePriceSar)} ر.س مرة واحدة` : "بدون قطعة"}
           </p>
         </div>
       </CardHeader>
@@ -208,8 +208,8 @@ export function CheckoutSummary({ plan, cycle }: { plan: PlanConfig; cycle: Bill
       <CardContent className="space-y-3 text-sm">
         <SummaryRow label="الباقة" value={plan.nameAr} />
         <SummaryRow label="دورة الفوترة" value={cycle === "monthly" ? "شهري" : "سنوي"} />
-        <SummaryRow label="قيمة الاشتراك" value={`${formatSar(subscriptionAmount)} ر.س`} />
-        <SummaryRow label="الجهاز" value={plan.includesDevice ? `${formatSar(deviceAmount)} ر.س رسوم مرة واحدة` : "غير مطلوب"} />
+        <SummaryRow label="الاشتراك" value={`${formatSar(subscriptionAmount)} ر.س ${cycle === "annual" ? "/ سنة" : "/ شهر"}`} />
+        <SummaryRow label="القطعة" value={plan.includesDevice ? `${formatSar(deviceAmount)} ر.س مرة واحدة` : "غير مطلوبة"} />
         <SummaryRow label="الشحن" value="0 ر.س" />
         <SummaryRow label="ضريبة القيمة المضافة" value={`${formatSar(vat)} ر.س`} />
         <div className="border-t pt-3">
@@ -248,7 +248,7 @@ export function PaymentGatewayPlaceholder({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm leading-7 text-muted-foreground">
-          هذا موضع تكامل Moyasar القادم. لا يتم جمع بيانات بطاقة داخل مفك في هذه المحاكاة.
+          بوابة دفع محاكاة للتجربة. لا يتم جمع بيانات بطاقة داخل مفك، وسيتم اعتماد الطلب تجريبيًا بعد الضغط.
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
           {["مدى", "Visa / Mastercard", "Apple Pay"].map((method) => (
@@ -262,10 +262,10 @@ export function PaymentGatewayPlaceholder({
           </div>
         )}
         <Button className="h-11 w-full rounded-xl font-bold" onClick={onPay} disabled={processing}>
-          {processing ? "جارٍ إرسال الطلب للتحقق..." : "محاكاة انتقال آمن للدفع"}
+          {processing ? "جارٍ اعتماد الدفع التجريبي..." : "متابعة الدفع"}
         </Button>
         <p className="text-xs leading-6 text-muted-foreground">
-          TODO: تهيئة Moyasar، تأكيد webhook، والتحقق من الدفع في الخادم قبل تفعيل الطلب.
+          عند الربط الحقيقي: تهيئة Moyasar، تأكيد webhook، والتحقق من الدفع في الخادم قبل تفعيل الطلب.
         </p>
       </CardContent>
     </Card>
@@ -456,6 +456,8 @@ export function CustomerInformationForm({
 }
 
 type ShippingFormValue = {
+  shortAddress: string;
+  mapUrl: string;
   city: string;
   district: string;
   street: string;
@@ -476,6 +478,12 @@ export function ShippingAddressForm({
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
+      <FormField label="رقم العنوان المختصر" error={errors.shortAddress}>
+        <Input value={value.shortAddress} onChange={(event) => onChange({ ...value, shortAddress: event.target.value })} placeholder="مثال: RDBA1234" />
+      </FormField>
+      <FormField label="رابط موقع البيت على الخريطة" error={errors.mapUrl}>
+        <Input value={value.mapUrl} onChange={(event) => onChange({ ...value, mapUrl: event.target.value })} placeholder="https://maps.app.goo.gl/..." />
+      </FormField>
       <FormField label="المدينة" error={errors.city}><Input value={value.city} onChange={(event) => onChange({ ...value, city: event.target.value })} /></FormField>
       <FormField label="الحي" error={errors.district}><Input value={value.district} onChange={(event) => onChange({ ...value, district: event.target.value })} /></FormField>
       <FormField label="الشارع" error={errors.street}><Input value={value.street} onChange={(event) => onChange({ ...value, street: event.target.value })} /></FormField>
