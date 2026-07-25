@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { Href, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -112,8 +112,7 @@ export default function PairDeviceScreen() {
               return;
             }
 
-            // TODO: Replace this Phase 1 mock with Bluetooth OBD-II pairing logic.
-            setStatus("connecting");
+            router.push("/obd-connect" as Href);
           }}
           disabled={status === "connecting"}
         >
@@ -121,7 +120,7 @@ export default function PairDeviceScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.primaryText}>
-              {status === "success" ? "الانتقال إلى لوحة التحكم" : "تخطي (محاكاة النجاح)"}
+              {status === "success" ? "الانتقال إلى لوحة التحكم" : "بدء الربط بالبلوتوث"}
             </Text>
           )}
         </Pressable>

@@ -80,6 +80,7 @@ function RootLayoutNav() {
       <Stack.Screen name="verify" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="pair-device" options={{ headerShown: false }} />
+      <Stack.Screen name="obd-connect" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="vehicle/[id]" options={{ headerShown: false, presentation: "card" }} />
       <Stack.Screen name="add-vehicle" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="dtc" options={{ headerShown: false, presentation: "card" }} />
