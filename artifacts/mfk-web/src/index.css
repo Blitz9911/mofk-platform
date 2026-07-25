@@ -237,6 +237,7 @@
 @layer base {
   * {
     @apply border-border;
+    min-width: 0;
   }
 
   body {
@@ -244,9 +245,29 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
   /* Smooth theme transitions */
   html {
     transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 3px;
+  }
+
+  img,
+  svg,
+  canvas,
+  video {
+    max-width: 100%;
   }
 }
 

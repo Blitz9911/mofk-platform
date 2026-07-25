@@ -48,7 +48,11 @@ function base64Url(input: Buffer | string): string {
 }
 
 function tokenSecret(): string {
-  return process.env.JWT_SECRET || process.env.AUTH_TOKEN_SECRET || "mofk-dev-secret-change-me";
+  const secret = process.env.JWT_SECRET || process.env.AUTH_TOKEN_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET or AUTH_TOKEN_SECRET must be set in production.");
+  }
+  return secret || "mofk-dev-secret-change-me";
 }
 
 export function issueAuthToken(userId: string, role: "user" | "admin" | "fleet" = "user"): string {
@@ -89,7 +93,20 @@ function decodeSupabaseJwt(token: string): SupabaseJwtPayload | null {
   }
 }
 
-export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
+function demoAuthEnabled() {
+  return process.env.NODE_ENV !== "production" || process.env.ENABLE_DEMO_AUTH === "true";
+}
+
+function isPublicApiPath(path: string) {
+  return path === "/healthz" || path === "/auth/login" || path === "/auth/register";
+}
+
+export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (isPublicApiPath(req.path)) {
+    next();
+    return;
+  }
+
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) {
     const token = header.slice(7).trim();
@@ -100,7 +117,7 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
       next();
       return;
     }
-    if (token === DEMO_ADMIN_ID) {
+    if (demoAuthEnabled() && token === DEMO_ADMIN_ID) {
       req.userId = DEMO_ADMIN_ID;
       req.userRole = "admin";
       next();
@@ -113,16 +130,16 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
       next();
       return;
     }
-    if (token && token.length > 10) {
-      req.userId = token;
-      req.userRole = "user";
-      next();
-      return;
-    }
   }
-  req.userId = DEMO_USER_ID;
-  req.userRole = "user";
-  next();
+
+  if (demoAuthEnabled()) {
+    req.userId = DEMO_USER_ID;
+    req.userRole = "user";
+    next();
+    return;
+  }
+
+  res.status(401).json({ error: "Unauthorized" });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {

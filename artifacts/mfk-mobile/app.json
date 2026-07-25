@@ -3,7 +3,7 @@
     "name": "MFK",
     "slug": "mfk-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "mfk-mobile",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
       "backgroundColor": "#060e1c"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.mfk.diagnostics",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."

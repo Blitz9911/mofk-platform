@@ -104,13 +104,12 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
 /** GET /api/auth/me */
 router.get("/auth/me", async (req, res): Promise<void> => {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
+  if (!req.userId) {
     res.status(401).json({ error: "غير مخوّل" });
     return;
   }
 
-  const userId = header.slice(7).trim();
+  const userId = req.userId;
 
   if (userId === DEMO_USER_ID) {
     res.json({ token: issueAuthToken(DEMO_USER_ID, "user"), userId: DEMO_USER_ID, name: "مستخدم تجريبي", email: "demo@mfk.sa", phone: "+966501234567", role: "user" });
