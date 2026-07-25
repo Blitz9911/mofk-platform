@@ -74,7 +74,7 @@ function PlanAmount({ planId, cycle }: { planId: SubscriptionPlanId; cycle: Bill
 
   return (
     <>
-      <span className="text-3xl font-black">{formatSar(displayPrice)}</span>
+      <span className="text-2xl font-black sm:text-3xl">{formatSar(displayPrice)}</span>
       <span className="text-xs text-[#8A8A8A]">
         ر.س / شهر
         {cycle === "yearly" && plan.yearlyPrice ? `، تدفع ${formatSar(plan.yearlyPrice)} سنويًا وتوفر ${getYearlySavings(plan)}٪` : ""}
@@ -87,6 +87,37 @@ function CellValue({ value }: { value: string }) {
   if (value === "نعم") return <CheckCircle2 className="mx-auto h-5 w-5 text-[#2ECC71]" />;
   if (value === "لا") return <span className="text-[#5A5A5A]">-</span>;
   return <span>{value}</span>;
+}
+
+function MobileComparisonCards() {
+  return (
+    <div className="space-y-3 md:hidden">
+      {comparisonRows.map((row) =>
+        row.type === "section" ? (
+          <div key={row.label} className="rounded-[12px] bg-[#0B0B0B] px-3 py-2 text-sm font-black text-[#FF6A00]">
+            {row.label}
+          </div>
+        ) : (
+          <div key={row.label} className="rounded-[14px] border border-[#2A2A2A] bg-[#222] p-3">
+            <p className="mb-3 text-sm font-black">{row.label}</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                ["مجانية", row.free],
+                ["مفك", row.mofk],
+                ["العائلة", row.family],
+                ["الاسطول", row.fleet],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-[10px] bg-[#111] p-2">
+                  <p className="mb-1 text-[#8A8A8A]">{label}</p>
+                  <div className="font-bold text-white"><CellValue value={value} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
 }
 
 export default function Subscription() {
@@ -109,7 +140,7 @@ export default function Subscription() {
 
   return (
     <div className="dark -m-3 min-h-screen bg-[#0B0B0B] p-3 text-white sm:-m-4 sm:p-4 md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
-      <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-40 lg:pb-32">
+      <div className="mx-auto w-full max-w-[min(100%,1760px)] space-y-5 pb-64 sm:pb-56 xl:pb-32">
         <div className="rounded-[18px] border border-[#1F1F1F] bg-[#111]/80 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -194,7 +225,7 @@ export default function Subscription() {
                 onClick={() => setSelectedPlanId(plan.id)}
                 aria-pressed={selected}
                 className={cn(
-                  "flex min-h-[342px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  "flex min-h-[300px] flex-col rounded-[16px] border bg-[#1A1A1A] p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00] sm:min-h-[342px] sm:p-5",
                   selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                 )}
               >
@@ -256,7 +287,8 @@ export default function Subscription() {
             <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
             <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
           </div>
-          <div className="overflow-x-auto">
+          <MobileComparisonCards />
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[920px] text-sm">
               <thead>
                 <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
@@ -290,8 +322,8 @@ export default function Subscription() {
       </div>
 
       {selectedPlan.id !== "free" && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-3 pb-3 pt-8 sm:px-4 sm:pb-4 lg:right-[280px]">
-          <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 shadow-2xl sm:flex-row sm:items-center sm:justify-between">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] left-0 right-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-3 pb-3 pt-8 sm:px-4 sm:pb-4 xl:bottom-0 xl:right-[280px]">
+          <div className="mx-auto flex w-full max-w-[min(100%,1760px)] flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 shadow-2xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-[#8A8A8A]">الترقية المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>

@@ -62,9 +62,7 @@ function getTierLabel(tier?: string | null) {
     case "plus":
       return "مفك";
     case "premium":
-      return "احترافي";
     case "pro":
-      return "متقدم";
     case "family":
       return "العائلة";
     case "fleet":
@@ -129,6 +127,55 @@ export default function AdminVehicles() {
             ))}
           </div>
         ) : filteredVehicles.length > 0 ? (
+          <>
+          <div className="grid gap-3 p-3 md:hidden">
+            {filteredVehicles.map((vehicle) => {
+              const healthScore = vehicle.health_score ?? 100;
+              const owner = vehicle.users;
+
+              return (
+                <div key={vehicle.id} className="rounded-xl border bg-background p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">
+                        {vehicle.nickname || `${vehicle.make} ${vehicle.model}`}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {vehicle.year} - {vehicle.fuel_type || "petrol"}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={getHealthColor(healthScore)}>
+                      {healthScore}%
+                    </Badge>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">المالك</p>
+                      <p className="truncate font-medium">{owner?.name || "غير محدد"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">الباقة</p>
+                      <p className="font-medium">{getTierLabel(owner?.subscription_tier)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">اللوحة</p>
+                      <p className="font-medium">{vehicle.plate_number || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">الجهاز</p>
+                      <p className="font-medium">{vehicle.adapter_mac ? "مربوط" : "بانتظار OBD"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">التواصل</p>
+                      <p className="truncate font-medium" dir="ltr">{owner?.phone || owner?.email || "-"}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -205,6 +252,8 @@ export default function AdminVehicles() {
               })}
             </TableBody>
           </Table>
+          </div>
+          </>
         ) : (
           <div className="py-12">
             <EmptyState

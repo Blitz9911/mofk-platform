@@ -273,7 +273,7 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 min-w-[280px]">
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-auto xl:min-w-[280px]">
               <div className="rounded-2xl bg-white/15 border border-white/20 p-4 backdrop-blur">
                 <p className="text-xs text-white/70">المركبة النشطة</p>
                 <p className="text-lg font-black mt-1 truncate">
@@ -330,7 +330,7 @@ export default function Dashboard() {
                 <Card
                   key={vehicle.id}
                   className={cn(
-                    "w-[310px] cursor-pointer transition-all overflow-hidden",
+                    "w-[min(82vw,310px)] cursor-pointer transition-all overflow-hidden sm:w-[310px]",
                     selected
                       ? "border-primary ring-1 ring-primary shadow-md"
                       : "hover:border-primary/50",

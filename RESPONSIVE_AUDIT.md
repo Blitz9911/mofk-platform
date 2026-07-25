@@ -38,6 +38,11 @@ The following viewports must be verified manually or in CI with Playwright befor
 - Added media max-width guards for `img`, `svg`, `canvas`, and `video`.
 - Changed Expo orientation to `default`.
 - Enabled iOS tablet support in Expo.
+- Moved the web app sidebar from `lg` to `xl` so tablets and small laptops keep the compact navigation.
+- Added mobile comparison cards for pricing and in-app subscription pages instead of forcing users to scroll a wide comparison table.
+- Raised the in-app subscription fixed CTA above the mobile/tablet bottom navigation.
+- Made dashboard vehicle summary/cards shrink correctly at narrow widths.
+- Added mobile card rendering for admin vehicles while preserving the table on larger screens.
 
 ## Horizontal Overflow Status
 
@@ -47,10 +52,10 @@ Static CSS safeguards are now in place. Full confirmation still requires browser
 
 | Class | Status |
 | --- | --- |
-| Small phones | Needs browser verification |
-| Large phones | Needs browser verification |
-| Tablets / iPad | Improved, needs real device or simulator verification |
-| Laptop | Static layout appears supported |
+| Small phones | Improved for pricing, subscription, dashboard, and admin vehicles; needs browser verification |
+| Large phones | Improved for pricing, subscription, dashboard, and admin vehicles; needs browser verification |
+| Tablets / iPad | Improved shell behavior and Expo support; needs real device or simulator verification |
+| Laptop | Improved for small laptops by delaying fixed sidebar until `xl` |
 | Desktop | Static layout appears supported |
 | 2K / 4K | Needs visual verification for over-wide content density |
 | Smart TV | Focus-visible improved; arrow-key navigation still needs manual verification |

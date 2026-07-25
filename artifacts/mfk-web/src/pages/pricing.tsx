@@ -56,6 +56,37 @@ function CellValue({ value }: { value: string }) {
   return <span>{value}</span>;
 }
 
+function MobileComparisonCards() {
+  return (
+    <div className="space-y-3 md:hidden">
+      {comparisonRows.map((row) =>
+        row.type === "section" ? (
+          <div key={row.label} className="rounded-[12px] bg-[#0B0B0B] px-3 py-2 text-sm font-black text-[#FF6A00]">
+            {row.label}
+          </div>
+        ) : (
+          <div key={row.label} className="rounded-[14px] border border-[#2A2A2A] bg-[#222] p-3">
+            <p className="mb-3 text-sm font-black">{row.label}</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                ["مجانية", row.free],
+                ["مفك", row.mofk],
+                ["العائلة", row.family],
+                ["الاسطول", row.fleet],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-[10px] bg-[#111] p-2">
+                  <p className="mb-1 text-[#8A8A8A]">{label}</p>
+                  <div className="font-bold text-white"><CellValue value={value} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
 function authCheckoutHref(plan: "mofk" | "family") {
   const params = new URLSearchParams({ next: "/checkout/plan", plan });
   return `/auth?${params.toString()}`;
@@ -83,7 +114,7 @@ export default function Pricing() {
         <section className="mx-auto w-full max-w-7xl px-4 md:px-6">
           <div className="max-w-3xl space-y-6">
             <div className="space-y-4">
-              <h1 className="text-4xl font-black leading-tight tracking-normal md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
+              <h1 className="text-3xl font-black leading-tight tracking-normal sm:text-4xl md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
               <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
                 باقة مجانية للأساسيات، باقة مفك لمركبة واحدة، باقة العائلة لعدة مركبات، وباقة الاسطول للشركات عبر المبيعات.
               </p>
@@ -115,7 +146,7 @@ export default function Pricing() {
           </div>
         </section>
 
-        <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
+        <section className="mx-auto mt-10 w-full max-w-[min(100%,1760px)] px-4 md:px-6">
           {networkError && (
             <div className="mb-4 flex items-center gap-3 rounded-[16px] border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-100">
               <AlertCircle className="h-5 w-5" />
@@ -141,7 +172,7 @@ export default function Pricing() {
                     onClick={() => setSelectedPlanId(plan.id)}
                     aria-pressed={selected}
                     className={cn(
-                      "relative flex min-h-[410px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                      "relative flex min-h-[340px] flex-col rounded-[16px] border bg-[#1A1A1A] p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00] sm:min-h-[410px] sm:p-5",
                       selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                     )}
                   >
@@ -204,7 +235,8 @@ export default function Pricing() {
               <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
               <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
             </div>
-            <div className="overflow-x-auto">
+            <MobileComparisonCards />
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
