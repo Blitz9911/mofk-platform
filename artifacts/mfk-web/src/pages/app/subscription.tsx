@@ -108,9 +108,10 @@ export default function Subscription() {
   };
 
   return (
-    <div className="dark -m-4 min-h-screen bg-[#0B0B0B] p-4 text-white md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
-      <div className="mx-auto max-w-7xl space-y-6 pb-28">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="dark -m-3 min-h-screen bg-[#0B0B0B] p-3 text-white sm:-m-4 sm:p-4 md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
+      <div className="mx-auto w-full max-w-[1440px] space-y-5 pb-40 lg:pb-32">
+        <div className="rounded-[18px] border border-[#1F1F1F] bg-[#111]/80 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-bold text-[#FF6A00]">الاشتراك والباقات</p>
             <h1 className="mt-2 text-3xl font-black tracking-normal md:text-4xl">إدارة اشتراك موفك</h1>
@@ -143,8 +144,9 @@ export default function Subscription() {
             ))}
           </div>
         </div>
+        </div>
 
-        <section className={cn("rounded-[16px] border p-5", stateCopy[paymentState].tone)}>
+        <section className={cn("rounded-[16px] border px-5 py-4", stateCopy[paymentState].tone)}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
               <StatusIcon className="mt-0.5 h-5 w-5 shrink-0" />
@@ -157,30 +159,30 @@ export default function Subscription() {
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-4">
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
             <ShieldCheck className="h-5 w-5 text-[#FF6A00]" />
-            <p className="mt-4 text-sm text-[#8A8A8A]">الباقة الحالية</p>
-            <h2 className="mt-1 text-2xl font-black">{currentPlan.name}</h2>
+            <p className="mt-3 text-sm text-[#8A8A8A]">الباقة الحالية</p>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">{currentPlan.name}</h2>
           </div>
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
             <CalendarClock className="h-5 w-5 text-[#FF6A00]" />
-            <p className="mt-4 text-sm text-[#8A8A8A]">حالة التجربة</p>
-            <h2 className="mt-1 text-2xl font-black">٧ أيام متبقية</h2>
+            <p className="mt-3 text-sm text-[#8A8A8A]">حالة التجربة</p>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">٧ أيام متبقية</h2>
           </div>
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
             <ReceiptText className="h-5 w-5 text-[#FF6A00]" />
-            <p className="mt-4 text-sm text-[#8A8A8A]">الفوترة المختارة</p>
-            <h2 className="mt-1 text-2xl font-black">{billingCycle === "yearly" ? "سنوي" : "شهري"}</h2>
+            <p className="mt-3 text-sm text-[#8A8A8A]">الفوترة المختارة</p>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">{billingCycle === "yearly" ? "سنوي" : "شهري"}</h2>
           </div>
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
             <CreditCard className="h-5 w-5 text-[#FF6A00]" />
-            <p className="mt-4 text-sm text-[#8A8A8A]">الدفع</p>
-            <h2 className="mt-1 text-2xl font-black">جاهز للربط</h2>
+            <p className="mt-3 text-sm text-[#8A8A8A]">الدفع</p>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">جاهز للربط</h2>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
           {subscriptionPlans.map((plan) => {
             const selected = selectedPlanId === plan.id;
             const current = currentPlanId === plan.id;
@@ -192,7 +194,7 @@ export default function Subscription() {
                 onClick={() => setSelectedPlanId(plan.id)}
                 aria-pressed={selected}
                 className={cn(
-                  "flex min-h-[360px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  "flex min-h-[342px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
                   selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                 )}
               >
@@ -204,11 +206,11 @@ export default function Subscription() {
                   {plan.badge && <span className="rounded-full bg-[#FF6A00] px-2 py-1 text-xs font-black">الأكثر</span>}
                 </div>
 
-                <div className="mt-5 flex flex-col">
+                <div className="mt-5 flex min-h-[58px] flex-col">
                   <PlanAmount planId={plan.id} cycle={billingCycle} />
                 </div>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 space-y-2.5">
                   {plan.included.slice(0, 4).map((feature) => (
                     <div key={feature} className="flex items-start gap-2 text-sm leading-6">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
@@ -288,8 +290,8 @@ export default function Subscription() {
       </div>
 
       {selectedPlan.id !== "free" && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-4 pb-4 pt-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-3 pb-3 pt-8 sm:px-4 sm:pb-4 lg:right-[280px]">
+          <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 shadow-2xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-[#8A8A8A]">الترقية المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
