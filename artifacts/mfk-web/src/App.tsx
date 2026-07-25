@@ -61,7 +61,6 @@ import AdminRevenue from "@/pages/admin/revenue";
 import AdminOrders from "@/pages/admin/orders";
 import AdminOrderDetail from "@/pages/admin/order-detail";
 import AdminDevices from "@/pages/admin/devices";
-import AdminSubscriptions from "@/pages/admin/subscriptions";
 import AdminFleetAccounts from "@/pages/admin/fleet-accounts";
 import AdminReports from "@/pages/admin/reports";
 import AdminSettings from "@/pages/admin/settings";
@@ -147,7 +146,6 @@ function AdminRoutes() {
         <Route path="/admin/orders" component={AdminOrders} />
         <Route path="/admin/orders/:orderId" component={AdminOrderDetail} />
         <Route path="/admin/devices" component={AdminDevices} />
-        <Route path="/admin/subscriptions" component={AdminSubscriptions} />
         <Route path="/admin/fleet-accounts" component={AdminFleetAccounts} />
         <Route path="/admin/reports" component={AdminReports} />
         <Route path="/admin/settings" component={AdminSettings} />

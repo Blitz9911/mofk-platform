@@ -215,7 +215,6 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
     { href: "/admin/orders", label: "الطلبات", shortLabel: "الطلبات", icon: Package },
     { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
-    { href: "/admin/subscriptions", label: "الاشتراكات", shortLabel: "الاشتراكات", icon: CreditCard },
     { href: "/admin/fleet-accounts", label: "حسابات الأسطول", shortLabel: "الأسطول", icon: Building2 },
     { href: "/admin/reports", label: "التقارير", shortLabel: "التقارير", icon: BarChart3 },
     { href: "/admin/settings", label: "الإعدادات", shortLabel: "الإعدادات", icon: Settings },

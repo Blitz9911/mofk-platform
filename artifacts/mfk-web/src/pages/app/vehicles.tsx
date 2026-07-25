@@ -737,6 +737,15 @@ export default function Vehicles() {
   }>({ open: false, vehicleId: null });
   const [selectedMake, setSelectedMake] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [upgradeNotice, setUpgradeNotice] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+  });
 
   const form = useForm<z.infer<typeof createVehicleSchema>>({
     resolver: zodResolver(createVehicleSchema),
@@ -762,15 +771,14 @@ export default function Vehicles() {
 
   const requestCreateVehicle = () => {
     if (reachedVehicleLimit) {
-      toast({
+      setUpgradeNotice({
+        open: true,
         title: "يجب الترقية لإضافة مركبة أخرى",
         description:
           normalizedTier === "free"
             ? "الباقة المجانية تسمح بمركبة واحدة فقط. رقّ إلى باقة مفك أو العائلة."
             : "باقة مفك مخصصة لمركبة واحدة. رقّ إلى باقة العائلة لإضافة مركبات أكثر.",
-        variant: "destructive",
       });
-      setLocation("/app/subscription");
       return;
     }
 
@@ -897,6 +905,43 @@ export default function Vehicles() {
               : "أضف مركباتك وتحكم بها من مكان واحد"}
           </p>
         </div>
+
+        <Dialog
+          open={upgradeNotice.open}
+          onOpenChange={(open) =>
+            setUpgradeNotice((current) => ({ ...current, open }))
+          }
+        >
+          <DialogContent className="sm:max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle>{upgradeNotice.title}</DialogTitle>
+              <DialogDescription className="leading-7">
+                {upgradeNotice.description}
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setUpgradeNotice((current) => ({ ...current, open: false }))
+                }
+              >
+                إغلاق
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setUpgradeNotice((current) => ({ ...current, open: false }));
+                  setLocation("/app/subscription");
+                }}
+              >
+                عرض الباقات
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog
           open={createOpen}

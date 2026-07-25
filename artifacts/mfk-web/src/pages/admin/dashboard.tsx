@@ -36,7 +36,6 @@ import {
   OrderStatusBadge,
   PageHeader,
   PaymentBadge,
-  SubscriptionStatusBadge,
 } from "@/components/commerce/commerce-components";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -295,8 +294,8 @@ export default function AdminDashboard() {
           <CardContent className="grid gap-3 sm:grid-cols-2">
             <QuickLink href="/admin/orders" icon={Package} title="الطلبات" subtitle="الدفع، الشحن، التفعيل" />
             <QuickLink href="/admin/devices" icon={Smartphone} title="الأجهزة" subtitle="المخزون والربط" />
-            <QuickLink href="/admin/subscriptions" icon={CreditCard} title="الاشتراكات" subtitle="الحالة والتجديد" />
             <QuickLink href="/admin/fleet-accounts" icon={Building2} title="الأسطول" subtitle="طلبات الشركات" />
+            <QuickLink href="/admin/revenue" icon={CreditCard} title="المالية" subtitle="الإيراد والتحصيل" />
           </CardContent>
         </Card>
       </div>
@@ -378,18 +377,26 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>الاشتراكات</CardTitle>
+            <CardTitle>آخر التحصيل</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {subscriptions.slice(0, 6).map((sub) => (
-              <div key={sub.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+            {paidOrders.slice(0, 6).map((order) => (
+              <div key={order.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
                 <div>
-                  <div className="font-bold">{sub.customer}</div>
-                  <div className="text-xs text-muted-foreground">{getPlanById(sub.planId)?.nameAr ?? sub.planId}</div>
+                  <div className="font-bold">{order.customer.fullName}</div>
+                  <div className="text-xs text-muted-foreground">{getPlanById(order.planId)?.nameAr ?? order.planId}</div>
                 </div>
-                <SubscriptionStatusBadge status={sub.status} />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold">{formatSar(order.totalSar)}</span>
+                  <PaymentBadge status={order.paymentStatus} />
+                </div>
               </div>
             ))}
+            {!paidOrders.length && (
+              <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                لا توجد طلبات مدفوعة حتى الآن.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
