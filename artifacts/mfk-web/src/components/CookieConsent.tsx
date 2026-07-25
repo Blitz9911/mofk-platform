@@ -64,8 +64,8 @@ export function CookieConsent() {
           <div className="space-y-1">
             <h2 className="text-base font-bold">موافقة الكوكيز</h2>
             <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-              نستخدم الكوكيز الضرورية لتشغيل الحساب والجلسة، وقد نستخدم كوكيز
-              تحسين التجربة بعد موافقتك. يمكنك متابعة التفاصيل في{" "}
+              نستخدم الكوكيز لتشغيل الحساب والجلسة، وقد نستخدم كوكيز تحسين
+              التجربة بعد موافقتك. يمكنك متابعة التفاصيل في{" "}
               <Link href="/privacy" className="font-semibold text-primary underline-offset-4 hover:underline">
                 سياسة الخصوصية
               </Link>
@@ -76,7 +76,7 @@ export function CookieConsent() {
 
         <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
           <Button variant="outline" onClick={() => saveConsent("rejected")}>
-            الضروري فقط
+            رفض
           </Button>
           <Button onClick={() => saveConsent("accepted")}>أوافق</Button>
         </div>
