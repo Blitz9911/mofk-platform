@@ -13,7 +13,6 @@ export interface DashboardOverview {
   upcomingMaintenanceCount: number;
   overdueMaintenanceCount?: number;
   avgHealthScore: number;
-  upcomingBookingCount?: number;
   totalSessionsLast30d?: number;
   kmDrivenLast30d?: number;
   estimatedSavingsSar?: number;

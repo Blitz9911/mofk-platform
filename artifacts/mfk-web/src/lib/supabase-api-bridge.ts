@@ -57,6 +57,8 @@ type UserRow = {
   email?: string | null;
   phone: string;
   role?: string | null;
+  subscription_tier?: string | null;
+  is_active?: boolean | null;
 };
 
 type NotificationRow = {
@@ -170,6 +172,64 @@ async function listVehicleRows(accessToken: string) {
     { method: "GET" },
     accessToken,
   );
+}
+
+async function getCurrentUserAccess(userId: string, accessToken: string) {
+  const rows = await supabaseRequest<UserRow[]>(
+    `/rest/v1/users?select=id,role,subscription_tier,is_active&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    { method: "GET" },
+    accessToken,
+  );
+
+  return rows[0] ?? null;
+}
+
+function vehicleLimitForTier(tier?: string | null) {
+  switch (tier) {
+    case "fleet":
+      return null;
+    case "family":
+    case "premium":
+    case "pro":
+      return 3;
+    case "plus":
+    case "mofk":
+    case "free":
+    default:
+      return 1;
+  }
+}
+
+function upgradeRequiredMessage(tier?: string | null, limit = 1) {
+  const currentPlan =
+    tier === "plus" || tier === "mofk"
+      ? "باقة مفك"
+      : tier === "free"
+        ? "الباقة المجانية"
+        : "باقتك الحالية";
+
+  return `لا يمكن إضافة مركبة جديدة. ${currentPlan} تسمح بـ ${limit} مركبة فقط، وتحتاج ترقية الباقة لإضافة مركبة أخرى.`;
+}
+
+async function assertCanCreateVehicle(session: Awaited<ReturnType<typeof requireSession>>) {
+  const access = await getCurrentUserAccess(session.user.id, session.access_token);
+
+  if (access?.is_active === false) {
+    throw new ApiBridgeError("حسابك غير نشط حالياً. تواصل مع الدعم.", 403);
+  }
+
+  if (access?.role === "admin") return;
+
+  const limit = vehicleLimitForTier(access?.subscription_tier);
+  if (limit === null) return;
+
+  const rows = await listVehicleRows(session.access_token);
+  if (rows.length >= limit) {
+    throw new ApiBridgeError(
+      upgradeRequiredMessage(access?.subscription_tier, limit),
+      403,
+    );
+  }
 }
 
 async function getVehicleRow(vehicleId: string, accessToken: string) {
@@ -606,7 +666,7 @@ function toAiRecommendation(item: any) {
           ? 85
           : 70,
     suggestedAction: isOverdue
-      ? `احجز أو سجل ${label} الآن.`
+      ? `سجل ${label} الآن.`
       : isUpcoming
         ? `خطط لتنفيذ ${label} قريبًا.`
         : `تابع ${label} حسب العداد أو التاريخ القادم.`,
@@ -1071,6 +1131,8 @@ async function handleVehicles(
         throw new ApiBridgeError("بيانات المركبة ناقصة.", 400);
       }
 
+      await assertCanCreateVehicle(session);
+
       const rows = await supabaseRequest<VehicleRow[]>(
         "/rest/v1/vehicles?select=*",
         {
@@ -1197,7 +1259,6 @@ async function handleDashboard(path: string): Promise<ApiBridgeResult> {
         completedMaintenanceCount: completedMaintenance.length,
         activeRecommendationsCount: maintenanceRecommendations.length,
         avgHealthScore,
-        upcomingBookingCount: 0,
         totalSessionsLast30d: 0,
         kmDrivenLast30d: 0,
         estimatedSavingsSar: 0,
@@ -1559,15 +1620,6 @@ async function handleRequest(
     return { handled: true, data: [] };
   }
 
-  if (path === "/api/workshops" && method === "GET") {
-    return { handled: true, data: [] };
-  }
-
-  if (path === "/api/bookings" && method === "GET") {
-    await requireSession();
-    return { handled: true, data: [] };
-  }
-
  if (path === "/api/ai/chat" && method === "POST") {
   const session = await requireSession();
   const body = await readJsonBody(input, init);
@@ -1685,7 +1737,7 @@ async function handleRequest(
         "تجنب القيادة القوية",
         "افحص زيت القير إذا كان مسموح حسب نوع السيارة",
         "اقرأ أكواد القير التفصيلية بجهاز يدعم TCM",
-        "إذا فيه نتعة قوية أو تأخير تعشيق، راجع ورشة متخصصة",
+        "إذا فيه نتعة قوية أو تأخير تعشيق، راجع فني قير متخصص",
       ],
     },
   };
@@ -1828,7 +1880,7 @@ async function handleRequest(
       "- شرح أكواد الأعطال مثل P0300 و P0420 و P0171",
       "- تحليل البنزين والصرفية",
       "- متابعة الصيانة القادمة",
-      "- إعطاء خطوات فحص أولية قبل الورشة",
+      "- إعطاء خطوات فحص أولية قبل مراجعة فني مختص",
       "",
       vehicle
         ? `أنت الآن تسأل عن **${vehicleName}**.`
@@ -1861,6 +1913,8 @@ function toProfile(row: UserRow) {
     email: row.email ?? undefined,
     phone: row.phone,
     role: row.role || "user",
+    subscriptionTier: row.subscription_tier || "free",
+    isActive: row.is_active ?? true,
   };
 }
 
@@ -1876,7 +1930,7 @@ async function handleProfile(
 
   if (method === "GET") {
     const rows = await supabaseRequest<UserRow[]>(
-      `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(session.user.id)}&limit=1`,
+      `/rest/v1/users?select=id,name,email,phone,role,subscription_tier,is_active&id=eq.${encodeURIComponent(session.user.id)}&limit=1`,
       { method: "GET" },
       session.access_token,
     );
@@ -1900,7 +1954,7 @@ async function handleProfile(
     if (!phone) throw new ApiBridgeError("رقم الجوال مطلوب.", 400);
 
     const rows = await supabaseRequest<UserRow[]>(
-      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role`,
+      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role,subscription_tier,is_active`,
       {
         method: "PATCH",
         headers: {

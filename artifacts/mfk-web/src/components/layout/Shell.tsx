@@ -7,7 +7,6 @@ import {
   Car,
   Activity,
   Wrench,
-  MapPin,
   Calendar,
   MessageSquare,
   Lightbulb,
@@ -26,6 +25,11 @@ import {
   Zap,
   Fuel,
   MoreHorizontal,
+  Package,
+  Smartphone,
+  Building2,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MfkLogo } from "@/components/MfkLogo";
@@ -209,9 +213,11 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin", label: "نظرة عامة", shortLabel: "الرئيسية", icon: LayoutDashboard },
     { href: "/admin/users", label: "المستخدمين", shortLabel: "المستخدمين", icon: Users },
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
-    { href: "/admin/diagnostics", label: "التشخيص الحي", shortLabel: "التشخيص", icon: Activity },
-    { href: "/admin/issues", label: "الأعطال الشائعة", shortLabel: "الأعطال", icon: ShieldAlert },
-    { href: "/admin/workshops", label: "الورش والعوائد", shortLabel: "الورش", icon: MapPin },
+    { href: "/admin/orders", label: "الطلبات", shortLabel: "الطلبات", icon: Package },
+    { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
+    { href: "/admin/fleet-accounts", label: "حسابات الأسطول", shortLabel: "الأسطول", icon: Building2 },
+    { href: "/admin/reports", label: "التقارير", shortLabel: "التقارير", icon: BarChart3 },
+    { href: "/admin/settings", label: "الإعدادات", shortLabel: "الإعدادات", icon: Settings },
     { href: "/admin/revenue", label: "المالية", shortLabel: "المالية", icon: CreditCard },
   ];
 

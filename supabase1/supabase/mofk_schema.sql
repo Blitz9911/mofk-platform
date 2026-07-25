@@ -73,27 +73,69 @@ create table if not exists public.activity (
 
 create index if not exists idx_activity_user on public.activity(user_id, occurred_at);
 
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on delete cascade,
+  plan text default 'free',
+  status text default 'active',
+  started_at timestamptz default now(),
+  ends_at timestamptz
+);
+
+create index if not exists idx_subscriptions_user on public.subscriptions(user_id);
+
 create or replace function public.handle_new_auth_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  profile_name text;
+  profile_phone text;
 begin
+  profile_name := coalesce(
+    nullif(new.raw_user_meta_data->>'name', ''),
+    nullif(new.raw_user_meta_data->>'full_name', ''),
+    split_part(new.email, '@', 1),
+    'مستخدم مفك'
+  );
+
+  profile_phone := coalesce(
+    nullif(new.raw_user_meta_data->>'phone', ''),
+    concat('user-', substring(new.id::text, 1, 12))
+  );
+
+  if exists (
+    select 1 from public.users
+    where phone = profile_phone and id <> new.id
+  ) then
+    profile_phone := concat('user-', substring(new.id::text, 1, 12));
+  end if;
+
   insert into public.users (id, name, phone, email)
-  values (
-    new.id,
-    coalesce(nullif(new.raw_user_meta_data->>'name', ''), nullif(new.raw_user_meta_data->>'full_name', ''), split_part(new.email, '@', 1), 'مستخدم مفك'),
-    coalesce(nullif(new.raw_user_meta_data->>'phone', ''), concat('user-', substring(new.id::text, 1, 12))),
-    new.email
-  )
+  values (new.id, profile_name, profile_phone, new.email)
   on conflict (id) do update
   set
     name = excluded.name,
-    phone = excluded.phone,
+    phone = case
+      when exists (
+        select 1 from public.users u
+        where u.phone = excluded.phone and u.id <> public.users.id
+      ) then public.users.phone
+      else excluded.phone
+    end,
     email = excluded.email;
 
   return new;
+  exception
+    when unique_violation then
+      insert into public.users (id, name, phone, email)
+      values (new.id, profile_name, concat('user-', substring(new.id::text, 1, 12)), new.email)
+      on conflict (id) do update
+      set name = excluded.name,
+          email = excluded.email;
+      return new;
 end;
 $$;
 
@@ -107,6 +149,49 @@ alter table public.users enable row level security;
 alter table public.vehicles enable row level security;
 alter table public.fuel_logs enable row level security;
 alter table public.activity enable row level security;
+alter table public.subscriptions enable row level security;
+
+create or replace function public.current_user_is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1
+    from public.users u
+    where u.id = (select auth.uid())
+      and u.role = 'admin'
+      and u.is_active is true
+  );
+$$;
+
+revoke all on function public.current_user_is_admin() from public;
+grant execute on function public.current_user_is_admin() to authenticated;
+revoke execute on function public.current_user_is_admin() from anon;
+
+create or replace function public.plan_vehicle_limit(plan text)
+returns integer
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select case coalesce(plan, 'free')
+    when 'free' then 1
+    when 'mofk' then 1
+    when 'plus' then 1
+    when 'premium' then 3
+    when 'pro' then 3
+    when 'family' then 5
+    when 'fleet' then null
+    else 1
+  end;
+$$;
+
+revoke all on function public.plan_vehicle_limit(text) from public;
+grant execute on function public.plan_vehicle_limit(text) to authenticated;
+revoke execute on function public.plan_vehicle_limit(text) from anon;
 
 drop policy if exists "Users can read own profile" on public.users;
 create policy "Users can read own profile"
@@ -124,11 +209,163 @@ on public.users for update
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
+drop policy if exists "Admins can read all profiles" on public.users;
+create policy "Admins can read all profiles"
+on public.users for select
+to authenticated
+using (public.current_user_is_admin());
+
+drop policy if exists "Admins can update all profiles" on public.users;
+create policy "Admins can update all profiles"
+on public.users for update
+to authenticated
+using (public.current_user_is_admin())
+with check (public.current_user_is_admin());
+
+revoke update on public.users from anon, authenticated;
+grant update (name, phone, email, city, language, last_active_at) on public.users to authenticated;
+
+create or replace function public.enforce_vehicle_plan_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  owner_role text;
+  owner_tier text;
+  allowed_count integer;
+  existing_count integer;
+  plan_label text;
+begin
+  select u.role, u.subscription_tier
+    into owner_role, owner_tier
+  from public.users u
+  where u.id = new.user_id;
+
+  if owner_role is null then
+    raise exception 'لم يتم العثور على مالك المركبة.' using errcode = '23503';
+  end if;
+
+  if owner_role = 'admin' then
+    return new;
+  end if;
+
+  allowed_count := public.plan_vehicle_limit(owner_tier);
+
+  if allowed_count is null then
+    return new;
+  end if;
+
+  select count(*)
+    into existing_count
+  from public.vehicles v
+  where v.user_id = new.user_id;
+
+  if existing_count >= allowed_count then
+    plan_label := case coalesce(owner_tier, 'free')
+      when 'free' then 'الباقة المجانية'
+      when 'mofk' then 'باقة مفك'
+      when 'plus' then 'باقة مفك'
+      else 'باقتك الحالية'
+    end;
+
+    raise exception 'لا يمكن إضافة مركبة جديدة. % تسمح بـ % مركبة فقط، وتحتاج ترقية الباقة لإضافة مركبة أخرى.', plan_label, allowed_count using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.enforce_vehicle_plan_limit() from public;
+revoke execute on function public.enforce_vehicle_plan_limit() from anon, authenticated;
+
+drop trigger if exists enforce_vehicle_plan_limit_before_insert on public.vehicles;
+create trigger enforce_vehicle_plan_limit_before_insert
+before insert on public.vehicles
+for each row execute function public.enforce_vehicle_plan_limit();
+
+create or replace function public.admin_update_user_access(
+  target_user_id uuid,
+  new_role text default null,
+  new_subscription_tier text default null,
+  new_is_active boolean default null
+)
+returns table (
+  id uuid,
+  name varchar,
+  phone varchar,
+  email varchar,
+  role varchar,
+  subscription_tier varchar,
+  is_active boolean,
+  city varchar,
+  last_active_at timestamptz,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  clean_role text;
+  clean_tier text;
+begin
+  if not public.current_user_is_admin() then
+    raise exception 'صلاحية الأدمن مطلوبة.' using errcode = '42501';
+  end if;
+
+  clean_role := nullif(trim(coalesce(new_role, '')), '');
+  clean_tier := nullif(trim(coalesce(new_subscription_tier, '')), '');
+
+  if clean_role is not null and clean_role not in ('user', 'admin', 'fleet') then
+    raise exception 'قيمة الصلاحية غير صحيحة.' using errcode = '22023';
+  end if;
+
+  if clean_tier is not null and clean_tier not in ('free', 'mofk', 'plus', 'premium', 'pro', 'family', 'fleet') then
+    raise exception 'قيمة الباقة غير صحيحة.' using errcode = '22023';
+  end if;
+
+  return query
+  update public.users u
+  set
+    role = coalesce(clean_role, u.role),
+    subscription_tier = coalesce(clean_tier, u.subscription_tier),
+    is_active = coalesce(new_is_active, u.is_active),
+    subscription_started_at = case
+      when clean_tier is not null and clean_tier <> u.subscription_tier then now()
+      else u.subscription_started_at
+    end
+  where u.id = target_user_id
+  returning
+    u.id,
+    u.name,
+    u.phone,
+    u.email,
+    u.role,
+    u.subscription_tier,
+    u.is_active,
+    u.city,
+    u.last_active_at,
+    u.created_at;
+end;
+$$;
+
+revoke all on function public.admin_update_user_access(uuid, text, text, boolean) from public;
+grant execute on function public.admin_update_user_access(uuid, text, text, boolean) to authenticated;
+revoke execute on function public.admin_update_user_access(uuid, text, text, boolean) from anon;
+
 drop policy if exists "Users can manage own vehicles" on public.vehicles;
 create policy "Users can manage own vehicles"
 on public.vehicles for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
+
+drop policy if exists "Admins can read all vehicles" on public.vehicles;
+create policy "Admins can read all vehicles"
+on public.vehicles for select
+to authenticated
+using (public.current_user_is_admin());
 
 drop policy if exists "Users can manage own fuel logs" on public.fuel_logs;
 create policy "Users can manage own fuel logs"
@@ -142,3 +379,16 @@ on public.activity for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+drop policy if exists "Users can view their own subscription" on public.subscriptions;
+create policy "Users can view their own subscription"
+on public.subscriptions for select
+using (auth.uid() = user_id);
+
+drop policy if exists "Admins can read all subscriptions" on public.subscriptions;
+create policy "Admins can read all subscriptions"
+on public.subscriptions for select
+to authenticated
+using (public.current_user_is_admin());
+
+grant select on public.vehicles to authenticated;
+grant select on public.subscriptions to authenticated;
