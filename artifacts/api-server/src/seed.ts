@@ -7,8 +7,6 @@ import {
   dtcCodesTable,
   telemetryTable,
   maintenanceTable,
-  workshopsTable,
-  bookingsTable,
   recommendationsTable,
   healthHistoryTable,
   subscriptionPlansTable,
@@ -24,8 +22,6 @@ async function clearAll() {
     subscription_plans,
     health_history,
     recommendations,
-    bookings,
-    workshops,
     maintenance_schedule,
     telemetry,
     dtc_codes,
@@ -200,162 +196,6 @@ const dtcCatalog: {
   },
 ];
 
-const workshopSeeds: Array<{
-  name: string;
-  nameAr: string;
-  city: string;
-  rating: number;
-  reviewsCount: number;
-  services: string[];
-  servicesAr: string[];
-  isVerified: boolean;
-  priceLevel: "budget" | "standard" | "premium";
-  descriptionAr: string;
-  openingHours: string;
-  commissionPct: number;
-}> = [
-  {
-    name: "Saudi Auto Care - Riyadh",
-    nameAr: "العناية السعودية للسيارات - الرياض",
-    city: "الرياض",
-    rating: 4.8,
-    reviewsCount: 1240,
-    services: ["oil_change", "diagnostic_scan", "brake_service", "ac_service", "full_inspection"],
-    servicesAr: ["تغيير زيت", "فحص أعطال", "صيانة مكابح", "صيانة مكيف", "فحص شامل"],
-    isVerified: true,
-    priceLevel: "premium",
-    descriptionAr: "مركز خدمة متكامل ومعتمد، فنيون مدربون على أحدث الأنظمة الذكية. ضمان حقيقي على كل خدمة.",
-    openingHours: "السبت-الخميس: 7ص-11م، الجمعة: 4م-11م",
-    commissionPct: 12,
-  },
-  {
-    name: "Premium Garage Riyadh",
-    nameAr: "كراج بريميوم الرياض",
-    city: "الرياض",
-    rating: 4.9,
-    reviewsCount: 856,
-    services: ["full_inspection", "diagnostic_scan", "brake_service"],
-    servicesAr: ["فحص شامل", "فحص أعطال", "صيانة مكابح"],
-    isVerified: true,
-    priceLevel: "premium",
-    descriptionAr: "متخصصون في السيارات الحديثة. أجهزة فحص أصلية وقطع غيار معتمدة من الوكالة.",
-    openingHours: "السبت-الخميس: 8ص-10م",
-    commissionPct: 15,
-  },
-  {
-    name: "Al-Mahmal Auto Service",
-    nameAr: "خدمة المحمل للسيارات",
-    city: "الرياض",
-    rating: 4.5,
-    reviewsCount: 420,
-    services: ["oil_change", "tire_rotation", "battery_check", "general"],
-    servicesAr: ["تغيير زيت", "تدوير إطارات", "فحص بطارية", "صيانة عامة"],
-    isVerified: true,
-    priceLevel: "standard",
-    descriptionAr: "أسعار تنافسية وخدمة سريعة. تعامل مباشر بدون وسطاء.",
-    openingHours: "يومياً: 7ص-12ص",
-    commissionPct: 10,
-  },
-  {
-    name: "Jeddah Premier Motors",
-    nameAr: "موتورز جدة الأول",
-    city: "جدة",
-    rating: 4.7,
-    reviewsCount: 980,
-    services: ["full_inspection", "diagnostic_scan", "ac_service", "brake_service"],
-    servicesAr: ["فحص شامل", "فحص أعطال", "صيانة مكيف", "صيانة مكابح"],
-    isVerified: true,
-    priceLevel: "premium",
-    descriptionAr: "خبرة 20 عاماً في خدمة سيارات الفخامة. صالة انتظار مريحة وقهوة مجانية.",
-    openingHours: "السبت-الخميس: 7:30ص-11م، الجمعة: مغلق",
-    commissionPct: 13,
-  },
-  {
-    name: "Red Sea Auto Workshop",
-    nameAr: "ورشة البحر الأحمر للسيارات",
-    city: "جدة",
-    rating: 4.4,
-    reviewsCount: 312,
-    services: ["oil_change", "general", "tire_rotation"],
-    servicesAr: ["تغيير زيت", "صيانة عامة", "تدوير إطارات"],
-    isVerified: false,
-    priceLevel: "budget",
-    descriptionAr: "حلول اقتصادية لكل ميزانية. خدمة سريعة لتغيير الزيت في 30 دقيقة.",
-    openingHours: "يومياً: 6ص-1ص",
-    commissionPct: 8,
-  },
-  {
-    name: "Dammam Auto Hub",
-    nameAr: "مركز الدمام للسيارات",
-    city: "الدمام",
-    rating: 4.6,
-    reviewsCount: 670,
-    services: ["full_inspection", "diagnostic_scan", "ac_service"],
-    servicesAr: ["فحص شامل", "فحص أعطال", "صيانة مكيف"],
-    isVerified: true,
-    priceLevel: "standard",
-    descriptionAr: "أكبر مركز خدمة في المنطقة الشرقية، معتمد من شركات التأمين الكبرى.",
-    openingHours: "السبت-الخميس: 7ص-11م",
-    commissionPct: 11,
-  },
-  {
-    name: "Eastern Province Motors",
-    nameAr: "المنطقة الشرقية موتورز",
-    city: "الخبر",
-    rating: 4.5,
-    reviewsCount: 380,
-    services: ["oil_change", "diagnostic_scan", "battery_check", "brake_service"],
-    servicesAr: ["تغيير زيت", "فحص أعطال", "فحص بطارية", "صيانة مكابح"],
-    isVerified: true,
-    priceLevel: "standard",
-    descriptionAr: "موقع مركزي في الكورنيش، خدمة سيارات بدائل أثناء الصيانة.",
-    openingHours: "يومياً: 8ص-12ص",
-    commissionPct: 10,
-  },
-  {
-    name: "Makkah Express Service",
-    nameAr: "خدمة مكة السريعة",
-    city: "مكة المكرمة",
-    rating: 4.3,
-    reviewsCount: 245,
-    services: ["oil_change", "tire_rotation", "general"],
-    servicesAr: ["تغيير زيت", "تدوير إطارات", "صيانة عامة"],
-    isVerified: false,
-    priceLevel: "budget",
-    descriptionAr: "خدمة سريعة في قلب مكة. مفتوح 24 ساعة في موسم الحج والعمرة.",
-    openingHours: "24 ساعة",
-    commissionPct: 8,
-  },
-  {
-    name: "Madinah Auto Plus",
-    nameAr: "المدينة أوتو بلس",
-    city: "المدينة المنورة",
-    rating: 4.6,
-    reviewsCount: 410,
-    services: ["full_inspection", "ac_service", "brake_service"],
-    servicesAr: ["فحص شامل", "صيانة مكيف", "صيانة مكابح"],
-    isVerified: true,
-    priceLevel: "standard",
-    descriptionAr: "ورشة موثوقة في المدينة المنورة، تتعامل مع جميع موديلات السيارات.",
-    openingHours: "السبت-الخميس: 8ص-10م",
-    commissionPct: 11,
-  },
-  {
-    name: "Taif Mountain Garage",
-    nameAr: "كراج جبال الطائف",
-    city: "الطائف",
-    rating: 4.4,
-    reviewsCount: 165,
-    services: ["oil_change", "general", "diagnostic_scan"],
-    servicesAr: ["تغيير زيت", "صيانة عامة", "فحص أعطال"],
-    isVerified: true,
-    priceLevel: "standard",
-    descriptionAr: "متخصصون في تجهيز السيارات للقيادة في المرتفعات والطرق الجبلية.",
-    openingHours: "السبت-الخميس: 8ص-9م",
-    commissionPct: 10,
-  },
-];
-
 const carCatalog = [
   { make: "Toyota", model: "Camry", year: 2022, fuelType: "petrol" as const, engineCc: 2500 },
   { make: "Toyota", model: "Land Cruiser", year: 2023, fuelType: "petrol" as const, engineCc: 4000 },
@@ -445,14 +285,14 @@ async function seed() {
       priceMonthlySar: 29,
       priceYearlySar: 290,
       tier: "premium",
-      features: ["Unlimited vehicles", "AI assistant", "Workshop booking"],
+      features: ["Unlimited vehicles", "AI assistant", "Excel export"],
       featuresAr: [
         "حتى 5 مركبات",
         "تشخيص متقدم وتفسير عربي مفصّل",
         "المساعد الذكي بالعربية",
         "توصيات صيانة استباقية",
         "تاريخ غير محدود",
-        "حجز مباشر مع الورش",
+
         "تقارير PDF شهرية",
         "دعم أولوية",
       ],
@@ -474,7 +314,7 @@ async function seed() {
         "تقارير مخصصة",
         "تكامل API",
         "مدير حساب مخصص",
-        "أسعار خاصة على الورش",
+
         "دعم فني 24/7",
       ],
       isPopular: false,
@@ -482,22 +322,6 @@ async function seed() {
     },
   ]);
 
-  console.log("[seed] inserting workshops...");
-  const workshopInserts = workshopSeeds.map((w) => {
-    const dist = pick(districts[w.city] ?? ["الوسط"]);
-    return {
-      ...w,
-      district: dist,
-      address: `${dist}, ${w.city}`,
-      addressAr: `${dist}، ${w.city}`,
-      phone: `+9665${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}${rand(0, 9)}`,
-      rating: w.rating.toString(),
-    };
-  });
-  const insertedWorkshops = await db
-    .insert(workshopsTable)
-    .values(workshopInserts)
-    .returning();
 
   console.log("[seed] inserting users...");
   const adminUser = {
@@ -827,7 +651,7 @@ async function seed() {
         descriptionAr:
           "بقي حوالي 600 كم على الموعد الموصى به لتغيير زيت المحرك بناءً على نمط قيادتك.",
         confidencePct: 95,
-        suggestedAction: "حجز تغيير زيت",
+        suggestedAction: "تسجيل تغيير زيت",
         suggestedCostSar: 280,
       },
     );
@@ -880,39 +704,6 @@ async function seed() {
     await db.insert(healthHistoryTable).values(healthInserts.slice(i, i + 500));
   }
 
-  console.log("[seed] inserting bookings...");
-  const bookingInserts: Array<typeof bookingsTable.$inferInsert> = [];
-  const services = ["oil_change", "diagnostic_scan", "brake_service", "ac_service", "full_inspection", "battery_check"];
-  for (const u of insertedUsers) {
-    if (u.id === DEMO_ADMIN_ID) continue;
-    const userVehicles = allVehicles.filter((v) => v.userId === u.id);
-    if (!userVehicles.length) continue;
-    const count = u.id === DEMO_USER_ID ? 5 : rand(0, 3);
-    for (let i = 0; i < count; i++) {
-      const w = pick(insertedWorkshops);
-      const v = pick(userVehicles);
-      const isPast = Math.random() > 0.5;
-      const scheduledAt = isPast
-        ? new Date(Date.now() - rand(1, 90) * 86400_000)
-        : new Date(Date.now() + rand(1, 30) * 86400_000);
-      const status = isPast
-        ? pick(["completed", "completed", "completed", "cancelled"] as const)
-        : pick(["pending", "confirmed", "confirmed", "in_progress"] as const);
-      const serviceType = pick(services);
-      bookingInserts.push({
-        userId: u.id,
-        vehicleId: v.id,
-        workshopId: w.id,
-        serviceType,
-        serviceTypeAr: arabicServiceType(serviceType),
-        scheduledAt,
-        status,
-        estimatedCost: rand(150, 800),
-        finalCost: status === "completed" ? rand(150, 850) : null,
-      });
-    }
-  }
-  if (bookingInserts.length) await db.insert(bookingsTable).values(bookingInserts);
 
   console.log("[seed] inserting activity feed...");
   const activityInserts: Array<typeof activityTable.$inferInsert> = [];
@@ -963,19 +754,6 @@ async function seed() {
       occurredAt: m.lastDoneAt ?? new Date(),
     });
   }
-  // some recent bookings
-  const demoBookings = await db.select().from(bookingsTable);
-  for (const b of demoBookings.filter((b) => b.userId === DEMO_USER_ID).slice(0, 3)) {
-    activityInserts.push({
-      userId: DEMO_USER_ID,
-      vehicleId: b.vehicleId,
-      kind: b.status === "completed" ? "booking_completed" : "booking_created",
-      titleAr: b.status === "completed" ? `اكتمل حجز ${b.serviceTypeAr}` : `حجز جديد لـ ${b.serviceTypeAr}`,
-      subtitleAr: null,
-      severity: b.status === "completed" ? "success" : "info",
-      occurredAt: b.createdAt ?? new Date(),
-    });
-  }
   await db.insert(activityTable).values(activityInserts);
 
   console.log("[seed] inserting revenue history...");
@@ -988,7 +766,7 @@ async function seed() {
     revenueInserts.push({
       month,
       subscriptionRevenue: 8500 + grow * 1200 + rand(-400, 600),
-      commissionRevenue: 2200 + grow * 350 + rand(-100, 250),
+      commissionRevenue: 0,
       newSubscribers: 24 + grow * 5 + rand(-3, 8),
     });
   }

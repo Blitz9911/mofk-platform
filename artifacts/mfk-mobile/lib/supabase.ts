@@ -37,6 +37,11 @@ type UserRow = {
   email?: string | null;
   phone: string;
   role?: string | null;
+  subscription_tier?: string | null;
+  subscription_started_at?: string | null;
+  subscription_ends_at?: string | null;
+  subscription_auto_renew?: boolean | null;
+  is_active?: boolean | null;
 };
 
 export interface AuthUser {
@@ -45,10 +50,15 @@ export interface AuthUser {
   email?: string;
   phone: string;
   role: string;
+  subscriptionTier: string;
+  subscriptionStartedAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  subscriptionAutoRenew?: boolean | null;
+  isActive?: boolean | null;
 }
 
 export function getSupabaseConfig() {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "");
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "").replace(/\/(?:rest|auth)\/v1$/, "");
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
@@ -61,6 +71,11 @@ export function getSupabaseConfig() {
     url,
     anonKey,
   };
+}
+
+function buildSupabaseUrl(baseUrl: string, path: string): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
 }
 
 function getErrorMessage(data: unknown, fallback: string): string {
@@ -106,7 +121,7 @@ export async function supabaseRequest<T>(
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(`${url}${path}`, {
+  const response = await fetch(buildSupabaseUrl(url, path), {
     ...options,
     headers,
   });
@@ -294,6 +309,11 @@ function toAuthUser(
     email: row?.email || user.email || undefined,
     phone: row?.phone || fallbackPhone(user),
     role: row?.role || "user",
+    subscriptionTier: row?.subscription_tier || "free",
+    subscriptionStartedAt: row?.subscription_started_at ?? null,
+    subscriptionEndsAt: row?.subscription_ends_at ?? null,
+    subscriptionAutoRenew: row?.subscription_auto_renew ?? true,
+    isActive: row?.is_active ?? true,
   };
 }
 
@@ -310,7 +330,7 @@ async function upsertUserRow(
   };
 
   const rows = await supabaseRequest<UserRow[]>(
-    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role",
+    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active",
     {
       method: "POST",
       headers: {
@@ -330,7 +350,7 @@ async function getUserRow(
   accessToken: string,
 ): Promise<UserRow | null> {
   const rows = await supabaseRequest<UserRow[]>(
-    `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(
+    `/rest/v1/users?select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(
       userId,
     )}&limit=1`,
     {
@@ -340,6 +360,44 @@ async function getUserRow(
   );
 
   return rows?.[0] ?? null;
+}
+
+async function getProfileRow(
+  user: SupabaseAuthUser,
+  accessToken: string,
+): Promise<UserRow | null> {
+  try {
+    return (
+      (await getUserRow(user.id, accessToken)) ??
+      (await upsertUserRow(user, accessToken))
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function touchLastActiveAt(
+  userId: string,
+  accessToken: string,
+): Promise<void> {
+  try {
+    await supabaseRequest(
+      `/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          last_active_at: new Date().toISOString(),
+        }),
+      },
+      accessToken,
+    );
+  } catch {
+    // Last activity should never block login.
+  }
 }
 
 export const authApi = {
@@ -381,10 +439,8 @@ export const authApi = {
 
     await saveSupabaseSession(session);
 
-    const row = await upsertUserRow(
-      session.user,
-      session.access_token,
-    );
+    const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
 
     return toAuthUser(session.user, row);
   },
@@ -417,10 +473,8 @@ export const authApi = {
 
     await saveSupabaseSession(session);
 
-    const row = await upsertUserRow(
-      session.user,
-      session.access_token,
-    );
+    const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
 
     return toAuthUser(session.user, row);
   },
@@ -441,15 +495,8 @@ export const authApi = {
         session.access_token,
       );
 
-      const row =
-        (await getUserRow(
-          authUser.id,
-          session.access_token,
-        )) ??
-        (await upsertUserRow(
-          authUser,
-          session.access_token,
-        ));
+      const row = await getProfileRow(authUser, session.access_token);
+      await touchLastActiveAt(authUser.id, session.access_token);
 
       return toAuthUser(authUser, row);
     } catch {

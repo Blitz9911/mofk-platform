@@ -193,11 +193,11 @@ router.post("/ai/interpret-dtc", async (req, res): Promise<void> => {
   res.json(
     InterpretDtcResponse.parse({
       code: body.data.code,
-      descriptionAr: "كود تشخيصي غير معروف، يُنصح بزيارة ورشة معتمدة للفحص.",
+      descriptionAr: "كود تشخيصي غير معروف، يُنصح بمراجعة فني مختص للفحص.",
       severity: "medium",
       causes: ["قد يحتاج إلى فحص إضافي بأداة احترافية"],
       action: "schedule_week",
-      actionReasonAr: "زر ورشة معتمدة خلال الأسبوع للفحص الكامل",
+      actionReasonAr: "راجع فني مختص خلال الأسبوع للفحص الكامل",
     }),
   );
 });

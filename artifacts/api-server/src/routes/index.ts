@@ -6,12 +6,11 @@ import vehiclesRouter from "./vehicles";
 import diagnosticsRouter from "./diagnostics";
 import dtcRouter from "./dtc";
 import maintenanceRouter from "./maintenance";
-import workshopsRouter from "./workshops";
-import bookingsRouter from "./bookings";
 import aiRouter from "./ai";
 import subscriptionsRouter from "./subscriptions";
 import adminRouter from "./admin";
 import fuelRouter from "./fuel";
+import commerceRouter from "./commerce";
 
 const router: IRouter = Router();
 
@@ -22,10 +21,9 @@ router.use(vehiclesRouter);
 router.use(diagnosticsRouter);
 router.use(dtcRouter);
 router.use(maintenanceRouter);
-router.use(workshopsRouter);
-router.use(bookingsRouter);
 router.use(aiRouter);
 router.use(subscriptionsRouter);
+router.use(commerceRouter);
 router.use(adminRouter);
 router.use(fuelRouter);
 
