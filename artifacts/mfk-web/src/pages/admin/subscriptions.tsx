@@ -103,13 +103,11 @@ function planLabel(plan?: string | null) {
     case "mofk":
       return "مفك";
     case "premium":
-      return "احترافي";
     case "pro":
-      return "متقدم";
     case "family":
       return "العائلة";
     case "fleet":
-      return "الأسطول";
+      return "الاسطول";
     default:
       return "مجاني";
   }

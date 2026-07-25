@@ -700,7 +700,14 @@ const createVehicleSchema = z.object({
   make: z.string().min(1, "مطلوب"),
   model: z.string().min(1, "مطلوب"),
   year: z.coerce.number().min(1990).max(new Date().getFullYear() + 1),
-  plateNumber: z.string().optional(),
+  plateNumber: z
+    .string()
+    .trim()
+    .min(1, "رقم اللوحة إجباري")
+    .refine((value) => {
+      const parsed = parsePlate(value);
+      return parsed.letters.every(Boolean) && parsed.digits.every(Boolean);
+    }, "أدخل ٣ أحرف و٤ أرقام للوحة"),
   odometerKm: z.coerce.number().optional(),
   fuelType: z.enum(["petrol", "diesel", "hybrid", "ev"]),
   vin: z.string().optional(),
@@ -1137,13 +1144,18 @@ export default function Vehicles() {
                   render={({ field }) => (
                     <div className="space-y-2">
                       <label className="text-sm font-medium leading-none">
-                        رقم اللوحة
+                        رقم اللوحة <span className="text-destructive">*</span>
                       </label>
 
                       <PlateInput
                         value={field.value || ""}
                         onChange={field.onChange}
                       />
+                      {form.formState.errors.plateNumber?.message && (
+                        <p className="text-sm font-medium text-destructive">
+                          {form.formState.errors.plateNumber.message}
+                        </p>
+                      )}
                     </div>
                   )}
                 />

@@ -52,7 +52,7 @@ type SupabaseAdminUser = {
 };
 
 type UserRole = "user" | "admin" | "fleet";
-type SubscriptionTier = "free" | "plus" | "premium" | "pro" | "family" | "fleet";
+type SubscriptionTier = "free" | "plus" | "family" | "fleet";
 
 const roleOptions: Array<{ value: UserRole; label: string; description: string }> = [
   { value: "user", label: "مستخدم", description: "صلاحيات التطبيق العادية" },
@@ -63,15 +63,30 @@ const roleOptions: Array<{ value: UserRole; label: string; description: string }
 const tierOptions: Array<{ value: SubscriptionTier; label: string; description: string }> = [
   { value: "free", label: "مجاني", description: "مركبة واحدة" },
   { value: "plus", label: "مفك", description: "مركبة واحدة" },
-  { value: "premium", label: "احترافي", description: "حتى 3 مركبات" },
-  { value: "pro", label: "متقدم", description: "حتى 3 مركبات" },
-  { value: "family", label: "العائلة", description: "حتى 5 مركبات" },
-  { value: "fleet", label: "الأسطول", description: "بدون حد عملي" },
+  { value: "family", label: "العائلة", description: "حتى 3 مركبات" },
+  { value: "fleet", label: "الاسطول", description: "بدون حد عملي" },
 ];
+
+function getTierLabel(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+      return "مفك";
+    case "premium":
+    case "pro":
+    case "family":
+      return "العائلة";
+    case "fleet":
+      return "الاسطول";
+    default:
+      return "مجاني";
+  }
+}
 
 function getTierColor(tier?: string | null) {
   switch (tier) {
     case "plus":
+    case "mofk":
     case "premium":
     case "pro":
     case "family":
@@ -80,23 +95,6 @@ function getTierColor(tier?: string | null) {
       return "bg-indigo-500 text-white";
     default:
       return "bg-muted text-muted-foreground";
-  }
-}
-
-function getTierLabel(tier?: string | null) {
-  switch (tier) {
-    case "plus":
-      return "مفك";
-    case "premium":
-      return "احترافي";
-    case "pro":
-      return "متقدم";
-    case "family":
-      return "العائلة";
-    case "fleet":
-      return "أسطول";
-    default:
-      return "مجاني";
   }
 }
 
@@ -335,8 +333,16 @@ function normalizeRole(role?: string | null): UserRole {
 }
 
 function normalizeTier(tier?: string | null): SubscriptionTier {
-  if (tier === "plus" || tier === "premium" || tier === "pro" || tier === "family" || tier === "fleet") {
-    return tier;
+  if (tier === "plus" || tier === "mofk") {
+    return "plus";
+  }
+
+  if (tier === "premium" || tier === "pro" || tier === "family") {
+    return "family";
+  }
+
+  if (tier === "fleet") {
+    return "fleet";
   }
 
   return "free";

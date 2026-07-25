@@ -1,4 +1,4 @@
-import { CreditCard, TrendingUp, Users } from "lucide-react";
+import { CreditCard, Package, ReceiptText, TrendingUp, Users } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty";
 import { fallbackRevenueData } from "@/data/adminMockData";
+import { getPlanById } from "@/config/plans";
+import { commerceService } from "@/services/mockCommerceService";
 
 export default function AdminRevenue() {
   const { data: apiRevenueData, isLoading, isError } = useGetRevenueBreakdown();
@@ -30,6 +32,13 @@ export default function AdminRevenue() {
   const totalRevenue = revenueData?.reduce((sum, item) => sum + item.subscriptionRevenue, 0) || 0;
   const avgMonthly = revenueData?.length ? totalRevenue / revenueData.length : 0;
   const totalNewSubscribers = revenueData?.reduce((sum, item) => sum + (item.newSubscribers || 0), 0) || 0;
+  const paidOrders = commerceService.getOrders().filter((order) => order.paymentStatus === "paid");
+  const paidOrdersRevenue = paidOrders.reduce((sum, order) => sum + order.totalSar, 0);
+  const deviceRevenue = paidOrders.reduce((sum, order) => {
+    const plan = getPlanById(order.planId);
+    return sum + (plan?.includesDevice ? plan.devicePriceSar * order.deviceQuantity : 0);
+  }, 0);
+  const combinedRevenue = totalRevenue + paidOrdersRevenue;
   
   let growthPct = 0;
   if (revenueData && revenueData.length >= 2) {
@@ -47,7 +56,7 @@ export default function AdminRevenue() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">المالية</h1>
-          <p className="text-muted-foreground">تحليل الإيرادات والنمو</p>
+          <p className="text-muted-foreground">تحليل الإيرادات، الاشتراكات، القطع، والتحصيل التجريبي</p>
         </div>
       </div>
 
@@ -60,7 +69,7 @@ export default function AdminRevenue() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الإيرادات (12 شهر)</CardTitle>
+            <CardTitle className="text-sm font-medium">إيرادات الاشتراكات (12 شهر)</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -72,6 +81,47 @@ export default function AdminRevenue() {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">تحصيل الطلبات التجريبي</CardTitle>
+            <ReceiptText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-bold">{formatSAR(paidOrdersRevenue)}</div>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">{paidOrders.length} طلب مدفوع بمحاكاة</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">إيرادات القطع</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-bold">{formatSAR(deviceRevenue)}</div>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">من الطلبات المدفوعة تجريبيًا</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">الإجمالي المالي</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-8 w-24" /> : (
+              <div className="text-2xl font-bold text-green-500">{formatSAR(combinedRevenue)}</div>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">اشتراكات API + طلبات محاكاة</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">متوسط الإيراد الشهري</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -81,29 +131,22 @@ export default function AdminRevenue() {
             )}
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">مشتركين جدد (12 شهر)</CardTitle>
+            <CardTitle className="text-sm font-medium">مشتركين جدد ومعدل النمو</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex items-end justify-between gap-4">
             {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className="text-2xl font-bold">{totalNewSubscribers}</div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">معدل النمو (عن الشهر السابق)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : (
-              <div className={`text-2xl font-bold ${growthPct >= 0 ? "text-green-500" : "text-red-500"}`}>
-                <span dir="ltr">{growthPct > 0 ? "+" : ""}{growthPct}%</span>
-              </div>
+              <>
+                <div>
+                  <div className="text-2xl font-bold">{totalNewSubscribers}</div>
+                  <p className="text-xs text-muted-foreground">مشترك جديد خلال 12 شهر</p>
+                </div>
+                <div className={`text-2xl font-bold ${growthPct >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  <span dir="ltr">{growthPct > 0 ? "+" : ""}{growthPct}%</span>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

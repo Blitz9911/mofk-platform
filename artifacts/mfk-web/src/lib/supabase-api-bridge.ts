@@ -189,7 +189,6 @@ function vehicleLimitForTier(tier?: string | null) {
     case "fleet":
       return null;
     case "family":
-      return 5;
     case "premium":
     case "pro":
       return 3;
