@@ -27,6 +27,45 @@ const TIER_LABELS: Record<string, string> = {
   fleet: "الأسطول",
 };
 
+function displayPlanShort(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+    case "basic":
+    case "individual-basic":
+      return "مفك";
+    case "family":
+    case "premium":
+    case "pro":
+    case "individual-advanced":
+      return "العائلة";
+    case "fleet":
+      return "الأسطول";
+    case "free":
+    default:
+      return "مجانية";
+  }
+}
+
+function displayPlanName(tier?: string | null) {
+  const shortName = displayPlanShort(tier);
+  if (shortName === "مجانية") return "باقة مجانية";
+  return `باقة ${shortName}`;
+}
+
+Object.assign(TIER_LABELS, {
+  free: "مجانية",
+  plus: "مفك",
+  mofk: "مفك",
+  basic: "مفك",
+  "individual-basic": "مفك",
+  premium: "العائلة",
+  pro: "العائلة",
+  family: "العائلة",
+  "individual-advanced": "العائلة",
+  fleet: "الأسطول",
+});
+
 function MenuItem({ icon, label, onPress, danger }: { icon: string; label: string; onPress: () => void; danger?: boolean }) {
   const colors = useColors();
   return (

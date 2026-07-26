@@ -270,7 +270,7 @@ function vehicleLimitForTier(tier?: string | null) {
     case "fleet":
       return null;
     case "family":
-      return 5;
+      return 3;
     case "premium":
     case "pro":
       return 3;
@@ -688,7 +688,8 @@ async function handleVehicles(
       if (
         !payload.make ||
         !payload.model ||
-        !payload.year
+        !payload.year ||
+        !payload.plate_number
       ) {
         throw new ApiBridgeError(
           "بيانات المركبة ناقصة.",

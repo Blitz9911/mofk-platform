@@ -271,6 +271,7 @@ export default function AddVehicleScreen() {
     if (!model.trim()) e.model = "مطلوب";
     if (!year || year < 1990 || year > CURRENT_YEAR + 1) e.year = `بين 1990 و ${CURRENT_YEAR + 1}`;
     if (!["petrol", "diesel", "hybrid", "ev"].includes(fuelType)) e.fuelType = "مطلوب";
+    if (!plateNumber.trim()) e.plateNumber = "مطلوب";
     if (odometerKm.trim() && (!/^\d+$/.test(odometerKm.trim()) || Number(odometerKm) < 0)) {
       e.odometerKm = "رقم غير صحيح";
     }
@@ -467,6 +468,7 @@ export default function AddVehicleScreen() {
           <View style={styles.row}>
             <Text style={[styles.label, { color: colors.foreground }]}>رقم اللوحة</Text>
             <PlateInput value={plateNumber} onChange={setPlateNumber} />
+            {errors.plateNumber ? <Text style={styles.errorText}>{errors.plateNumber}</Text> : null}
           </View>
 
           {/* Odometer + VIN */}

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useListVehicles } from "@workspace/api-client-react";
 import React, { useState } from "react";
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   Platform,
@@ -16,6 +17,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 
 function healthColor(score: number) {
   return score >= 80 ? "#22c55e" : score >= 60 ? "#f59e0b" : "#ef4444";
@@ -31,10 +33,43 @@ const FUEL_AR: Record<string, string> = {
   electric: "كهربائي",
 };
 
+function vehicleLimitForTier(tier?: string | null) {
+  switch (tier) {
+    case "fleet":
+      return null;
+    case "family":
+      return 3;
+    case "premium":
+    case "pro":
+      return 3;
+    case "plus":
+    case "mofk":
+    case "free":
+    default:
+      return 1;
+  }
+}
+
+function planLabel(tier?: string | null) {
+  switch (tier) {
+    case "family":
+      return "باقة العائلة";
+    case "fleet":
+      return "باقة الأسطول";
+    case "mofk":
+    case "plus":
+      return "باقة مفك";
+    case "free":
+    default:
+      return "الباقة المجانية";
+  }
+}
+
 export default function VehiclesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: vehicles, isLoading, refetch } = useListVehicles();
@@ -46,6 +81,24 @@ export default function VehiclesScreen() {
   };
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const vehicleLimit = vehicleLimitForTier(user?.subscriptionTier);
+  const isVehicleLimitReached = vehicleLimit !== null && (vehicles?.length ?? 0) >= vehicleLimit;
+
+  const handleAddVehicle = () => {
+    if (isVehicleLimitReached) {
+      Alert.alert(
+        "ترقية الباقة",
+        `${planLabel(user?.subscriptionTier)} تسمح بـ ${vehicleLimit} مركبة فقط. للمتابعة أضف ترقية من صفحة الاشتراك.`,
+        [
+          { text: "إلغاء", style: "cancel" },
+          { text: "عرض الباقات", onPress: () => router.push("/subscription" as any) },
+        ],
+      );
+      return;
+    }
+
+    router.push("/add-vehicle" as any);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
@@ -53,9 +106,9 @@ export default function VehiclesScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable
           style={[styles.addBtn, { backgroundColor: colors.primary }]}
-          onPress={() => router.push("/add-vehicle" as any)}
+          onPress={handleAddVehicle}
         >
-          <Ionicons name="add" size={20} color="#fff" />
+          <Ionicons name="add" size={20} color={colors.primaryForeground} />
           <Text style={styles.addBtnText}>إضافة مركبة</Text>
         </Pressable>
         <View style={styles.headerRight}>
@@ -79,8 +132,8 @@ export default function VehiclesScreen() {
           </View>
           <Text style={[styles.emptyTitle, { color: colors.foreground }]}>لا توجد مركبات</Text>
           <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>أضف مركبتك الأولى للبدء</Text>
-          <Pressable style={[styles.addBtn, { backgroundColor: colors.primary }]} onPress={() => router.push("/add-vehicle" as any)}>
-            <Ionicons name="add" size={18} color="#fff" />
+          <Pressable style={[styles.addBtn, { backgroundColor: colors.primary }]} onPress={handleAddVehicle}>
+            <Ionicons name="add" size={18} color={colors.primaryForeground} />
             <Text style={styles.addBtnText}>إضافة مركبة</Text>
           </Pressable>
         </View>
@@ -136,8 +189,8 @@ export default function VehiclesScreen() {
                         </View>
                       )}
                     </View>
-                    <View style={[styles.vehicleIconWrap, { backgroundColor: colors.accent }]}>
-                      <Ionicons name="car" size={28} color={colors.mutedForeground} />
+                    <View style={[styles.vehicleIconWrap, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
+                      <Ionicons name="car" size={28} color={colors.primary} />
                     </View>
                   </View>
 
@@ -211,26 +264,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "#080808",
   },
   headerRight: { alignItems: "flex-end", gap: 2 },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
   headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 },
-  addBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
+  addBtnText: { color: "#050505", fontSize: 13, fontFamily: "Inter_700Bold" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
   emptyIcon: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   emptyDesc: { fontSize: 14, fontFamily: "Inter_400Regular" },
   card: {
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    borderWidth: 1,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
   },
   cardTop: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
     padding: 16,
+    backgroundColor: "#111111",
   },
   scoreBox: {
     width: 90,
@@ -250,13 +309,14 @@ const styles = StyleSheet.create({
   vehicleSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
   plateBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   plateText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  vehicleIconWrap: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
+  vehicleIconWrap: { width: 52, height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   statsRow: {
     flexDirection: "row-reverse",
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingVertical: 12,
     paddingHorizontal: 16,
     justifyContent: "space-around",
+    backgroundColor: "#080808",
   },
   stat: { alignItems: "center", gap: 3 },
   statVal: { fontSize: 16, fontFamily: "Inter_700Bold" },

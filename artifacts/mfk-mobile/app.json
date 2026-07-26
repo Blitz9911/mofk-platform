@@ -21,10 +21,13 @@
       }
     },
     "android": {
+      "package": "com.mfk.diagnostics",
       "permissions": [
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN"
       ]
     },
     "web": {
@@ -38,6 +41,7 @@
         }
       ],
       "expo-font",
+      "expo-dev-client",
       "expo-web-browser",
       [
         "react-native-ble-plx",
@@ -51,6 +55,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "640f7d9f-6d0b-4f5b-8dba-babc7c5b8d48"
+      }
     }
   }
 }

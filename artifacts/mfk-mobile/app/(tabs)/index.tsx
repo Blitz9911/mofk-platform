@@ -147,6 +147,35 @@ export default function DashboardScreen() {
           </Pressable>
         )}
 
+        <Pressable
+          onPress={() => router.push("/(tabs)/diagnostics")}
+          style={[
+            styles.obdBanner,
+            {
+              backgroundColor: activeVehicle?.adapterMac ? "#00C48C14" : colors.card,
+              borderColor: activeVehicle?.adapterMac ? "#00C48C35" : colors.border,
+            },
+          ]}
+        >
+          <View style={styles.obdLeft}>
+            <Text style={[styles.obdProtocol, { color: activeVehicle?.adapterMac ? "#00C48C" : colors.primary }]}>
+              BLE 5.0
+            </Text>
+            <Ionicons name="chevron-back" size={16} color={colors.mutedForeground} />
+          </View>
+          <View style={styles.obdInfo}>
+            <Text style={[styles.obdTitle, { color: activeVehicle?.adapterMac ? "#00C48C" : colors.foreground }]}>
+              {activeVehicle?.adapterMac ? "مفك متصل" : "جهاز مفك غير متصل"}
+            </Text>
+            <Text style={[styles.obdSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {activeVehicle
+                ? activeVehicle.nickname || `${activeVehicle.make} ${activeVehicle.model}`
+                : "اضغط لبدء جلسة التشخيص"}
+            </Text>
+          </View>
+          <View style={[styles.obdDot, { backgroundColor: activeVehicle?.adapterMac ? "#00C48C" : colors.primary }]} />
+        </Pressable>
+
         {/* Vehicle Picker (horizontal scroll, web style) */}
         {vehicles && vehicles.length > 0 && (
           <ScrollView
@@ -350,6 +379,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "#080808",
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   logo: { height: 34, width: 90 },
@@ -358,7 +388,7 @@ const styles = StyleSheet.create({
   avatarText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
 
   greeting: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4, gap: 4 },
-  greetTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "right" },
+  greetTitle: { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "right" },
   greetDate: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right" },
 
   alertBanner: {
@@ -367,9 +397,33 @@ const styles = StyleSheet.create({
     borderRadius: 12, borderWidth: 1, justifyContent: "space-between",
   },
   alertText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flex: 1, textAlign: "right" },
+  obdBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  obdLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  obdProtocol: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  obdInfo: { flex: 1, alignItems: "flex-end", gap: 2 },
+  obdTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
+  obdSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
+  obdDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    shadowColor: "#00C48C",
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+  },
 
   vPickCard: {
-    width: 240, padding: 12, borderRadius: 14, flexDirection: "row-reverse",
+    width: 242, padding: 12, borderRadius: 16, flexDirection: "row-reverse",
     alignItems: "center", justifyContent: "space-between", gap: 10,
   },
   vPickInfo: { flex: 1, flexDirection: "row-reverse", alignItems: "center", gap: 10 },
@@ -389,7 +443,7 @@ const styles = StyleSheet.create({
   sectionSub: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1, textAlign: "left", marginLeft: 8 },
   seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
 
-  liveCard: { padding: 16, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+  liveCard: { padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
   liveOffline: { alignItems: "center", paddingVertical: 24, gap: 10 },
   liveOfflineText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   liveBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1, marginTop: 4 },

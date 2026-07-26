@@ -60,7 +60,7 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={["#090A0B", "#070707"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#080808", "#050505"]} style={StyleSheet.absoluteFill} />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 22 }]}
         keyboardShouldPersistTaps="handled"
@@ -141,17 +141,17 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: "#050505", flex: 1 },
+  root: { backgroundColor: "#080808", flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 22 },
   status: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
   statusText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 12 },
   topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 48 },
   iconButton: {
     alignItems: "center",
-    backgroundColor: "#151618",
-    borderColor: "#24262B",
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "#111111",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -159,15 +159,15 @@ const styles = StyleSheet.create({
   iconGhost: { height: 36, width: 36 },
   topbarTitle: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 18 },
   hero: { alignItems: "center", marginBottom: 54 },
-  logoText: { color: "#FF6A00", fontFamily: "Inter_700Bold", fontSize: 42, marginBottom: 10 },
-  subtitle: { color: "#8E949D", fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" },
+  logoText: { color: "#FF6500", fontFamily: "Inter_700Bold", fontSize: 42, marginBottom: 10 },
+  subtitle: { color: "rgba(255,255,255,0.46)", fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" },
   form: { gap: 18 },
   fieldWrap: { gap: 8 },
   label: { color: "#F5F5F5", fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "right" },
   inputRow: {
     alignItems: "center",
-    backgroundColor: "#1A1A1A",
-    borderColor: "#24262B",
+    backgroundColor: "#181818",
+    borderColor: "rgba(255,255,255,0.08)",
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row-reverse",
@@ -180,19 +180,19 @@ const styles = StyleSheet.create({
   errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, textAlign: "right" },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#FF6A00",
-    borderRadius: 16,
+    backgroundColor: "#FF6500",
+    borderRadius: 14,
     height: 56,
     justifyContent: "center",
     marginTop: 8,
   },
-  primaryText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 16 },
+  primaryText: { color: "#050505", fontFamily: "Inter_700Bold", fontSize: 16 },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "#111214",
-    borderColor: "#24262B",
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "#111111",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
     height: 52,
     justifyContent: "center",
   },
