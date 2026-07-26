@@ -286,8 +286,8 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
                 "w-full justify-start gap-3 rounded-2xl transition-all",
                 compact ? "h-10 px-3 text-sm" : "h-11 px-4",
                 isActive
-                  ? "bg-primary/15 text-primary font-bold border border-primary/20"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                  ? "bg-primary/10 text-primary font-bold shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/70",
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />
@@ -302,8 +302,8 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
   return (
     <div className="min-h-screen bg-background flex w-full" dir="rtl">
       {/* Desktop Sidebar */}
-      <aside className="hidden xl:flex w-[280px] flex-col border-l border-border bg-card/95 backdrop-blur shrink-0 sticky top-0 h-screen">
-        <div className="h-16 flex items-center px-5 border-b border-border">
+      <aside className="hidden xl:flex w-[280px] flex-col border-l border-border/80 bg-card/80 backdrop-blur shrink-0 sticky top-0 h-screen">
+        <div className="h-16 flex items-center px-5 border-b border-border/80">
           <Link href="/" className="flex items-center gap-2">
             <MfkLogo size="sm" />
             {isAdmin && (
@@ -319,7 +319,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
         </ScrollArea>
 
         <div className="p-4 border-t border-border/80">
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-secondary p-3 mb-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-muted/40 p-3 mb-3">
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-primary/20 text-primary font-bold">
                 {initials}
@@ -349,7 +349,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-16 border-b border-border bg-card/95 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
+        <header className="h-16 border-b border-border/80 bg-card/90 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
             <div className="xl:hidden">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -569,7 +569,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
         </main>
 
         {/* Mobile / Tablet Bottom Navigation */}
-        <nav className="xl:hidden fixed bottom-3 inset-x-3 z-40 rounded-[1.35rem] border border-border bg-card/95 shadow-[0_18px_48px_rgba(0,0,0,0.45)] backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <nav className="xl:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="grid grid-cols-6 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
@@ -581,7 +581,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
                     className={cn(
                       "flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[11px] font-semibold transition-colors",
                       isActive
-                        ? "text-primary bg-primary/15 border border-primary/15"
+                        ? "text-primary bg-primary/10"
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >

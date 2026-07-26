@@ -48,8 +48,8 @@ export default function Login() {
     <div className="min-h-screen bg-background flex flex-col md:flex-row" dir="rtl">
 
       {/* Left visual panel */}
-      <div className="hidden md:flex md:w-1/2 bg-card/90 border-l border-border relative overflow-hidden items-center justify-center p-12">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,101,0,0.18),transparent_22rem)]" />
+      <div className="hidden md:flex md:w-1/2 bg-card border-l border-border relative overflow-hidden items-center justify-center p-12">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
         <div className="relative z-10 max-w-sm text-right">
           <Link href="/">
             <MfkLogo size="lg" className="mb-10 cursor-pointer" />
@@ -64,7 +64,7 @@ export default function Login() {
           <div className="flex gap-4">
             <div className="flex -space-x-4 rtl:space-x-reverse">
               {[1, 2, 3, 4].map(i => (
-                <div key={i} className="w-12 h-12 rounded-full border-2 border-background bg-secondary flex items-center justify-center overflow-hidden shadow-[0_0_24px_rgba(255,101,0,0.12)]">
+                <div key={i} className="w-12 h-12 rounded-full border-2 border-background bg-secondary flex items-center justify-center overflow-hidden">
                   <img src={`https://i.pravatar.cc/150?img=${i + 10}`} alt="" />
                 </div>
               ))}
@@ -83,13 +83,13 @@ export default function Login() {
           <Link href="/"><MfkLogo size="md" className="cursor-pointer" /></Link>
         </div>
 
-        <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card/90 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] sm:p-7">
+        <div className="w-full max-w-md">
           <motion.div
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}>
 
             <div className="mb-8">
-              <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl border border-primary/20 flex items-center justify-center mb-5">
+              <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-5">
                 <LogIn size={28} />
               </div>
               <h2 className="text-3xl font-bold mb-2">تسجيل الدخول</h2>

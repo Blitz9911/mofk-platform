@@ -45,7 +45,7 @@ const stateCopy: Record<PaymentState, { title: string; body: string; tone: strin
   pending: {
     title: "الدفع قيد المعالجة",
     body: "سنحدث حالة الاشتراك تلقائيًا بعد اكتمال عملية الدفع.",
-    tone: "border-primary/40 bg-primary/10 text-white",
+    tone: "border-[#FF6A00]/40 bg-[#FF6A00]/10 text-white",
     icon: RefreshCw,
   },
   past_due: {
@@ -94,11 +94,11 @@ function MobileComparisonCards() {
     <div className="space-y-3 md:hidden">
       {comparisonRows.map((row) =>
         row.type === "section" ? (
-          <div key={row.label} className="rounded-xl bg-secondary px-3 py-2 text-sm font-black text-primary">
+          <div key={row.label} className="rounded-[12px] bg-[#0B0B0B] px-3 py-2 text-sm font-black text-[#FF6A00]">
             {row.label}
           </div>
         ) : (
-          <div key={row.label} className="rounded-2xl border border-border bg-card p-3">
+          <div key={row.label} className="rounded-[14px] border border-[#2A2A2A] bg-[#222] p-3">
             <p className="mb-3 text-sm font-black">{row.label}</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
@@ -107,7 +107,7 @@ function MobileComparisonCards() {
                 ["العائلة", row.family],
                 ["الاسطول", row.fleet],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-xl bg-secondary p-2">
+                <div key={label} className="rounded-[10px] bg-[#111] p-2">
                   <p className="mb-1 text-[#8A8A8A]">{label}</p>
                   <div className="font-bold text-white"><CellValue value={value} /></div>
                 </div>
@@ -139,19 +139,19 @@ export default function Subscription() {
   };
 
   return (
-    <div className="dark -m-3 min-h-screen bg-background p-3 text-white sm:-m-4 sm:p-4 md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
+    <div className="dark -m-3 min-h-screen bg-[#0B0B0B] p-3 text-white sm:-m-4 sm:p-4 md:-m-6 md:p-6" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
       <div className="mx-auto w-full max-w-[min(100%,1760px)] space-y-5 pb-64 sm:pb-56 xl:pb-32">
-        <div className="rounded-2xl border border-border bg-card/90 p-5 shadow-[0_18px_48px_rgba(0,0,0,0.22)]">
+        <div className="rounded-[18px] border border-[#1F1F1F] bg-[#111]/80 p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-bold text-primary">الاشتراك والباقات</p>
+            <p className="text-sm font-bold text-[#FF6A00]">الاشتراك والباقات</p>
             <h1 className="mt-2 text-3xl font-black tracking-normal md:text-4xl">إدارة اشتراك موفك</h1>
             <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">
               باقة مجانية للأساسيات، باقة مفك لمركبة واحدة، باقة العائلة لعدة مركبات، وباقة الاسطول للشركات.
             </p>
           </div>
 
-          <div className="inline-grid w-full grid-cols-2 rounded-2xl border border-border bg-secondary p-1 sm:w-auto" role="tablist" aria-label="دورة الفوترة">
+          <div className="inline-grid w-full grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1 sm:w-auto" role="tablist" aria-label="دورة الفوترة">
             {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
               <button
                 key={cycle}
@@ -161,8 +161,8 @@ export default function Subscription() {
                 aria-pressed={billingCycle === cycle}
                 onClick={() => setBillingCycle(cycle)}
                 className={cn(
-                  "min-w-[112px] rounded-xl px-5 py-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  billingCycle === cycle ? "bg-primary text-primary-foreground" : "text-[#8A8A8A] hover:text-white",
+                  "min-w-[112px] rounded-[10px] px-5 py-3 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                  billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
                 )}
               >
                 <span className="inline-flex items-center justify-center gap-2">
@@ -186,28 +186,28 @@ export default function Subscription() {
                 <p className="mt-1 text-sm leading-6 opacity-85">{stateCopy[paymentState].body}</p>
               </div>
             </div>
-            {paymentState === "past_due" && <Button className="rounded-xl">إعادة محاولة الدفع</Button>}
+            {paymentState === "past_due" && <Button className="rounded-[12px] bg-[#FF6A00] hover:bg-[#E65C00]">إعادة محاولة الدفع</Button>}
           </div>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="min-h-[112px] rounded-2xl border border-border bg-card p-4">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+            <ShieldCheck className="h-5 w-5 text-[#FF6A00]" />
             <p className="mt-3 text-sm text-[#8A8A8A]">الباقة الحالية</p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">{currentPlan.name}</h2>
           </div>
-          <div className="min-h-[112px] rounded-2xl border border-border bg-card p-4">
-            <CalendarClock className="h-5 w-5 text-primary" />
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+            <CalendarClock className="h-5 w-5 text-[#FF6A00]" />
             <p className="mt-3 text-sm text-[#8A8A8A]">حالة التجربة</p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">٧ أيام متبقية</h2>
           </div>
-          <div className="min-h-[112px] rounded-2xl border border-border bg-card p-4">
-            <ReceiptText className="h-5 w-5 text-primary" />
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+            <ReceiptText className="h-5 w-5 text-[#FF6A00]" />
             <p className="mt-3 text-sm text-[#8A8A8A]">الفوترة المختارة</p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">{billingCycle === "yearly" ? "سنوي" : "شهري"}</h2>
           </div>
-          <div className="min-h-[112px] rounded-2xl border border-border bg-card p-4">
-            <CreditCard className="h-5 w-5 text-primary" />
+          <div className="min-h-[112px] rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4">
+            <CreditCard className="h-5 w-5 text-[#FF6A00]" />
             <p className="mt-3 text-sm text-[#8A8A8A]">الدفع</p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">جاهز للربط</h2>
           </div>
@@ -225,8 +225,8 @@ export default function Subscription() {
                 onClick={() => setSelectedPlanId(plan.id)}
                 aria-pressed={selected}
                 className={cn(
-                  "flex min-h-[300px] flex-col rounded-2xl border bg-card p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-[342px] sm:p-5",
-                  selected ? "border-primary bg-secondary shadow-[0_0_40px_rgba(255,101,0,0.10)]" : "border-border hover:border-primary/70",
+                  "flex min-h-[300px] flex-col rounded-[16px] border bg-[#1A1A1A] p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00] sm:min-h-[342px] sm:p-5",
+                  selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -234,7 +234,7 @@ export default function Subscription() {
                     <h2 className="text-2xl font-black">{plan.name}</h2>
                     <p className="mt-2 text-sm leading-6 text-[#8A8A8A]">{plan.subtitle}</p>
                   </div>
-                  {plan.badge && <span className="rounded-full bg-primary px-2 py-1 text-xs font-black text-primary-foreground">الأكثر</span>}
+                  {plan.badge && <span className="rounded-full bg-[#FF6A00] px-2 py-1 text-xs font-black">الأكثر</span>}
                 </div>
 
                 <div className="mt-5 flex min-h-[58px] flex-col">
@@ -251,7 +251,7 @@ export default function Subscription() {
                 </div>
 
                 <div className="mt-auto pt-5">
-                  <div className={cn("rounded-xl px-4 py-3 text-center text-sm font-black", current ? "bg-[#2ECC71]/15 text-[#BDF2CC]" : "bg-background text-white")}>
+                  <div className={cn("rounded-[12px] px-4 py-3 text-center text-sm font-black", current ? "bg-[#2ECC71]/15 text-[#BDF2CC]" : "bg-[#0B0B0B] text-white")}>
                     {current ? "باقتك الحالية" : plan.saleType === "sales-led" ? "تواصل مع المبيعات" : selected ? "محددة" : "اختيار"}
                   </div>
                 </div>
@@ -260,21 +260,21 @@ export default function Subscription() {
           })}
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-5">
+        <section className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-bold text-primary">تفاصيل الباقة</p>
+              <p className="text-sm font-bold text-[#FF6A00]">تفاصيل الباقة</p>
               <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
             </div>
-            <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-[#8A8A8A]">
+            <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
               {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
             </div>
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {selectedPlan.included.map((feature) => (
-              <div key={feature} className="flex items-start gap-3 rounded-xl bg-secondary p-3 text-sm leading-6">
+              <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
                 <span>{feature}</span>
               </div>
@@ -282,19 +282,19 @@ export default function Subscription() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-border bg-card p-5">
+        <section className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5">
           <div className="mb-6">
-            <p className="text-sm font-bold text-primary">جدول المقارنة</p>
+            <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
             <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
           </div>
           <MobileComparisonCards />
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[920px] text-sm">
               <thead>
-                <tr className="border-b border-border text-[#8A8A8A]">
+                <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
                   <th className="p-3 text-right">الميزة</th>
                   <th className="p-3 text-center">باقة مجانية</th>
-                  <th className="p-3 text-center text-primary">باقة مفك</th>
+                  <th className="p-3 text-center text-[#FF6A00]">باقة مفك</th>
                   <th className="p-3 text-center">باقة العائلة</th>
                   <th className="p-3 text-center">باقة الاسطول</th>
                 </tr>
@@ -303,13 +303,13 @@ export default function Subscription() {
                 {comparisonRows.map((row) =>
                   row.type === "section" ? (
                     <tr key={row.label}>
-                      <td colSpan={5} className="bg-background p-3 text-sm font-black text-primary">{row.label}</td>
+                      <td colSpan={5} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
                     </tr>
                   ) : (
-                    <tr key={row.label} className="border-b border-border/80">
+                    <tr key={row.label} className="border-b border-[#2A2A2A]/80">
                       <td className="p-3 font-bold">{row.label}</td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
-                      <td className="bg-primary/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                      <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                       <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                     </tr>
@@ -322,13 +322,13 @@ export default function Subscription() {
       </div>
 
       {selectedPlan.id !== "free" && (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] left-0 right-0 z-40 border-t border-border bg-gradient-to-t from-background via-background/95 to-transparent px-3 pb-3 pt-8 sm:px-4 sm:pb-4 xl:bottom-0 xl:right-[280px]">
-          <div className="mx-auto flex w-full max-w-[min(100%,1760px)] flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] left-0 right-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-3 pb-3 pt-8 sm:px-4 sm:pb-4 xl:bottom-0 xl:right-[280px]">
+          <div className="mx-auto flex w-full max-w-[min(100%,1760px)] flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 shadow-2xl sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-[#8A8A8A]">الترقية المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
-            <Button className="h-12 rounded-xl px-8 text-base font-black" onClick={continueSelectedPlan}>
+            <Button className="h-12 rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00]" onClick={continueSelectedPlan}>
               {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "متابعة الدفع"}
             </Button>
           </div>

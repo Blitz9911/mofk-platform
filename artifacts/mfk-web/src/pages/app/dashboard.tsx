@@ -247,9 +247,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className="relative overflow-hidden rounded-[2rem] border border-primary/20 bg-card text-foreground shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
-        <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-primary/15 blur-3xl" />
-        <div className="absolute -bottom-24 right-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary via-orange-500 to-orange-600 text-white shadow-xl">
+        <div className="absolute -top-24 -left-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-24 right-24 h-64 w-64 rounded-full bg-black/10 blur-3xl" />
 
         <div className="relative p-6 md:p-8">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
