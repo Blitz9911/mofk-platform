@@ -1,78 +1,126 @@
-import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
+import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
-function tabIcon(route: string, focused: boolean, color: string, isIOS: boolean) {
-  const sf: Record<string, string> = {
-    index: focused ? "house.fill" : "house",
-    vehicles: focused ? "car.fill" : "car",
-    diagnostics: "waveform.path.ecg",
-    profile: focused ? "person.fill" : "person",
-  };
-  const ion: Record<string, string> = {
-    index: focused ? "home" : "home-outline",
-    vehicles: focused ? "car" : "car-outline",
-    diagnostics: focused ? "pulse" : "pulse-outline",
-    profile: focused ? "person" : "person-outline",
-  };
-
-  return isIOS ? (
-    <SymbolView name={sf[route] as any} tintColor={color} size={24} />
-  ) : (
-    <Ionicons name={ion[route] as any} size={22} color={color} />
+function NativeTabLayout() {
+  return (
+    <NativeTabs>
+      <NativeTabs.Trigger name="index">
+        <Icon sf={{ default: "house", selected: "house.fill" }} />
+        <Label>الرئيسية</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="vehicles">
+        <Icon sf={{ default: "car", selected: "car.fill" }} />
+        <Label>مركباتي</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="diagnostics">
+        <Icon sf={{ default: "waveform.path.ecg", selected: "waveform.path.ecg" }} />
+        <Label>التشخيص</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <Icon sf={{ default: "person", selected: "person.fill" }} />
+        <Label>حسابي</Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
 
-export default function TabLayout() {
+function ClassicTabLayout() {
   const colors = useColors();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
   return (
     <Tabs
-      screenOptions={({ route }) => ({
+      screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         headerShown: false,
-        tabBarHideOnKeyboard: true,
-        tabBarLabelStyle: {
-          fontFamily: "Inter_600SemiBold",
-          fontSize: 10,
-          marginTop: 2,
-        },
-        tabBarItemStyle: { paddingTop: 8 },
+        tabBarLabelStyle: { fontFamily: "Inter_500Medium", fontSize: 10 },
         tabBarStyle: {
           position: "absolute",
-          left: 14,
-          right: 14,
-          bottom: isIOS ? 18 : 12,
-          height: isIOS ? 72 : 68,
-          backgroundColor: "#111111F2",
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border,
-          borderRadius: 22,
+          backgroundColor: isIOS ? "transparent" : colors.background,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
           elevation: 0,
-          shadowColor: "#000",
-          shadowOpacity: 0.28,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 10 },
-          overflow: "hidden",
-          ...(isWeb ? { height: 76, bottom: 12 } : {}),
+          ...(isWeb ? { height: 84 } : {}),
         },
-        tabBarBackground: () => (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: "#111111F2" }]} />
-        ),
-        tabBarIcon: ({ color, focused }) => tabIcon(route.name, focused, color, isIOS),
-      })}
+        tabBarBackground: () =>
+          isIOS ? (
+            <BlurView
+              intensity={100}
+              tint={isDark ? "dark" : "light"}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : isWeb ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+          ) : null,
+      }}
     >
-      <Tabs.Screen name="index" options={{ title: "الرئيسية" }} />
-      <Tabs.Screen name="vehicles" options={{ title: "مركباتي" }} />
-      <Tabs.Screen name="diagnostics" options={{ title: "التشخيص" }} />
-      <Tabs.Screen name="profile" options={{ title: "حسابي" }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "الرئيسية",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="house" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="home-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="vehicles"
+        options={{
+          title: "مركباتي",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="car" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="car-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="diagnostics"
+        options={{
+          title: "التشخيص",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="waveform.path.ecg" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="pulse-outline" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "حسابي",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="person" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="person-outline" size={22} color={color} />
+            ),
+        }}
+      />
     </Tabs>
   );
+}
+
+export default function TabLayout() {
+  if (isLiquidGlassAvailable()) {
+    return <NativeTabLayout />;
+  }
+  return <ClassicTabLayout />;
 }

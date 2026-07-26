@@ -18,53 +18,10 @@ import { useColors } from "@/hooks/useColors";
 
 const TIER_LABELS: Record<string, string> = {
   free: "مجاني",
-  mofk: "مفك",
-  plus: "مفك",
   basic: "أساسي",
-  premium: "احترافي",
-  pro: "متقدم",
-  family: "العائلة",
+  premium: "مميز",
   fleet: "الأسطول",
 };
-
-function displayPlanShort(tier?: string | null) {
-  switch (tier) {
-    case "plus":
-    case "mofk":
-    case "basic":
-    case "individual-basic":
-      return "مفك";
-    case "family":
-    case "premium":
-    case "pro":
-    case "individual-advanced":
-      return "العائلة";
-    case "fleet":
-      return "الأسطول";
-    case "free":
-    default:
-      return "مجانية";
-  }
-}
-
-function displayPlanName(tier?: string | null) {
-  const shortName = displayPlanShort(tier);
-  if (shortName === "مجانية") return "باقة مجانية";
-  return `باقة ${shortName}`;
-}
-
-Object.assign(TIER_LABELS, {
-  free: "مجانية",
-  plus: "مفك",
-  mofk: "مفك",
-  basic: "مفك",
-  "individual-basic": "مفك",
-  premium: "العائلة",
-  pro: "العائلة",
-  family: "العائلة",
-  "individual-advanced": "العائلة",
-  fleet: "الأسطول",
-});
 
 function MenuItem({ icon, label, onPress, danger }: { icon: string; label: string; onPress: () => void; danger?: boolean }) {
   const colors = useColors();
@@ -89,8 +46,7 @@ export default function ProfileScreen() {
   const { data: plans } = useListSubscriptionPlans();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const activeTier = user?.subscriptionTier || sub?.tier || "free";
-  const currentPlan = plans?.find((p) => p.tier === activeTier || p.id === activeTier);
+  const currentPlan = plans?.find((p) => p.tier === sub?.tier);
 
   const firstLetter = user?.name?.charAt(0) ?? "م";
 
@@ -126,20 +82,20 @@ export default function ProfileScreen() {
         </View>
 
         {/* Subscription Card */}
-        {(sub || user) && (
+        {sub && (
           <View style={[styles.subCard, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
             <View style={styles.subHeader}>
               <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
               <Text style={[styles.subTitle, { color: colors.primary }]}>
-                الاشتراك {TIER_LABELS[activeTier] ?? activeTier}
+                الاشتراك {TIER_LABELS[sub.tier] ?? sub.tier}
               </Text>
             </View>
             {currentPlan && (
               <Text style={[styles.subDesc, { color: colors.foreground }]}>{currentPlan.nameAr}</Text>
             )}
-            {(user?.subscriptionEndsAt || sub?.endsAt) && (
+            {sub.endsAt && (
               <Text style={[styles.subExp, { color: colors.mutedForeground }]}>
-                صالح حتى {new Date(user?.subscriptionEndsAt || sub?.endsAt || "").toLocaleDateString("ar-SA")}
+                صالح حتى {new Date(sub.endsAt).toLocaleDateString("ar-SA")}
               </Text>
             )}
           </View>

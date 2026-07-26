@@ -21,7 +21,6 @@ type Booking = {
   vehicleMake?: string | null;
   vehicleModel?: string | null;
   workshopName?: string | null;
-  workshopNameAr?: string | null;
   serviceTypeAr?: string | null;
   scheduledAt: string;
   status: string;

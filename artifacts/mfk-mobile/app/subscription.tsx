@@ -26,27 +26,6 @@ const TIER_NAMES: Record<string, string> = {
   fleet: "باقة الأسطول",
 };
 
-function displayPlanName(tier?: string | null, fallback?: string | null) {
-  switch (tier) {
-    case "free":
-      return "باقة مجانية";
-    case "plus":
-    case "mofk":
-    case "basic":
-    case "individual-basic":
-      return "باقة مفك";
-    case "family":
-    case "premium":
-    case "pro":
-    case "individual-advanced":
-      return "باقة العائلة";
-    case "fleet":
-      return "باقة الأسطول";
-    default:
-      return fallback || "باقة مجانية";
-  }
-}
-
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   active: { label: "نشط", color: "#22c55e" },
   expired: { label: "منتهي", color: "#ef4444" },
@@ -101,7 +80,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.currentTitleRow}>
                   <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
                   <Text style={[styles.currentTitle, { color: colors.primary }]}>
-                    {displayPlanName(subscription.tier, TIER_NAMES[subscription.tier] ?? subscription.tier)}
+                    {TIER_NAMES[subscription.tier] ?? subscription.tier}
                   </Text>
                 </View>
               </View>
@@ -205,9 +184,7 @@ export default function SubscriptionScreen() {
                     )}
                   </View>
                   <View>
-                    <Text style={[styles.planName, { color: colors.foreground }]}>
-                      {displayPlanName((plan as any).tier ?? plan.id, plan.nameAr)}
-                    </Text>
+                    <Text style={[styles.planName, { color: colors.foreground }]}>{plan.nameAr}</Text>
                     <Text style={[styles.planDesc, { color: colors.mutedForeground }]}>{plan.descriptionAr}</Text>
                   </View>
                 </View>

@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useListVehicles, useGetLiveTelemetry, useListDiagnosticSessions } from "@workspace/api-client-react";
-import { Href, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -32,7 +32,6 @@ function GaugeCard({ label, value, unit, color, icon }: { label: string; value: 
 export default function DiagnosticsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { data: vehicles } = useListVehicles();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -57,7 +56,7 @@ export default function DiagnosticsScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable
           style={[styles.newSessionBtn, { backgroundColor: colors.primary }]}
-          onPress={() => router.push("/obd-connect" as Href)}
+          onPress={() => Alert.alert("جلسة جديدة", "قم بتوصيل جهاز OBD-II ثم ابدأ الجلسة من التطبيق.")}
         >
           <Ionicons name="play-circle-outline" size={18} color="#fff" />
           <Text style={styles.newSessionText}>بدء جلسة جديدة</Text>

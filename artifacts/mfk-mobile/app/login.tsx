@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -15,18 +15,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { authApi, useAuth } from "@/context/AuthContext";
-
-function StatusBarMock() {
-  return (
-    <View style={styles.status}>
-      <Text style={styles.statusText}>٩:٤١</Text>
-      <Text style={styles.statusText}>◉ WiFi ▰</Text>
-    </View>
-  );
-}
+import { useAuth, authApi } from "@/context/AuthContext";
+import { useColors } from "@/hooks/useColors";
 
 export default function LoginScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { login } = useAuth();
@@ -36,18 +29,16 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setError("");
     if (!email.trim() || !password) return;
     setIsLoading(true);
     try {
-      const user = await authApi.login(
-        email.trim(),
-        password,
-      );
-
+      const user = await authApi.login(email.trim(), password);
       await login(user);
+      router.replace("/(tabs)");
     } catch (err: any) {
       setError(err.message || "البريد الإلكتروني أو كلمة المرور غير صحيحة");
     } finally {
@@ -55,42 +46,61 @@ export default function LoginScreen() {
     }
   };
 
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !isLoading;
+
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[s.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={["#080808", "#050505"]} style={StyleSheet.absoluteFill} />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 22 }]}
+        contentContainerStyle={[s.scroll, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <StatusBarMock />
+        {/* Back button */}
+        <Pressable onPress={() => router.back()} hitSlop={10} style={[s.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          <Ionicons name="arrow-forward" size={18} color={colors.foreground} />
+        </Pressable>
 
-        <View style={styles.topbar}>
-          <Pressable style={styles.iconButton} onPress={() => router.replace("/welcome")}>
-            <Ionicons name="chevron-forward" size={18} color="#F5F5F5" />
-          </Pressable>
-          <Text style={styles.topbarTitle}>تسجيل الدخول</Text>
-          <View style={styles.iconGhost} />
+        {/* Logo section */}
+        <View style={s.logoSection}>
+          <Image
+            source={require("@/assets/images/mfk-logo.png")}
+            style={s.logo}
+            contentFit="contain"
+          />
+          <View style={[s.dividerRow, { backgroundColor: colors.border }]} />
+          <Text style={[s.tagline, { color: colors.mutedForeground }]}>
+            المنصة الأولى لتشخيص السيارات بالعربية
+          </Text>
         </View>
 
-        <View style={styles.hero}>
-          <Text style={styles.logoText}>مفك</Text>
-          <Text style={styles.subtitle}>رجوعك يعني أن سيارتك جاهزة للكلام.</Text>
+        {/* Title */}
+        <View style={s.titleBlock}>
+          <Text style={[s.title, { color: colors.foreground }]}>مرحباً بعودتك</Text>
+          <Text style={[s.subtitle, { color: colors.mutedForeground }]}>سجّل دخولك للمتابعة</Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>البريد الإلكتروني</Text>
-            <View style={styles.inputRow}>
+        {/* Form */}
+        <View style={s.form}>
+          {/* Email */}
+          <View style={s.fieldGroup}>
+            <Text style={[s.label, { color: colors.foreground }]}>البريد الإلكتروني</Text>
+            <View style={[
+              s.inputRow,
+              { backgroundColor: colors.card, borderColor: focusedField === "email" ? "#FF6A00" : colors.border },
+              focusedField === "email" && s.inputFocused,
+            ]}>
+              <Ionicons name="mail-outline" size={18} color={focusedField === "email" ? "#FF6A00" : colors.mutedForeground} />
               <TextInput
-                style={styles.input}
+                style={[s.input, { color: colors.foreground }]}
                 placeholder="example@email.com"
-                placeholderTextColor="#8E949D"
+                placeholderTextColor={colors.mutedForeground}
                 value={email}
                 onChangeText={setEmail}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -99,40 +109,90 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>كلمة المرور</Text>
-            <View style={styles.inputRow}>
-              <Pressable onPress={() => setShowPassword((value) => !value)}>
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#8E949D" />
+          {/* Password */}
+          <View style={s.fieldGroup}>
+            <View style={s.labelRow}>
+              <Pressable hitSlop={8}>
+                <Text style={[s.forgotLink, { color: "#FF6A00" }]}>نسيت كلمة المرور؟</Text>
+              </Pressable>
+              <Text style={[s.label, { color: colors.foreground }]}>كلمة المرور</Text>
+            </View>
+            <View style={[
+              s.inputRow,
+              { backgroundColor: colors.card, borderColor: focusedField === "pass" ? "#FF6A00" : colors.border },
+              focusedField === "pass" && s.inputFocused,
+            ]}>
+              <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={8}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={18}
+                  color={focusedField === "pass" ? "#FF6A00" : colors.mutedForeground}
+                />
               </Pressable>
               <TextInput
-                style={styles.input}
+                style={[s.input, { color: colors.foreground }]}
                 placeholder="••••••••"
-                placeholderTextColor="#8E949D"
+                placeholderTextColor={colors.mutedForeground}
                 value={password}
                 onChangeText={setPassword}
+                onFocus={() => setFocusedField("pass")}
+                onBlur={() => setFocusedField(null)}
                 secureTextEntry={!showPassword}
                 textAlign="left"
               />
+              <Ionicons name="lock-closed-outline" size={18} color={focusedField === "pass" ? "#FF6A00" : colors.mutedForeground} />
             </View>
           </View>
 
+          {/* Error */}
           {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={[s.errorBox, { backgroundColor: "#ef444412", borderColor: "#ef444430" }]}>
+              <Ionicons name="alert-circle-outline" size={16} color="#ef4444" />
+              <Text style={s.errorTxt}>{error}</Text>
             </View>
           ) : null}
 
+          {/* Submit */}
           <Pressable
-            style={({ pressed }) => [styles.primaryButton, { opacity: pressed || isLoading ? 0.82 : 1 }]}
+            style={({ pressed }) => [
+              s.submitBtn,
+              {
+                backgroundColor: canSubmit ? "#FF6A00" : colors.card,
+                borderColor: canSubmit ? "transparent" : colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
             onPress={handleLogin}
-            disabled={isLoading || !email.trim() || !password}
+            disabled={!canSubmit}
           >
-            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>تسجيل الدخول</Text>}
+            {isLoading
+              ? <ActivityIndicator color="#fff" />
+              : (
+                <>
+                  <Text style={[s.submitTxt, { color: canSubmit ? "#fff" : colors.mutedForeground }]}>
+                    تسجيل الدخول
+                  </Text>
+                  {canSubmit && <Ionicons name="arrow-back" size={18} color="#fff" />}
+                </>
+              )
+            }
           </Pressable>
 
-          <Pressable onPress={() => router.replace("/register")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryText}>إنشاء حساب جديد</Text>
+          {/* Divider */}
+          <View style={s.orRow}>
+            <View style={[s.orLine, { backgroundColor: colors.border }]} />
+            <Text style={[s.orTxt, { color: colors.mutedForeground }]}>أو</Text>
+            <View style={[s.orLine, { backgroundColor: colors.border }]} />
+          </View>
+
+          {/* Register link */}
+          <Pressable
+            onPress={() => router.replace("/register")}
+            style={[s.registerBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          >
+            <Text style={[s.registerTxt, { color: colors.foreground }]}>
+              إنشاء حساب جديد
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -140,61 +200,64 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { backgroundColor: "#080808", flex: 1 },
+const s = StyleSheet.create({
+  root: { flex: 1 },
   scroll: { flexGrow: 1, paddingHorizontal: 22 },
-  status: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
-  statusText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 12 },
-  topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 48 },
-  iconButton: {
-    alignItems: "center",
-    backgroundColor: "#111111",
-    borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
+
+  backBtn: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth, marginBottom: 24, alignSelf: "flex-end",
   },
-  iconGhost: { height: 36, width: 36 },
-  topbarTitle: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 18 },
-  hero: { alignItems: "center", marginBottom: 54 },
-  logoText: { color: "#FF6500", fontFamily: "Inter_700Bold", fontSize: 42, marginBottom: 10 },
-  subtitle: { color: "rgba(255,255,255,0.46)", fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center" },
-  form: { gap: 18 },
-  fieldWrap: { gap: 8 },
-  label: { color: "#F5F5F5", fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "right" },
+
+  logoSection: { alignItems: "center", marginBottom: 32, gap: 10 },
+  logo: { height: 58, width: 172 },
+  dividerRow: { height: StyleSheet.hairlineWidth, width: 80 },
+  tagline: { fontSize: 12, fontFamily: "Inter_400Regular" },
+
+  titleBlock: { alignItems: "flex-end", marginBottom: 28, gap: 4 },
+  title: { fontSize: 26, fontFamily: "Inter_700Bold" },
+  subtitle: { fontSize: 14, fontFamily: "Inter_400Regular" },
+
+  form: { gap: 16 },
+  fieldGroup: { gap: 8 },
+  label: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  forgotLink: { fontSize: 12, fontFamily: "Inter_500Medium" },
+
   inputRow: {
-    alignItems: "center",
-    backgroundColor: "#181818",
-    borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row-reverse",
-    gap: 10,
-    height: 48,
-    paddingHorizontal: 14,
+    flexDirection: "row-reverse", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, height: 54, borderRadius: 14,
+    borderWidth: 1.5,
   },
-  input: { color: "#F5F5F5", flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, height: "100%" },
-  errorBox: { backgroundColor: "#EF444415", borderColor: "#EF444430", borderRadius: 12, borderWidth: 1, padding: 12 },
-  errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, textAlign: "right" },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: "#FF6500",
-    borderRadius: 14,
-    height: 56,
-    justifyContent: "center",
-    marginTop: 8,
+  inputFocused: {
+    shadowColor: "#FF6A00", shadowOpacity: 0.15, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 }, elevation: 3,
   },
-  primaryText: { color: "#050505", fontFamily: "Inter_700Bold", fontSize: 16 },
-  secondaryButton: {
-    alignItems: "center",
-    backgroundColor: "#111111",
-    borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 14,
-    borderWidth: 1,
-    height: 52,
-    justifyContent: "center",
+  input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+
+  errorBox: {
+    flexDirection: "row-reverse", alignItems: "center", gap: 8,
+    padding: 12, borderRadius: 12, borderWidth: 1,
   },
-  secondaryText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 15 },
+  errorTxt: { color: "#ef4444", fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", flex: 1 },
+
+  submitBtn: {
+    height: 54, borderRadius: 16, borderWidth: 1.5,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    shadowColor: "#FF6A00", shadowOpacity: 0.25, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    marginTop: 4,
+  },
+  submitTxt: { fontSize: 16, fontFamily: "Inter_700Bold" },
+
+  orRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  orTxt: { fontSize: 13, fontFamily: "Inter_400Regular" },
+
+  registerBtn: {
+    height: 52, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center", justifyContent: "center",
+  },
+  registerTxt: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });

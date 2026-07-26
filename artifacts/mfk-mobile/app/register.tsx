@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -15,17 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { authApi, useAuth } from "@/context/AuthContext";
+import { useAuth, authApi } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-
-function StatusBarMock() {
-  return (
-    <View style={styles.status}>
-      <Text style={styles.statusText}>٩:٤١</Text>
-      <Text style={styles.statusText}>◉ WiFi ▰</Text>
-    </View>
-  );
-}
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -50,17 +41,11 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      const user = await authApi.register(
-        name.trim(),
-        phone,
-        email.trim(),
-        password,
-      );
-
+      const user = await authApi.register(name.trim(), phone, email.trim(), password);
       await login(user);
-      router.replace("/verify");
+      router.replace("/(tabs)");
     } catch (err: any) {
-      setError(err.message || "حدث خطأ. حاول مجددًا.");
+      setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {
       setIsLoading(false);
     }
@@ -68,71 +53,71 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={["#090A0B", "#070707"]} style={StyleSheet.absoluteFill} />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 22 }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <StatusBarMock />
-
-        <View style={styles.topbar}>
-          <Pressable style={styles.iconButton} onPress={() => router.replace("/welcome")}>
-            <Ionicons name="chevron-forward" size={18} color="#F5F5F5" />
-          </Pressable>
-          <Text style={styles.topbarTitle}>إنشاء حساب</Text>
-          <View style={styles.iconGhost} />
+        {/* Logo */}
+        <View style={styles.logoWrap}>
+          <Image source={require("@/assets/images/mfk-logo.png")} style={styles.logo} contentFit="contain" />
         </View>
 
-        <Text style={styles.stepLabel}>خطوة 1 من 3 — بياناتك الأساسية</Text>
-        <View style={styles.progressTrack}>
-          <View style={styles.progressFill} />
+        {/* Title */}
+        <View style={styles.titleWrap}>
+          <Text style={[styles.title, { color: colors.foreground }]}>إنشاء حساب جديد</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>أدخل بياناتك لإنشاء حسابك في مفك</Text>
         </View>
 
+        {/* Form */}
         <View style={styles.form}>
+          {/* Name */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>الاسم الكامل</Text>
-            <View style={styles.inputRow}>
+            <Text style={[styles.label, { color: colors.foreground }]}>الاسم الكامل</Text>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <TextInput
-                style={styles.input}
-                placeholder="فيصل العتيبي"
-                placeholderTextColor="#8E949D"
+                style={[styles.input, { color: colors.foreground }]}
+                placeholder="محمد العمري"
+                placeholderTextColor={colors.mutedForeground}
                 value={name}
                 onChangeText={setName}
                 textAlign="right"
                 autoCorrect={false}
               />
+              <Ionicons name="person-outline" size={18} color={colors.mutedForeground} />
             </View>
           </View>
 
+          {/* Phone */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>رقم الجوال</Text>
-            <View style={styles.phoneRow}>
-              <View style={styles.prefixBox}>
-                <Text style={styles.prefixText}>+٩٦٦</Text>
-              </View>
+            <Text style={[styles.label, { color: colors.foreground }]}>رقم الجوال</Text>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <TextInput
-                style={[styles.input, styles.phoneInput]}
-                placeholder="53 442 1190"
-                placeholderTextColor="#8E949D"
+                style={[styles.input, { color: colors.foreground }]}
+                placeholder="5X XXX XXXX"
+                placeholderTextColor={colors.mutedForeground}
                 value={phone}
-                onChangeText={(text) => setPhone(text.replace(/\D/g, "").slice(0, 9))}
+                onChangeText={t => setPhone(t.replace(/\D/g, "").slice(0, 9))}
                 keyboardType="phone-pad"
                 textAlign="left"
               />
+              <View style={[styles.phonePrefixWrap, { borderColor: colors.border }]}>
+                <Text style={[styles.phonePrefix, { color: colors.mutedForeground }]}>966+</Text>
+              </View>
             </View>
           </View>
 
+          {/* Email */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>البريد الإلكتروني</Text>
-            <View style={styles.inputRow}>
+            <Text style={[styles.label, { color: colors.foreground }]}>البريد الإلكتروني</Text>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.foreground }]}
                 placeholder="example@email.com"
-                placeholderTextColor="#8E949D"
+                placeholderTextColor={colors.mutedForeground}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -140,47 +125,58 @@ export default function RegisterScreen() {
                 autoCorrect={false}
                 textAlign="left"
               />
+              <Ionicons name="mail-outline" size={18} color={colors.mutedForeground} />
             </View>
           </View>
 
+          {/* Password */}
           <View style={styles.fieldWrap}>
-            <Text style={styles.label}>كلمة المرور</Text>
-            <View style={styles.inputRow}>
-              <Pressable onPress={() => setShowPassword((value) => !value)}>
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color="#8E949D" />
+            <Text style={[styles.label, { color: colors.foreground }]}>كلمة المرور</Text>
+            <View style={[styles.inputRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Pressable onPress={() => setShowPassword(v => !v)}>
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={18} color={colors.mutedForeground} />
               </Pressable>
               <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor="#8E949D"
+                style={[styles.input, { color: colors.foreground }]}
+                placeholder="8 أحرف على الأقل"
+                placeholderTextColor={colors.mutedForeground}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 textAlign="left"
               />
+              <Ionicons name="lock-closed-outline" size={18} color={colors.mutedForeground} />
             </View>
+            {password.length > 0 && password.length < 8 && (
+              <Text style={styles.passHint}>{password.length}/8 أحرف</Text>
+            )}
           </View>
 
+          {/* Error */}
           {error ? (
-            <View style={styles.errorBox}>
+            <View style={[styles.errorBox, { backgroundColor: "#ef444415", borderColor: "#ef444430" }]}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
+          {/* Submit */}
           <Pressable
-            style={({ pressed }) => [styles.primaryButton, { opacity: pressed || isLoading ? 0.82 : 1 }]}
+            style={({ pressed }) => [styles.btn, { backgroundColor: colors.primary, opacity: pressed || isLoading ? 0.8 : 1 }]}
             onPress={handleRegister}
             disabled={isLoading}
           >
-            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>متابعة</Text>}
+            {isLoading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.btnText}>إنشاء الحساب</Text>
+            }
           </Pressable>
 
-          <Text style={styles.terms}>
-            بالمتابعة أنت توافق على <Text style={styles.orangeText}>الشروط والأحكام</Text> وسياسة <Text style={styles.orangeText}>الخصوصية</Text>.
-          </Text>
-
-          <Pressable onPress={() => router.replace("/login")} style={styles.loginLink}>
-            <Text style={styles.loginText}>لدي حساب بالفعل</Text>
+          {/* Login link */}
+          <Pressable onPress={() => router.replace("/login")} style={styles.linkWrap}>
+            <Text style={[styles.linkText, { color: colors.mutedForeground }]}>
+              لديك حساب بالفعل؟{" "}
+              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>تسجيل الدخول</Text>
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -189,73 +185,39 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: "#050505", flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 22 },
-  status: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
-  statusText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 12 },
-  topbar: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  iconButton: {
-    alignItems: "center",
-    backgroundColor: "#151618",
-    borderColor: "#24262B",
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  iconGhost: { height: 36, width: 36 },
-  topbarTitle: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 18 },
-  stepLabel: { color: "#8E949D", fontFamily: "Inter_500Medium", fontSize: 12, marginBottom: 12, textAlign: "right" },
-  progressTrack: { backgroundColor: "#25272B", borderRadius: 999, height: 4, marginBottom: 30, overflow: "hidden" },
-  progressFill: { backgroundColor: "#FF6A00", height: 4, width: "33%" },
-  form: { gap: 18 },
-  fieldWrap: { gap: 8 },
-  label: { color: "#F5F5F5", fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "right" },
+  root: { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
+  logoWrap: { alignItems: "center", marginBottom: 32 },
+  logo: { height: 60, width: 180 },
+  titleWrap: { alignItems: "flex-end", marginBottom: 28 },
+  title: { fontSize: 26, fontFamily: "Inter_700Bold", marginBottom: 6 },
+  subtitle: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  form: { gap: 16 },
+  fieldWrap: { gap: 7 },
+  label: { fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right" },
   inputRow: {
-    alignItems: "center",
-    backgroundColor: "#1A1A1A",
-    borderColor: "#24262B",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row-reverse",
+    alignItems: "center",
     gap: 10,
-    height: 48,
     paddingHorizontal: 14,
-  },
-  input: { color: "#F5F5F5", flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, height: "100%" },
-  phoneRow: { flexDirection: "row-reverse", gap: 8 },
-  prefixBox: {
-    alignItems: "center",
-    backgroundColor: "#1A1A1A",
-    borderColor: "#24262B",
+    height: 52,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    height: 48,
-    justifyContent: "center",
-    width: 58,
   },
-  prefixText: { color: "#8E949D", fontFamily: "Inter_700Bold", fontSize: 13 },
-  phoneInput: {
-    backgroundColor: "#1A1A1A",
-    borderColor: "#24262B",
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-  },
-  errorBox: { backgroundColor: "#EF444415", borderColor: "#EF444430", borderRadius: 12, borderWidth: 1, padding: 12 },
-  errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, textAlign: "right" },
-  primaryButton: {
+  input: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", height: "100%" },
+  phonePrefixWrap: { borderRightWidth: StyleSheet.hairlineWidth, paddingRight: 10 },
+  phonePrefix: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  passHint: { color: "#f59e0b", fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  errorBox: { padding: 12, borderRadius: 10, borderWidth: 1 },
+  errorText: { color: "#ef4444", fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "right" },
+  btn: {
+    height: 52,
+    borderRadius: 14,
     alignItems: "center",
-    backgroundColor: "#FF6A00",
-    borderRadius: 16,
-    height: 56,
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 4,
   },
-  primaryText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 16 },
-  terms: { color: "#8E949D", fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 20, textAlign: "center" },
-  orangeText: { color: "#FF6A00", fontFamily: "Inter_700Bold" },
-  loginLink: { alignItems: "center", paddingTop: 2 },
-  loginText: { color: "#FF6A00", fontFamily: "Inter_700Bold", fontSize: 13 },
+  btnText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  linkWrap: { alignItems: "center", paddingTop: 4 },
+  linkText: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
 });

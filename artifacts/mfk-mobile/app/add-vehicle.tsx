@@ -139,7 +139,7 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Input boxes: letters on right, digits on left (RTL) */}
+      {/* Input boxes — RTL: letters on right, divider, digits on left */}
       <View style={plateStyles.boxRow}>
         {[0, 1, 2].map((i) => (
           <Box
@@ -165,34 +165,25 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
         ))}
       </View>
 
-      {/* KSA Plate visual preview */}
+      {/* KSA Plate visual preview — matches web exactly */}
       {hasContent && (
-        <View style={plateStyles.previewWrap}>
-          <View style={plateStyles.preview}>
-            {/* Numbers (left) */}
-            <View style={plateStyles.previewNumCell}>
-              <Text style={plateStyles.previewBig}>
-                {digits.join(" ") || "- - -"}
-              </Text>
-              <Text style={plateStyles.previewSmall}>
-                {digits.join(" ") || ""}
-              </Text>
-            </View>
-            {/* Letters cell */}
-            <View style={plateStyles.previewDivider} />
-            <View style={plateStyles.previewLetterCell}>
-              <Text style={plateStyles.previewBig}>
-                {letters.join(" ") || "- - -"}
-              </Text>
-              <Text style={plateStyles.previewSmall}>
-                {letters.join(" ") || ""}
-              </Text>
-            </View>
-            {/* KSA badge */}
-            <View style={plateStyles.ksaBadge}>
-              <Text style={plateStyles.ksaArText}>السعودية</Text>
-              <Text style={plateStyles.ksaEnText}>KSA</Text>
-            </View>
+        <View style={plateStyles.plate}>
+          {/* Numbers — left side */}
+          <View style={plateStyles.numCell}>
+            <Text style={plateStyles.numText}>{digits.join("") || "---"}</Text>
+            <Text style={plateStyles.subText}>{digits.join("") || ""}</Text>
+          </View>
+          {/* Vertical separator */}
+          <View style={plateStyles.plateSep} />
+          {/* Letters — middle */}
+          <View style={plateStyles.letterCell}>
+            <Text style={plateStyles.letterText}>{letters.join(" ") || "- -"}</Text>
+            <Text style={plateStyles.subText}>{letters.join(" ") || ""}</Text>
+          </View>
+          {/* Green KSA badge — rightmost */}
+          <View style={plateStyles.ksaBadge}>
+            <Text style={plateStyles.ksaAr}>السعودية</Text>
+            <Text style={plateStyles.ksaEn}>KSA</Text>
           </View>
         </View>
       )}
@@ -203,27 +194,52 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
 const plateStyles = StyleSheet.create({
   boxRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6 },
   box: {
-    width: 38, height: 48, textAlign: "center",
-    fontSize: 20, fontFamily: "Inter_700Bold",
+    width: 40, height: 50, textAlign: "center",
+    fontSize: 22, fontFamily: "Inter_700Bold",
     borderRadius: 10, borderWidth: 2,
   },
-  divider: { width: 1, height: 32 },
-  previewWrap: { alignItems: "flex-end" },
-  preview: {
-    flexDirection: "row", borderRadius: 10, overflow: "hidden",
-    borderWidth: 2, borderColor: "#d4d4d4",
+  divider: { width: 1, height: 32, marginHorizontal: 4 },
+  /* Plate visual */
+  plate: {
+    flexDirection: "row",          /* LTR: numbers | sep | letters | badge */
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#d4d4d4",
+    alignSelf: "flex-start",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  previewNumCell: { backgroundColor: "#fff", paddingHorizontal: 18, paddingVertical: 8, alignItems: "center", minWidth: 90 },
-  previewLetterCell: { backgroundColor: "#fff", paddingHorizontal: 18, paddingVertical: 8, alignItems: "center", minWidth: 80 },
-  previewDivider: { width: 1, backgroundColor: "#d4d4d4" },
-  previewBig: { fontSize: 20, color: "#000", fontFamily: "Inter_700Bold", letterSpacing: 2 },
-  previewSmall: { fontSize: 12, color: "#666", fontFamily: "Inter_600SemiBold", letterSpacing: 2 },
+  numCell: {
+    backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 8,
+    alignItems: "center", justifyContent: "center", minWidth: 90,
+  },
+  plateSep: { width: 1, backgroundColor: "#d4d4d4" },
+  letterCell: {
+    backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 8,
+    alignItems: "center", justifyContent: "center", minWidth: 74,
+  },
+  numText: {
+    fontSize: 22, color: "#000", fontFamily: "Inter_700Bold",
+    letterSpacing: 3,
+  },
+  letterText: {
+    fontSize: 22, color: "#000", fontFamily: "Inter_700Bold",
+    letterSpacing: 4, textAlign: "center",
+  },
+  subText: {
+    fontSize: 11, color: "#666", fontFamily: "Inter_600SemiBold",
+    letterSpacing: 2, marginTop: 1,
+  },
   ksaBadge: {
-    backgroundColor: "#006c35", paddingHorizontal: 8,
-    alignItems: "center", justifyContent: "center", minWidth: 40,
+    backgroundColor: "#006c35", paddingHorizontal: 10,
+    alignItems: "center", justifyContent: "center", minWidth: 38,
   },
-  ksaArText: { fontSize: 8, color: "#fff", fontFamily: "Inter_700Bold" },
-  ksaEnText: { fontSize: 11, color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
+  ksaAr: { fontSize: 7, color: "#fff", fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
+  ksaEn: { fontSize: 12, color: "#fff", fontFamily: "Inter_700Bold", marginTop: 2 },
 });
 
 /* ── Main Screen ─────────────────────────────────────────── */
@@ -271,7 +287,6 @@ export default function AddVehicleScreen() {
     if (!model.trim()) e.model = "مطلوب";
     if (!year || year < 1990 || year > CURRENT_YEAR + 1) e.year = `بين 1990 و ${CURRENT_YEAR + 1}`;
     if (!["petrol", "diesel", "hybrid", "ev"].includes(fuelType)) e.fuelType = "مطلوب";
-    if (!plateNumber.trim()) e.plateNumber = "مطلوب";
     if (odometerKm.trim() && (!/^\d+$/.test(odometerKm.trim()) || Number(odometerKm) < 0)) {
       e.odometerKm = "رقم غير صحيح";
     }
@@ -468,7 +483,6 @@ export default function AddVehicleScreen() {
           <View style={styles.row}>
             <Text style={[styles.label, { color: colors.foreground }]}>رقم اللوحة</Text>
             <PlateInput value={plateNumber} onChange={setPlateNumber} />
-            {errors.plateNumber ? <Text style={styles.errorText}>{errors.plateNumber}</Text> : null}
           </View>
 
           {/* Odometer + VIN */}
