@@ -110,6 +110,12 @@ type RecommendationRow = {
   created_at?: string | null;
 };
 
+type DeviceOrderRow = {
+  id: string;
+  status: string;
+  created_at: string;
+};
+
 type ApiBridgeResult =
   | {
       handled: true;
@@ -1633,6 +1639,46 @@ async function handleAi(
       session.access_token,
     );
 
+    if (!rows.length) {
+      const maintenanceRows = await listMaintenanceLogs(
+        session.access_token,
+        session.user.id,
+        vehicleId,
+      );
+
+      const recommendations = buildMaintenanceRecommendations(
+        maintenanceRows,
+      )
+        .slice(0, 5)
+        .map((item) => ({
+          id: `maintenance-${item.id}`,
+          vehicleId,
+          kind: "maintenance_due",
+          severity:
+            item.status === "overdue"
+              ? "critical"
+              : item.status === "upcoming"
+                ? "warning"
+                : "info",
+          titleAr: item.serviceTypeAr
+            ? `${item.serviceTypeAr} تحتاج متابعة`
+            : "صيانة تحتاج متابعة",
+          descriptionAr:
+            item.status === "overdue"
+              ? "يوجد بند صيانة متأخر حسب آخر سجل محفوظ للمركبة."
+              : "هذه توصية مبنية على سجل الصيانة المحفوظ للمركبة.",
+          confidencePct: item.status === "scheduled" ? 72 : 88,
+          suggestedAction: "راجع جدول الصيانة وسجل آخر قراءة للعداد.",
+          suggestedCostSar: item.estimatedCost ?? null,
+          createdAt: new Date().toISOString(),
+        }));
+
+      return {
+        handled: true,
+        data: recommendations,
+      };
+    }
+
     return {
       handled: true,
       data: rows.map(toRecommendation),
@@ -1640,6 +1686,62 @@ async function handleAi(
   }
 
   return { handled: false };
+}
+
+async function handleDeviceOrders(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  if (path !== "/api/device-orders" || method !== "POST") {
+    return { handled: false };
+  }
+
+  const session = await requireSession();
+  const body = await readJsonBody(input, init);
+
+  const rows = await supabaseRequest<DeviceOrderRow[]>(
+    "/rest/v1/device_orders?select=id,status,created_at",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        user_id: session.user.id,
+        plan_tier:
+          typeof body.planTier === "string" ? body.planTier : null,
+        customer_name:
+          typeof body.customerName === "string"
+            ? body.customerName.trim()
+            : null,
+        phone:
+          typeof body.phone === "string" ? body.phone.trim() : null,
+        city:
+          typeof body.city === "string" && body.city.trim()
+            ? body.city.trim()
+            : null,
+        short_address:
+          typeof body.shortAddress === "string" &&
+          body.shortAddress.trim()
+            ? body.shortAddress.trim()
+            : null,
+        notes:
+          typeof body.notes === "string" && body.notes.trim()
+            ? body.notes.trim()
+            : null,
+      }),
+    },
+    session.access_token,
+  );
+
+  return {
+    handled: true,
+    status: 201,
+    data: rows[0],
+  };
 }
 
 function getRawUrl(
@@ -1719,6 +1821,17 @@ async function handleRequest(
 
   if (bookingsResult.handled) {
     return bookingsResult;
+  }
+
+  const deviceOrdersResult = await handleDeviceOrders(
+    path,
+    method,
+    input,
+    init,
+  );
+
+  if (deviceOrdersResult.handled) {
+    return deviceOrdersResult;
   }
 
   const aiResult = await handleAi(

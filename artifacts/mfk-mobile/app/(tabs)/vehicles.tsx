@@ -186,7 +186,7 @@ export default function VehiclesScreen() {
                     </Pressable>
                     <Pressable
                       style={[styles.actionBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30" }]}
-                      onPress={() => router.push("/(tabs)/diagnostics")}
+                      onPress={() => router.push("/diagnostics")}
                     >
                       <Ionicons name="pulse-outline" size={15} color={colors.primary} />
                       <Text style={[styles.actionText, { color: colors.primary }]}>تشخيص</Text>

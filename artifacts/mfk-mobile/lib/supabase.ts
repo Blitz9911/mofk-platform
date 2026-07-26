@@ -511,6 +511,39 @@ export const authApi = {
     return session?.access_token ?? null;
   },
 
+  async updateProfile(input: {
+    name: string;
+    phone: string;
+    city?: string;
+  }): Promise<AuthUser> {
+    const session = await getValidSupabaseSession();
+
+    if (!session?.access_token || !session.user?.id) {
+      throw new Error("يلزم تسجيل الدخول أولا.");
+    }
+
+    const payload = {
+      name: input.name.trim(),
+      phone: input.phone.trim(),
+      city: input.city?.trim() || null,
+    };
+
+    const rows = await supabaseRequest<UserRow[]>(
+      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}&select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(payload),
+      },
+      session.access_token,
+    );
+
+    return toAuthUser(session.user, rows[0]);
+  },
+
   async logout(): Promise<void> {
     const session = await getStoredSupabaseSession();
 

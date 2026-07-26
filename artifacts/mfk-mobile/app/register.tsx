@@ -43,7 +43,7 @@ export default function RegisterScreen() {
     try {
       const user = await authApi.register(name.trim(), phone, email.trim(), password);
       await login(user);
-      router.replace("/(tabs)");
+      router.replace("/");
     } catch (err: any) {
       setError(err.message || "حدث خطأ. حاول مجدداً.");
     } finally {

@@ -38,7 +38,7 @@ export default function PairDeviceScreen() {
     return () => clearTimeout(timer);
   }, [status]);
 
-  const goHome = () => router.replace("/(tabs)");
+  const goHome = () => router.replace("/");
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 18 }]}>

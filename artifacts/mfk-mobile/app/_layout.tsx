@@ -64,7 +64,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (user && inAuthScreen && !inOnboardingScreen) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/" />;
   }
 
   return <>{children}</>;

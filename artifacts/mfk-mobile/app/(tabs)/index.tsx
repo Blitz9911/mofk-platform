@@ -245,7 +245,7 @@ export default function DashboardScreen() {
                     المركبة غير متصلة حالياً
                   </Text>
                   <Pressable
-                    onPress={() => router.push("/(tabs)/diagnostics")}
+                    onPress={() => router.push("/diagnostics")}
                     style={[styles.liveBtn, { borderColor: colors.border }]}
                   >
                     <Text style={[styles.liveBtnText, { color: colors.foreground }]}>بدء جلسة</Text>

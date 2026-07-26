@@ -1,17 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import {
   useGetMySubscription,
   useListSubscriptionPlans,
 } from "@workspace/api-client-react";
-import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from "react-native";
@@ -19,44 +19,127 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
-const TIER_NAMES: Record<string, string> = {
-  free: "الباقة المجانية",
-  basic: "الباقة الأساسية",
-  premium: "الباقة الاحترافية",
+const PLAN_LABELS: Record<string, string> = {
+  free: "باقة مجانية",
+  plus: "باقة مفك",
+  mofk: "باقة مفك",
+  family: "باقة العائلة",
+  premium: "باقة العائلة",
+  pro: "باقة العائلة",
   fleet: "باقة الأسطول",
 };
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  active: { label: "نشط", color: "#22c55e" },
-  expired: { label: "منتهي", color: "#ef4444" },
-  cancelled: { label: "ملغى", color: "#6b7280" },
+const PLAN_SUBTITLES: Record<string, string> = {
+  free: "للبداية ومتابعة مركبة واحدة",
+  mofk: "اشتراك مفك لمركبة واحدة مع جهاز OBD",
+  plus: "اشتراك مفك لمركبة واحدة مع جهاز OBD",
+  family: "لعدة مركبات مع دعم أولوية",
+  premium: "لعدة مركبات مع دعم أولوية",
+  fleet: "للشركات والأساطيل بدعم خاص",
 };
+
+function normalizeTier(tier?: string) {
+  if (tier === "plus") return "mofk";
+  if (tier === "premium" || tier === "pro") return "family";
+  return tier ?? "free";
+}
 
 export default function SubscriptionScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("yearly");
+  const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const { data: subscription, isLoading: subLoading } = useGetMySubscription();
   const { data: plans, isLoading: plansLoading } = useListSubscriptionPlans();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const currentTier = normalizeTier(subscription?.tier);
 
-  const statusInfo = subscription?.status ? STATUS_LABEL[subscription.status] : null;
+  const orderedPlans = useMemo(() => {
+    const rank: Record<string, number> = {
+      free: 1,
+      mofk: 2,
+      plus: 2,
+      family: 3,
+      premium: 3,
+      pro: 3,
+      fleet: 4,
+    };
 
-  const formatDate = (d: string | null | undefined) =>
-    d ? new Date(d).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" }) : "—";
+    return [...(plans ?? [])].sort(
+      (a, b) => (rank[a.tier ?? a.id] ?? 99) - (rank[b.tier ?? b.id] ?? 99),
+    );
+  }, [plans]);
+
+  const activePlan = orderedPlans.find((plan) => normalizeTier(plan.tier) === currentTier);
+  const selectedPlan =
+    orderedPlans.find((plan) => normalizeTier(plan.tier) === selectedTier) ??
+    orderedPlans.find((plan) => normalizeTier(plan.tier) !== currentTier) ??
+    orderedPlans[0];
+
+  const checkout = async () => {
+    if (!selectedPlan) return;
+
+    if (normalizeTier(selectedPlan.tier) === currentTier) {
+      Alert.alert("الباقة الحالية", "هذه باقتك الحالية بالفعل.");
+      return;
+    }
+
+    setCheckingOut(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      Alert.alert(
+        "بوابة الدفع التجريبية",
+        `تم تجهيز محاكاة الدفع لـ ${PLAN_LABELS[normalizeTier(selectedPlan.tier)] ?? selectedPlan.nameAr}.`,
+      );
+    } finally {
+      setCheckingOut(false);
+    }
+  };
+
+  const formatPrice = (plan: NonNullable<typeof plans>[number]) => {
+    const monthly =
+      billingCycle === "yearly" && plan.priceYearlySar
+        ? Math.round(plan.priceYearlySar / 12)
+        : plan.priceMonthlySar;
+
+    if (monthly === 0 && normalizeTier(plan.tier) === "fleet") {
+      return "تواصل معنا";
+    }
+
+    return monthly === 0 ? "مجاناً" : `${monthly} ر.س`;
+  };
+
+  const maxVehiclesFor = (plan: NonNullable<typeof plans>[number]) => {
+    const value = (plan as { maxVehicles?: number | null }).maxVehicles;
+
+    if (value === null) return "مركبات أكثر";
+    return `${value ?? 1} مركبة`;
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
-      {/* Header */}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: topPad },
+      ]}
+    >
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.back()} style={styles.iconButton}>
           <Ionicons name="chevron-forward" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>الاشتراك والباقات</Text>
-        <View style={{ width: 34 }} />
+        <View style={styles.headerText}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+            الاشتراك والباقات
+          </Text>
+          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+            اختر الباقة المناسبة، والقطعة تطلب بشكل مستقل
+          </Text>
+        </View>
+        <View style={{ width: 38 }} />
       </View>
 
       {subLoading || plansLoading ? (
@@ -65,159 +148,188 @@ export default function SubscriptionScreen() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 20 }}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 16, paddingBottom: 86, gap: 16 }}
         >
-          {/* Current Subscription */}
-          {subscription && (
-            <View style={[styles.currentCard, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "40" }]}>
-              <View style={styles.currentTop}>
-                {statusInfo && (
-                  <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + "20" }]}>
-                    <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
-                  </View>
-                )}
-                <View style={styles.currentTitleRow}>
-                  <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
-                  <Text style={[styles.currentTitle, { color: colors.primary }]}>
-                    {TIER_NAMES[subscription.tier] ?? subscription.tier}
-                  </Text>
-                </View>
+          <View
+            style={[
+              styles.currentCard,
+              { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}45` },
+            ]}
+          >
+            <View style={styles.currentTop}>
+              <View style={styles.currentText}>
+                <Text style={[styles.eyebrow, { color: colors.primary }]}>
+                  باقتك الحالية
+                </Text>
+                <Text style={[styles.currentTitle, { color: colors.foreground }]}>
+                  {PLAN_LABELS[currentTier] ?? activePlan?.nameAr ?? "باقة مجانية"}
+                </Text>
+                <Text style={[styles.currentSub, { color: colors.mutedForeground }]}>
+                  {activePlan?.descriptionAr ?? "يمكنك الترقية في أي وقت عند الحاجة."}
+                </Text>
               </View>
-
-              <View style={styles.currentDates}>
-                <View style={styles.dateItem}>
-                  <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>تاريخ البدء</Text>
-                  <Text style={[styles.dateVal, { color: colors.foreground }]}>{formatDate(subscription.startedAt)}</Text>
-                </View>
-                <View style={[styles.dateDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.dateItem}>
-                  <Text style={[styles.dateLabel, { color: colors.mutedForeground }]}>تاريخ الانتهاء</Text>
-                  <Text style={[styles.dateVal, { color: colors.foreground }]}>{formatDate(subscription.endsAt)}</Text>
-                </View>
-              </View>
-
-              <View style={[styles.autoRenewRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Switch value={subscription.autoRenew ?? false} thumbColor={colors.primary} trackColor={{ true: colors.primary + "60", false: colors.border }} />
-                <View style={styles.autoRenewInfo}>
-                  <Text style={[styles.autoRenewTitle, { color: colors.foreground }]}>التجديد التلقائي</Text>
-                  <Text style={[styles.autoRenewSub, { color: colors.mutedForeground }]}>تجديد تلقائي لتجنب انقطاع الخدمة</Text>
-                </View>
-              </View>
-
-              <View style={styles.currentActions}>
-                <Pressable style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Ionicons name="card-outline" size={16} color={colors.foreground} />
-                  <Text style={[styles.actionBtnText, { color: colors.foreground }]}>إدارة طريقة الدفع</Text>
-                </Pressable>
-                <Pressable style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Ionicons name="receipt-outline" size={16} color={colors.foreground} />
-                  <Text style={[styles.actionBtnText, { color: colors.foreground }]}>عرض الفواتير</Text>
-                </Pressable>
+              <View style={[styles.statusPill, { backgroundColor: colors.card }]}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                <Text style={[styles.statusText, { color: colors.success }]}>
+                  نشطة
+                </Text>
               </View>
             </View>
-          )}
+          </View>
 
-          {/* Billing Cycle Toggle */}
-          <View style={styles.centerBlock}>
-            <Text style={[styles.upgradeTitle, { color: colors.foreground }]}>ارتقِ بتجربتك</Text>
-            <Text style={[styles.upgradeSub, { color: colors.mutedForeground }]}>وفر حتى 20% عند الاشتراك السنوي</Text>
-            <View style={[styles.cycleToggle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.billingWrap}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              سوي ووفر أكثر
+            </Text>
+            <View style={[styles.segment, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Pressable
-                style={[styles.cyclePill, billingCycle === "monthly" && { backgroundColor: colors.background }]}
                 onPress={() => setBillingCycle("monthly")}
+                style={[
+                  styles.segmentItem,
+                  billingCycle === "monthly" && { backgroundColor: colors.background },
+                ]}
               >
-                <Text style={[styles.cyclePillText, { color: billingCycle === "monthly" ? colors.foreground : colors.mutedForeground }]}>
+                <Text style={[styles.segmentText, { color: billingCycle === "monthly" ? colors.foreground : colors.mutedForeground }]}>
                   شهري
                 </Text>
               </Pressable>
               <Pressable
-                style={[styles.cyclePill, billingCycle === "yearly" && { backgroundColor: colors.primary }]}
                 onPress={() => setBillingCycle("yearly")}
+                style={[
+                  styles.segmentItem,
+                  billingCycle === "yearly" && { backgroundColor: colors.primary },
+                ]}
               >
-                <Text style={[styles.cyclePillText, { color: billingCycle === "yearly" ? "#fff" : colors.mutedForeground }]}>
-                  سنوي  <Text style={{ fontSize: 10 }}>-20%</Text>
+                <Text style={[styles.segmentText, { color: billingCycle === "yearly" ? "#fff" : colors.mutedForeground }]}>
+                  سنوي -20%
                 </Text>
               </Pressable>
             </View>
           </View>
 
-          {/* Plans */}
-          {plans?.map((plan) => {
-            const isCurrent = subscription?.tier === plan.tier;
-            const price =
-              billingCycle === "monthly"
-                ? plan.priceMonthlySar
-                : plan.priceYearlySar
-                ? Math.round(plan.priceYearlySar / 12)
-                : plan.priceMonthlySar;
+          <View style={styles.plansList}>
+            {orderedPlans.map((plan) => {
+              const tier = normalizeTier(plan.tier);
+              const isCurrent = tier === currentTier;
+              const isSelected =
+                selectedTier === tier || (!selectedTier && selectedPlan?.id === plan.id);
 
-            return (
-              <View
-                key={plan.id}
-                style={[
-                  styles.planCard,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: plan.isPopular ? colors.primary : isCurrent ? colors.primary + "60" : colors.border,
-                    borderWidth: plan.isPopular ? 2 : StyleSheet.hairlineWidth,
-                  },
-                ]}
-              >
-                {plan.isPopular && (
-                  <View style={[styles.popularBadge, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="flash" size={12} color="#fff" />
-                    <Text style={styles.popularText}>الأكثر طلباً</Text>
-                  </View>
-                )}
-
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={[styles.planPrice, { color: colors.foreground }]}>
-                      {price}
-                      <Text style={[styles.planPriceUnit, { color: colors.mutedForeground }]}> ر.س/شهر</Text>
-                    </Text>
-                    {billingCycle === "yearly" && price > 0 && plan.priceYearlySar && (
-                      <Text style={[styles.planYearly, { color: colors.mutedForeground }]}>
-                        يُدفع {plan.priceYearlySar} ر.س سنوياً
-                      </Text>
-                    )}
-                  </View>
-                  <View>
-                    <Text style={[styles.planName, { color: colors.foreground }]}>{plan.nameAr}</Text>
-                    <Text style={[styles.planDesc, { color: colors.mutedForeground }]}>{plan.descriptionAr}</Text>
-                  </View>
-                </View>
-
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                <View style={styles.features}>
-                  {(plan.featuresAr || plan.features || []).map((f: string, i: number) => (
-                    <View key={i} style={styles.featureRow}>
-                      <Text style={[styles.featureText, { color: colors.foreground }]}>{f}</Text>
-                      <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                    </View>
-                  ))}
-                </View>
-
+              return (
                 <Pressable
-                  style={({ pressed }) => [
-                    styles.planBtn,
+                  key={plan.id}
+                  onPress={() => setSelectedTier(tier)}
+                  style={[
+                    styles.planCard,
                     {
-                      backgroundColor: isCurrent ? colors.card : plan.isPopular ? colors.primary : colors.accent,
-                      borderColor: isCurrent ? colors.border : plan.isPopular ? colors.primary : colors.border,
-                      opacity: pressed ? 0.8 : 1,
+                      backgroundColor: colors.card,
+                      borderColor: isSelected || plan.isPopular ? colors.primary : colors.border,
+                      borderWidth: isSelected || plan.isPopular ? 1.4 : StyleSheet.hairlineWidth,
                     },
                   ]}
-                  disabled={isCurrent}
                 >
-                  <Text style={[styles.planBtnText, { color: isCurrent ? colors.mutedForeground : plan.isPopular ? "#fff" : colors.foreground }]}>
-                    {isCurrent ? "باقتك الحالية" : price === 0 ? "ابدأ مجاناً" : "ترقية الباقة"}
-                  </Text>
+                  <View style={styles.planHeader}>
+                    <View style={styles.planMeta}>
+                      <Text style={[styles.planName, { color: colors.foreground }]}>
+                        {PLAN_LABELS[tier] ?? plan.nameAr}
+                      </Text>
+                      <Text style={[styles.planDescription, { color: colors.mutedForeground }]}>
+                        {PLAN_SUBTITLES[tier] ?? plan.descriptionAr}
+                      </Text>
+                    </View>
+                    <View style={styles.priceBox}>
+                      {plan.isPopular ? (
+                        <View style={[styles.popularBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.popularText}>الأكثر طلباً</Text>
+                        </View>
+                      ) : null}
+                      <Text style={[styles.price, { color: colors.foreground }]}>
+                        {formatPrice(plan)}
+                      </Text>
+                      {formatPrice(plan) !== "مجاناً" && formatPrice(plan) !== "تواصل معنا" ? (
+                        <Text style={[styles.priceUnit, { color: colors.mutedForeground }]}>
+                          / شهر
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  <View style={styles.planFacts}>
+                    <View style={[styles.fact, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Ionicons name="car-outline" size={15} color={colors.primary} />
+                      <Text style={[styles.factText, { color: colors.foreground }]}>
+                        {maxVehiclesFor(plan)}
+                      </Text>
+                    </View>
+                    <View style={[styles.fact, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Ionicons name="hardware-chip-outline" size={15} color={colors.primary} />
+                      <Text style={[styles.factText, { color: colors.foreground }]}>
+                        {tier === "free" ? "بدون قطعة" : "القطعة لحال"}
+                      </Text>
+                    </View>
+                    <View style={[styles.fact, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.primary} />
+                      <Text style={[styles.factText, { color: colors.foreground }]}>
+                        {tier === "free" ? "بدون AI" : "AI غير محدود"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.featureList}>
+                    {(plan.featuresAr ?? plan.features).slice(0, 4).map((feature) => (
+                      <View key={feature} style={styles.featureRow}>
+                        <Text style={[styles.featureText, { color: colors.foreground }]}>
+                          {feature}
+                        </Text>
+                        <Ionicons name="checkmark-circle" size={17} color={colors.success} />
+                      </View>
+                    ))}
+                  </View>
+
+                  {isCurrent ? (
+                    <View style={[styles.currentBadge, { backgroundColor: `${colors.success}18` }]}>
+                      <Text style={[styles.currentBadgeText, { color: colors.success }]}>
+                        باقتك الحالية
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
+              );
+            })}
+          </View>
+
+          <View
+            style={[
+              styles.checkoutCard,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.checkoutHeader}>
+              <View style={styles.checkoutText}>
+                <Text style={[styles.checkoutTitle, { color: colors.foreground }]}>
+                  ملخص الترقية
+                </Text>
+                <Text style={[styles.checkoutSub, { color: colors.mutedForeground }]}>
+                  الاشتراك منفصل عن طلب قطعة مفك، ويمكنك طلب القطعة من حسابي.
+                </Text>
               </View>
-            );
-          })}
+              <Ionicons name="card-outline" size={24} color={colors.primary} />
+            </View>
+            <Pressable
+              onPress={checkout}
+              disabled={checkingOut || !selectedPlan}
+              style={[
+                styles.checkoutBtn,
+                { backgroundColor: colors.primary, opacity: checkingOut ? 0.7 : 1 },
+              ]}
+            >
+              {checkingOut ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.checkoutTextBtn}>متابعة الدفع</Text>
+              )}
+            </Pressable>
+          </View>
         </ScrollView>
       )}
     </View>
@@ -234,85 +346,55 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  iconButton: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1, alignItems: "center", gap: 2 },
   headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  backBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
+  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
   loadCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
-  currentCard: { padding: 18, borderRadius: 18, borderWidth: 1, gap: 14 },
-  currentTop: { gap: 8 },
-  currentTitleRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
-  currentTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  statusBadge: { alignSelf: "flex-end", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  currentDates: { flexDirection: "row-reverse", gap: 12 },
-  dateItem: { flex: 1, alignItems: "flex-end", gap: 2 },
-  dateLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  dateVal: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  dateDivider: { width: 1 },
-  autoRenewRow: {
+  currentCard: { padding: 16, borderRadius: 18, borderWidth: 1 },
+  currentTop: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 12 },
+  currentText: { flex: 1, alignItems: "flex-end", gap: 4 },
+  eyebrow: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  currentTitle: { fontSize: 21, fontFamily: "Inter_700Bold", textAlign: "right" },
+  currentSub: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right" },
+  statusPill: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
-  autoRenewInfo: { flex: 1, alignItems: "flex-end" },
-  autoRenewTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  autoRenewSub: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  currentActions: { flexDirection: "row-reverse", gap: 10 },
-  actionBtn: {
-    flex: 1,
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  actionBtnText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  centerBlock: { alignItems: "center", gap: 8 },
-  upgradeTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  upgradeSub: { fontSize: 14, fontFamily: "Inter_400Regular" },
-  cycleToggle: {
-    flexDirection: "row",
-    borderRadius: 50,
-    padding: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginTop: 4,
-  },
-  cyclePill: { paddingHorizontal: 24, paddingVertical: 8, borderRadius: 50 },
-  cyclePillText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  planCard: { borderRadius: 16, overflow: "visible", paddingTop: 18, paddingHorizontal: 16, paddingBottom: 16, gap: 14 },
-  popularBadge: {
-    position: "absolute",
-    top: -14,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  popularText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
-  planHeader: { flexDirection: "row-reverse", alignItems: "flex-start", justifyContent: "space-between" },
-  planName: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
-  planDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  planPrice: { fontSize: 28, fontFamily: "Inter_700Bold" },
-  planPriceUnit: { fontSize: 13 },
-  planYearly: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  divider: { height: StyleSheet.hairlineWidth },
-  features: { gap: 10 },
-  featureRow: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 10 },
+  statusText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  billingWrap: { alignItems: "center", gap: 10 },
+  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  segment: { flexDirection: "row", padding: 4, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  segmentItem: { minWidth: 114, alignItems: "center", paddingVertical: 9, borderRadius: 999 },
+  segmentText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  plansList: { gap: 12 },
+  planCard: { padding: 15, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, gap: 13 },
+  planHeader: { flexDirection: "row-reverse", justifyContent: "space-between", gap: 12 },
+  planMeta: { flex: 1, alignItems: "flex-end", gap: 4 },
+  planName: { fontSize: 19, fontFamily: "Inter_700Bold", textAlign: "right" },
+  planDescription: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 18 },
+  priceBox: { alignItems: "flex-start", gap: 3, minWidth: 94 },
+  popularBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  popularText: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" },
+  price: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  priceUnit: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  planFacts: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 7 },
+  fact: { flexDirection: "row-reverse", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  factText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  featureList: { gap: 8 },
+  featureRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
   featureText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right" },
-  planBtn: {
-    height: 48,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    marginTop: 4,
-  },
-  planBtnText: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  currentBadge: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  currentBadgeText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  checkoutCard: { padding: 15, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, gap: 14 },
+  checkoutHeader: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 10 },
+  checkoutText: { flex: 1, alignItems: "flex-end", gap: 4 },
+  checkoutTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  checkoutSub: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right" },
+  checkoutBtn: { minHeight: 50, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  checkoutTextBtn: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
 });

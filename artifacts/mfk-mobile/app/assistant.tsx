@@ -64,7 +64,7 @@ export default function AssistantScreen() {
         ts: Date.now(),
       };
       setMessages((prev) => [assistantMsg, ...prev]);
-    } catch {
+    } catch (error) {
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
