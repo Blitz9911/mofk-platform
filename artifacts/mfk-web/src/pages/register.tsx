@@ -48,8 +48,8 @@ export default function Register() {
     <div className="min-h-screen bg-background flex flex-col md:flex-row" dir="rtl">
 
       {/* Left visual panel */}
-      <div className="hidden md:flex md:w-[45%] bg-card border-l border-border relative overflow-hidden items-center justify-center p-12">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
+      <div className="hidden md:flex md:w-[45%] bg-card/90 border-l border-border relative overflow-hidden items-center justify-center p-12">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,101,0,0.18),transparent_22rem)]" />
         <div className="relative z-10 max-w-sm">
           <Link href="/">
             <MfkLogo size="lg" className="mb-10 cursor-pointer" />
@@ -82,7 +82,7 @@ export default function Register() {
           <Link href="/"><MfkLogo size="md" className="cursor-pointer" /></Link>
         </div>
 
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card/90 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] sm:p-7">
           <AnimatePresence mode="wait">
 
             {!done ? (
@@ -91,7 +91,7 @@ export default function Register() {
                 exit={{ opacity: 0, y: -16 }} transition={{ duration: 0.25 }}>
 
                 <div className="mb-8">
-                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mb-5">
+                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl border border-primary/20 flex items-center justify-center mb-5">
                     <User size={28} />
                   </div>
                   <h2 className="text-3xl font-bold mb-2">إنشاء حساب جديد</h2>
@@ -120,7 +120,7 @@ export default function Register() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium block">رقم الجوال</label>
                     <div className="flex" dir="ltr">
-                      <div className="flex items-center justify-center px-4 border border-r-0 border-border bg-muted rounded-l-md text-muted-foreground font-medium text-sm shrink-0 gap-1">
+                      <div className="flex items-center justify-center px-4 border border-r-0 border-border bg-secondary rounded-l-xl text-muted-foreground font-medium text-sm shrink-0 gap-1">
                         <Phone className="w-3.5 h-3.5" />
                         +966
                       </div>

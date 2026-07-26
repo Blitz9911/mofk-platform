@@ -22,6 +22,103 @@ import {
 import { useListSubscriptionPlans } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+function WebAppHero() {
+  return (
+    <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_12%,rgba(255,101,0,0.12),transparent_32rem),radial-gradient(circle_at_84%_0%,rgba(255,140,0,0.08),transparent_26rem)]" />
+
+      <div className="container mx-auto grid items-center gap-10 px-4 lg:grid-cols-[1.02fr_0.98fr]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-2xl space-y-7"
+        >
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm font-bold text-primary">
+            <span className="mfk-live-dot" />
+            مفك للعناية الذكية بالمركبة
+          </div>
+          <h1 className="max-w-3xl text-4xl font-black leading-[1.12] tracking-normal md:text-6xl">
+            افهم سيارتك قبل ما تفاجئك.
+          </h1>
+          <p className="max-w-2xl text-lg leading-8 text-muted-foreground md:text-xl">
+            منصة مفك تجمع المركبات، الصيانة، الأعطال، الاشتراكات، والتنبيهات في تجربة عربية واضحة على الجوال والويب.
+          </p>
+          <div className="flex flex-col gap-4 pt-4 sm:flex-row">
+            <Link href="/register">
+              <Button size="lg" className="h-14 w-full rounded-2xl px-8 text-base font-black sm:w-auto">
+                ابدأ الآن
+              </Button>
+            </Link>
+            <Link href="#demo">
+              <Button size="lg" variant="outline" className="h-14 w-full rounded-2xl px-8 text-base font-black sm:w-auto">
+                شاهد التجربة
+              </Button>
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-2 text-sm text-muted-foreground">
+            {["ربط Supabase مباشر", "جاهز لقطعة OBD", "لوحة إدارة شاملة"].map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+        >
+          <div className="mx-auto max-w-[440px] rounded-[2rem] border border-border bg-card p-4 shadow-[0_32px_90px_rgba(0,0,0,0.48)]">
+            <div className="rounded-[1.5rem] border border-border bg-background p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
+                  BLE 5.0 متصل
+                </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black">
+                  م
+                </div>
+              </div>
+
+              <div className="relative mb-5 overflow-hidden rounded-3xl border border-primary/20 bg-primary/10 p-6">
+                <div className="absolute inset-x-0 top-1/2 h-px bg-primary/20" />
+                <div className="relative mx-auto h-32 max-w-[260px]">
+                  <div className="absolute left-1/2 top-8 h-10 w-24 -translate-x-1/2 rounded-t-3xl border-[3px] border-primary" />
+                  <div className="absolute bottom-7 left-1/2 h-14 w-56 -translate-x-1/2 rounded-[2rem] border-[3px] border-primary shadow-[0_0_32px_rgba(255,101,0,0.25)]" />
+                  <div className="absolute bottom-2 left-14 h-9 w-9 rounded-full border-[3px] border-primary bg-background" />
+                  <div className="absolute bottom-2 right-14 h-9 w-9 rounded-full border-[3px] border-primary bg-background" />
+                  <div className="absolute left-[43%] top-[58%] h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(0,196,140,0.9)]" />
+                  <div className="absolute right-[38%] top-[66%] h-2.5 w-2.5 rounded-full bg-amber-400 shadow-[0_0_14px_rgba(255,184,0,0.9)]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "حالة المركبة", value: "87%", icon: Activity, color: "text-emerald-400" },
+                  { label: "الصيانة", value: "قريبة", icon: Wrench, color: "text-amber-400" },
+                  { label: "الأعطال", value: "0", icon: ShieldCheck, color: "text-primary" },
+                  { label: "المساعد", value: "جاهز", icon: Smartphone, color: "text-blue-400" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="rounded-2xl border border-border bg-secondary p-3">
+                      <Icon className={`mb-2 h-4 w-4 ${item.color}`} />
+                      <div className={`text-lg font-black ${item.color}`}>{item.value}</div>
+                      <div className="text-xs text-muted-foreground">{item.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const { data: plans, isLoading: isPlansLoading } = useListSubscriptionPlans();
 
@@ -30,8 +127,9 @@ export default function Home() {
       <Header />
 
       <main className="flex-1">
+        <WebAppHero />
         {/* HERO SECTION */}
-        <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+        <section className="hidden">
           {/* Background effects */}
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"></div>
           <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] -z-10"></div>

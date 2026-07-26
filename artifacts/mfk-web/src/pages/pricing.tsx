@@ -61,11 +61,11 @@ function MobileComparisonCards() {
     <div className="space-y-3 md:hidden">
       {comparisonRows.map((row) =>
         row.type === "section" ? (
-          <div key={row.label} className="rounded-[12px] bg-[#0B0B0B] px-3 py-2 text-sm font-black text-[#FF6A00]">
+          <div key={row.label} className="rounded-xl bg-secondary px-3 py-2 text-sm font-black text-primary">
             {row.label}
           </div>
         ) : (
-          <div key={row.label} className="rounded-[14px] border border-[#2A2A2A] bg-[#222] p-3">
+          <div key={row.label} className="rounded-2xl border border-border bg-card p-3">
             <p className="mb-3 text-sm font-black">{row.label}</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
@@ -74,7 +74,7 @@ function MobileComparisonCards() {
                 ["العائلة", row.family],
                 ["الاسطول", row.fleet],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-[10px] bg-[#111] p-2">
+                <div key={label} className="rounded-xl bg-secondary p-2">
                   <p className="mb-1 text-[#8A8A8A]">{label}</p>
                   <div className="font-bold text-white"><CellValue value={value} /></div>
                 </div>
@@ -107,7 +107,7 @@ export default function Pricing() {
   };
 
   return (
-    <div className="dark min-h-screen bg-[#0B0B0B] text-white" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
+    <div className="dark min-h-screen bg-background text-white" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
       <Header />
 
       <main className="pb-32 pt-28 md:pt-32">
@@ -120,7 +120,7 @@ export default function Pricing() {
               </p>
             </div>
 
-            <div className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1" role="tablist" aria-label="دورة الفوترة">
+            <div className="inline-grid grid-cols-2 rounded-2xl border border-border bg-card p-1" role="tablist" aria-label="دورة الفوترة">
               {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
                 <button
                   key={cycle}
@@ -130,8 +130,8 @@ export default function Pricing() {
                   aria-pressed={billingCycle === cycle}
                   onClick={() => setBillingCycle(cycle)}
                   className={cn(
-                    "min-w-[112px] rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
-                    billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
+                    "min-w-[112px] rounded-xl px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                    billingCycle === cycle ? "bg-primary text-primary-foreground" : "text-[#8A8A8A] hover:text-white",
                   )}
                 >
                   <span className="inline-flex items-center justify-center gap-2">
@@ -157,7 +157,7 @@ export default function Pricing() {
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-4">
               {[1, 2, 3, 4].map((item) => (
-                <Skeleton key={item} className="h-[420px] rounded-[16px] bg-[#1A1A1A]" />
+                <Skeleton key={item} className="h-[420px] rounded-2xl bg-card" />
               ))}
             </div>
           ) : (
@@ -172,11 +172,11 @@ export default function Pricing() {
                     onClick={() => setSelectedPlanId(plan.id)}
                     aria-pressed={selected}
                     className={cn(
-                      "relative flex min-h-[340px] flex-col rounded-[16px] border bg-[#1A1A1A] p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00] sm:min-h-[410px] sm:p-5",
-                      selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
+                      "relative flex min-h-[340px] flex-col rounded-2xl border bg-card p-4 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-[410px] sm:p-5",
+                      selected ? "border-primary bg-secondary shadow-[0_0_40px_rgba(255,101,0,0.10)]" : "border-border hover:border-primary/70",
                     )}
                   >
-                    {plan.badge && <span className="absolute left-4 top-4 rounded-full bg-[#FF6A00] px-3 py-1 text-xs font-black text-white">{plan.badge}</span>}
+                    {plan.badge && <span className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-xs font-black text-primary-foreground">{plan.badge}</span>}
 
                     <div className="space-y-3">
                       <h2 className="text-2xl font-black">{plan.name}</h2>
@@ -194,7 +194,7 @@ export default function Pricing() {
                     </div>
 
                     <div className="mt-auto pt-6">
-                      <div className="rounded-[12px] border border-[#2A2A2A] bg-[#0B0B0B] px-4 py-3 text-center text-sm font-bold text-white">
+                      <div className="rounded-xl border border-border bg-background px-4 py-3 text-center text-sm font-bold text-white">
                         {plan.saleType === "sales-led" ? "تواصل مع المبيعات" : selected ? "الباقة المحددة" : "اختيار الباقة"}
                       </div>
                     </div>
@@ -206,21 +206,21 @@ export default function Pricing() {
         </section>
 
         <section className="mx-auto mt-6 w-full max-w-7xl px-4 md:px-6">
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-bold text-[#FF6A00]">تفاصيل الباقة</p>
+                <p className="text-sm font-bold text-primary">تفاصيل الباقة</p>
                 <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
                 <p className="mt-2 text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
               </div>
-              <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
+              <div className="rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-[#8A8A8A]">
                 {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
               </div>
             </div>
 
             <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {selectedPlan.included.map((feature) => (
-                <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
+                <div key={feature} className="flex items-start gap-3 rounded-xl bg-secondary p-3 text-sm leading-6">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
                   <span>{feature}</span>
                 </div>
@@ -230,19 +230,19 @@ export default function Pricing() {
         </section>
 
         <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
-          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
+          <div className="rounded-2xl border border-border bg-card p-5 md:p-6">
             <div className="mb-6">
-              <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
+              <p className="text-sm font-bold text-primary">جدول المقارنة</p>
               <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
             </div>
             <MobileComparisonCards />
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[920px] text-sm">
                 <thead>
-                  <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
+                  <tr className="border-b border-border text-[#8A8A8A]">
                     <th className="p-3 text-right">الميزة</th>
                     <th className="p-3 text-center">باقة مجانية</th>
-                    <th className="p-3 text-center text-[#FF6A00]">باقة مفك</th>
+                    <th className="p-3 text-center text-primary">باقة مفك</th>
                     <th className="p-3 text-center">باقة العائلة</th>
                     <th className="p-3 text-center">باقة الاسطول</th>
                   </tr>
@@ -251,13 +251,13 @@ export default function Pricing() {
                   {comparisonRows.map((row) =>
                     row.type === "section" ? (
                       <tr key={row.label}>
-                        <td colSpan={5} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                        <td colSpan={5} className="bg-background p-3 text-sm font-black text-primary">{row.label}</td>
                       </tr>
                     ) : (
-                      <tr key={row.label} className="border-b border-[#2A2A2A]/80">
+                      <tr key={row.label} className="border-b border-border/80">
                         <td className="p-3 font-bold">{row.label}</td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
-                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                        <td className="bg-primary/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
                         <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
                       </tr>
@@ -271,14 +271,14 @@ export default function Pricing() {
       </main>
 
       {selectedPlan.id !== "free" && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-4 pb-4 pt-8">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-4 pt-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-[#8A8A8A]">الباقة المحددة</p>
               <p className="text-lg font-black">{selectedPlan.name}</p>
             </div>
             <Link href={checkoutHrefByPlan[selectedPlan.id]}>
-              <Button className="h-12 w-full rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00] sm:w-auto">
+              <Button className="h-12 w-full rounded-xl px-8 text-base font-black sm:w-auto">
                 {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "ابدأ الاشتراك"}
               </Button>
             </Link>
