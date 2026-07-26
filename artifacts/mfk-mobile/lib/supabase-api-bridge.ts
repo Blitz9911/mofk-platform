@@ -28,6 +28,12 @@ type UserRow = {
   is_active?: boolean | null;
 };
 
+type SubscriptionUserRow = UserRow & {
+  subscription_started_at?: string | null;
+  subscription_ends_at?: string | null;
+  subscription_auto_renew?: boolean | null;
+};
+
 type MaintenanceLogRow = {
   id: string;
   vehicle_id: string;
@@ -44,6 +50,64 @@ type MaintenanceLogRow = {
     nickname?: string | null;
     odometer_km?: number | null;
   } | null;
+};
+
+type DiagnosticCodeRow = {
+  id: string;
+  user_id: string;
+  vehicle_id: string;
+  code: string;
+  title?: string | null;
+  severity?: string | null;
+  explanation?: string | null;
+  status?: string | null;
+  detected_at?: string | null;
+  vehicles?: {
+    make?: string | null;
+    model?: string | null;
+    nickname?: string | null;
+  } | null;
+};
+
+type SubscriptionPlanRow = {
+  id: string;
+  name: string;
+  name_ar: string;
+  description_ar?: string | null;
+  price_monthly_sar: number;
+  price_yearly_sar?: number | null;
+  max_vehicles?: number | null;
+  tier?: string | null;
+  features?: string[] | null;
+  features_ar?: string[] | null;
+  is_popular?: boolean | null;
+  sort_order?: number | null;
+};
+
+type BookingRow = {
+  id: string;
+  vehicle_id?: string | null;
+  workshop_name?: string | null;
+  service_type_ar?: string | null;
+  scheduled_at: string;
+  status: string;
+  vehicles?: {
+    make?: string | null;
+    model?: string | null;
+  } | null;
+};
+
+type RecommendationRow = {
+  id: string;
+  vehicle_id: string;
+  kind?: string | null;
+  severity?: string | null;
+  title_ar: string;
+  description_ar?: string | null;
+  confidence_pct?: number | null;
+  suggested_action?: string | null;
+  suggested_cost_sar?: number | null;
+  created_at?: string | null;
 };
 
 type ApiBridgeResult =
@@ -617,6 +681,99 @@ function liveTelemetry(vehicleId: string) {
       throttlePos: 0,
     },
     recent: [],
+  };
+}
+
+function toSubscriptionPlan(row: SubscriptionPlanRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    nameAr: row.name_ar,
+    descriptionAr: row.description_ar ?? "",
+    priceMonthlySar: Number(row.price_monthly_sar ?? 0),
+    priceYearlySar:
+      row.price_yearly_sar === null ||
+      row.price_yearly_sar === undefined
+        ? undefined
+        : Number(row.price_yearly_sar),
+    maxVehicles:
+      row.max_vehicles === undefined ? null : row.max_vehicles,
+    tier: row.tier ?? row.id,
+    features: row.features ?? [],
+    featuresAr: row.features_ar ?? [],
+    isPopular: Boolean(row.is_popular),
+  };
+}
+
+function toBooking(row: BookingRow) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id ?? null,
+    vehicleMake: row.vehicles?.make ?? null,
+    vehicleModel: row.vehicles?.model ?? null,
+    workshopName: row.workshop_name ?? null,
+    serviceTypeAr: row.service_type_ar ?? null,
+    scheduledAt: row.scheduled_at,
+    status: row.status,
+  };
+}
+
+function normalizeDtcStatus(status?: string | null) {
+  return status === "cleared" || status === "resolved"
+    ? "cleared"
+    : "active";
+}
+
+function normalizeDtcSeverity(severity?: string | null) {
+  return severity === "low" ||
+    severity === "medium" ||
+    severity === "high" ||
+    severity === "critical"
+    ? severity
+    : "medium";
+}
+
+function toDtcCode(row: DiagnosticCodeRow) {
+  const severity = normalizeDtcSeverity(row.severity);
+
+  return {
+    id: row.id,
+    sessionId: null,
+    vehicleId: row.vehicle_id,
+    vehicleMake: row.vehicles?.make ?? null,
+    vehicleModel: row.vehicles?.model ?? null,
+    code: row.code,
+    status: normalizeDtcStatus(row.status),
+    severity,
+    descriptionEn: null,
+    descriptionAr: row.title ?? row.explanation ?? row.code,
+    possibleCauses: row.explanation ? [row.explanation] : [],
+    estimatedCostMin: null,
+    estimatedCostMax: null,
+    recommendedAction:
+      severity === "critical"
+        ? "drive_now"
+        : severity === "high"
+          ? "schedule_week"
+          : "monitor",
+    actionReasonAr: row.explanation ?? null,
+    detectedAt: row.detected_at ?? undefined,
+    clearedAt: normalizeDtcStatus(row.status) === "cleared" ? row.detected_at ?? null : null,
+  };
+}
+
+function toRecommendation(row: RecommendationRow) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    kind: row.kind ?? "maintenance_due",
+    severity: row.severity ?? "info",
+    titleAr: row.title_ar,
+    descriptionAr: row.description_ar ?? "",
+    confidencePct: row.confidence_pct ?? undefined,
+    suggestedAction: row.suggested_action ?? null,
+    suggestedCostSar: row.suggested_cost_sar ?? null,
+    createdAt: row.created_at ?? undefined,
   };
 }
 
@@ -1274,6 +1431,217 @@ async function handleMaintenance(
   return { handled: false };
 }
 
+async function handleSubscriptions(
+  path: string,
+  method: string,
+): Promise<ApiBridgeResult> {
+  if (method !== "GET") {
+    return { handled: false };
+  }
+
+  if (path === "/api/subscriptions/plans") {
+    const rows = await supabaseRequest<SubscriptionPlanRow[]>(
+      "/rest/v1/subscription_plans?select=*&order=sort_order.asc",
+      {
+        method: "GET",
+      },
+    );
+
+    return {
+      handled: true,
+      data: rows.map(toSubscriptionPlan),
+    };
+  }
+
+  if (path === "/api/subscriptions/me") {
+    const session = await requireSession();
+    const user = await getCurrentUserAccess(
+      session.user.id,
+      session.access_token,
+    );
+
+    if (!user) {
+      return {
+        handled: true,
+        data: {
+          tier: "free",
+          status: "active",
+          startedAt: null,
+          endsAt: null,
+          autoRenew: true,
+        },
+      };
+    }
+
+    const rows = await supabaseRequest<SubscriptionUserRow[]>(
+      `/rest/v1/users?select=subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(
+        session.user.id,
+      )}&limit=1`,
+      {
+        method: "GET",
+      },
+      session.access_token,
+    );
+
+    const row = rows[0];
+    const endsAt = row?.subscription_ends_at ?? null;
+    const isExpired = endsAt ? new Date(endsAt) < new Date() : false;
+
+    return {
+      handled: true,
+      data: {
+        tier: row?.subscription_tier ?? "free",
+        status:
+          row?.is_active === false
+            ? "cancelled"
+            : isExpired
+              ? "expired"
+              : "active",
+        startedAt: row?.subscription_started_at ?? null,
+        endsAt,
+        autoRenew: row?.subscription_auto_renew ?? true,
+      },
+    };
+  }
+
+  return { handled: false };
+}
+
+async function handleBookings(
+  path: string,
+  method: string,
+): Promise<ApiBridgeResult> {
+  if (path !== "/api/bookings" || method !== "GET") {
+    return { handled: false };
+  }
+
+  const session = await requireSession();
+  const rows = await supabaseRequest<BookingRow[]>(
+    `/rest/v1/bookings?select=*,vehicles(make,model)&user_id=eq.${encodeURIComponent(
+      session.user.id,
+    )}&order=scheduled_at.desc`,
+    {
+      method: "GET",
+    },
+    session.access_token,
+  );
+
+  return {
+    handled: true,
+    data: rows.map(toBooking),
+  };
+}
+
+async function handleDtc(
+  url: URL,
+  method: string,
+): Promise<ApiBridgeResult> {
+  if (url.pathname !== "/api/dtc" || method !== "GET") {
+    return { handled: false };
+  }
+
+  const session = await requireSession();
+  const status = url.searchParams.get("status");
+  const vehicleId = url.searchParams.get("vehicleId");
+  const normalizedStatus =
+    status === "cleared" ? "cleared,resolved" : "open,active,pending";
+  const vehicleFilter = vehicleId
+    ? `&vehicle_id=eq.${encodeURIComponent(vehicleId)}`
+    : "";
+
+  const rows = await supabaseRequest<DiagnosticCodeRow[]>(
+    `/rest/v1/diagnostic_codes?select=*,vehicles(make,model,nickname)&user_id=eq.${encodeURIComponent(
+      session.user.id,
+    )}&status=in.(${normalizedStatus})${vehicleFilter}&order=detected_at.desc`,
+    {
+      method: "GET",
+    },
+    session.access_token,
+  );
+
+  return {
+    handled: true,
+    data: rows.map(toDtcCode),
+  };
+}
+
+async function handleAi(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  if (path === "/api/ai/chat" && method === "POST") {
+    const session = await requireSession();
+    const access = await getCurrentUserAccess(
+      session.user.id,
+      session.access_token,
+    );
+
+    if ((access?.subscription_tier ?? "free") === "free") {
+      throw new ApiBridgeError(
+        "المساعد الذكي متاح بعد ترقية الباقة.",
+        403,
+      );
+    }
+
+    const body = await readJsonBody(input, init);
+    const message = String(body.message ?? "").trim();
+    const lower = message.toLowerCase();
+    const reply =
+      lower.includes("dtc") ||
+      lower.includes("كود") ||
+      lower.includes("عطل")
+        ? "أكواد الأعطال تساعدك تفهم سبب التحذير في السيارة. إذا كتبت لي الكود أو اخترت مركبة، أشرح لك المعنى والخطوة المناسبة."
+        : lower.includes("زيت") ||
+            lower.includes("صيانة") ||
+            lower.includes("maintenance")
+          ? "تابع سجل الصيانة داخل مفك، وسأقترح لك الموعد القادم حسب آخر قراءة عداد وتاريخ الصيانة."
+          : "أنا مساعد مفك الذكي. أقدر أساعدك في فهم الأعطال، متابعة الصيانة، وقراءة حالة مركبتك من البيانات المسجلة.";
+
+    return {
+      handled: true,
+      data: {
+        reply,
+        suggestedActions: [
+          {
+            labelAr: "عرض مركباتي",
+            kind: "view_vehicle",
+          },
+          {
+            labelAr: "عرض سجل الأعطال",
+            kind: "view_dtc",
+          },
+        ],
+      },
+    };
+  }
+
+  const match = path.match(/^\/api\/ai\/recommendations\/([^/]+)$/);
+
+  if (match && method === "GET") {
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(match[1]);
+
+    const rows = await supabaseRequest<RecommendationRow[]>(
+      `/rest/v1/recommendations?select=*&user_id=eq.${encodeURIComponent(
+        session.user.id,
+      )}&vehicle_id=eq.${encodeURIComponent(vehicleId)}&order=created_at.desc`,
+      {
+        method: "GET",
+      },
+      session.access_token,
+    );
+
+    return {
+      handled: true,
+      data: rows.map(toRecommendation),
+    };
+  }
+
+  return { handled: false };
+}
+
 function getRawUrl(
   input: RequestInfo | URL,
 ) {
@@ -1337,6 +1705,37 @@ async function handleRequest(
         status: "ok",
       },
     };
+  }
+
+  const subscriptionsResult =
+    await handleSubscriptions(path, method);
+
+  if (subscriptionsResult.handled) {
+    return subscriptionsResult;
+  }
+
+  const bookingsResult =
+    await handleBookings(path, method);
+
+  if (bookingsResult.handled) {
+    return bookingsResult;
+  }
+
+  const aiResult = await handleAi(
+    path,
+    method,
+    input,
+    init,
+  );
+
+  if (aiResult.handled) {
+    return aiResult;
+  }
+
+  const dtcResult = await handleDtc(url, method);
+
+  if (dtcResult.handled) {
+    return dtcResult;
   }
 
   const vehiclesResult =

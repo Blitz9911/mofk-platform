@@ -41,16 +41,7 @@
         }
       ],
       "expo-font",
-      "expo-dev-client",
-      "expo-web-browser",
-      [
-        "react-native-ble-plx",
-        {
-          "neverForLocation": false,
-          "isBackgroundEnabled": false,
-          "bluetoothAlwaysPermission": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."
-        }
-      ]
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

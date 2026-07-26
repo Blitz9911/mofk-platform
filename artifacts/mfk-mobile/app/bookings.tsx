@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-import { authApi } from "@/context/AuthContext";
 
 type Booking = {
   id: string;
@@ -53,10 +52,7 @@ function getApiBaseUrl() {
 }
 
 async function listBookings() {
-  const token = await authApi.getAccessToken();
-  const response = await fetch(`${getApiBaseUrl()}/api/bookings`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  const response = await fetch("/api/bookings");
 
   if (!response.ok) {
     throw new Error("تعذر تحميل الحجوزات.");
