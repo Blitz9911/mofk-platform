@@ -61,7 +61,7 @@ export default function Contact() {
           <div className="container mx-auto px-4 text-center max-w-2xl">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <h1 className="text-5xl md:text-6xl font-bold mb-4">
-                تواصل <span className="text-transparent bg-clip-text bg-gradient-to-l from-primary to-orange-400">معنا</span>
+                تواصل مع <span className="text-transparent bg-clip-text bg-gradient-to-l from-primary to-orange-400">فريق مفك</span>
               </h1>
               <p className="text-xl text-muted-foreground">
                 هل لديك سؤال أو اقتراح؟ فريقنا جاهز للمساعدة.

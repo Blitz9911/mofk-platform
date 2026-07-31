@@ -41,8 +41,8 @@ export default function About() {
                 <Target className="w-4 h-4" /> قصتنا ومهمتنا
               </div>
               <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
-                نُغيّر علاقتك{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-l from-primary to-orange-400">بسيارتك</span>
+                نبني علاقة جديدة{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-l from-primary to-orange-400">بينك وبين سيارتك</span>
               </h1>
               <p className="text-xl text-muted-foreground leading-relaxed">
                 سوّينا مفك عشان ما تضيع بين التشخيصات المتضاربة —
@@ -234,13 +234,13 @@ export default function About() {
         <section className="py-20 bg-primary text-primary-foreground text-center relative overflow-hidden">
           <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle at 50% 50%, white 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
           <div className="container mx-auto px-4 relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">جاهز تجرّب مفك؟</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">جرّب مفك على سيارتك</h2>
             <p className="text-primary-foreground/80 text-lg mb-8 max-w-xl mx-auto">
               انضم لأكثر من 20,000 سائق يثقون بمفك لحماية سياراتهم يومياً.
             </p>
             <Link href="/register">
               <Button size="lg" variant="secondary" className="h-14 px-10 text-lg font-bold rounded-full text-primary">
-                ابدأ مجاناً الآن
+                ابدأ الآن مجانًا
               </Button>
             </Link>
           </div>

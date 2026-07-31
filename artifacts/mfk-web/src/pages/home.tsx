@@ -587,13 +587,13 @@ export default function Home() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white/10 rounded-full blur-[100px] -z-0"></div>
           
           <div className="container mx-auto px-4 relative z-10 text-center">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">جاهز لتغيير طريقة عنايتك بسيارتك؟</h2>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">ابدأ بفهم سيارتك اليوم</h2>
             <p className="text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto">
               انضم لآلاف المستخدمين الذين وفروا وقتهم وأموالهم مع منصة MFK.
             </p>
             <Link href="/login">
               <Button size="lg" className="bg-white text-primary hover:bg-white/90 text-xl h-16 px-12 rounded-full font-bold shadow-xl">
-                ابدأ تجربتك اليوم
+                ابدأ بفهم سيارتك اليوم
               </Button>
             </Link>
             <p className="text-sm text-primary-foreground/60 mt-6 flex items-center justify-center gap-2">
