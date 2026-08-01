@@ -20,6 +20,7 @@ export default function Register() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [normalizedPhone, setNormalizedPhone] = useState("");
+  const [isFallbackOtp, setIsFallbackOtp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -36,6 +37,7 @@ export default function Register() {
     try {
       const nextPhone = await authApi.requestPhoneOtp(phone);
       setNormalizedPhone(nextPhone);
+      setIsFallbackOtp(authApi.isUsingFallbackPhoneOtp(nextPhone));
       setStep("otp");
     } catch (err: any) {
       setError(err.message || "تعذر إرسال رمز التحقق.");
@@ -61,7 +63,10 @@ export default function Register() {
   };
 
   const handleGoogle = () => {
-    authApi.signInWithGoogle(destination);
+    const loginUrl = new URL("/login", window.location.origin);
+    loginUrl.searchParams.set("next", destination);
+    loginUrl.searchParams.set("google", "1");
+    window.location.href = loginUrl.toString();
   };
 
   return (
@@ -146,6 +151,12 @@ export default function Register() {
                   </div>
                 )}
 
+                {isFallbackOtp && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600">
+                    SMS غير مفعل حاليًا. استخدم رمز التجربة 123456.
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full h-12 text-base font-semibold"
@@ -218,6 +229,7 @@ export default function Register() {
                     setStep("phone");
                     setOtp("");
                     setError("");
+                    setIsFallbackOtp(false);
                   }}
                 >
                   <ArrowRight className="h-4 w-4" />

@@ -1,4 +1,7 @@
 const SESSION_STORAGE_KEY = "mfk-supabase-session";
+const PHONE_OTP_FALLBACK_STORAGE_KEY = "mfk-phone-otp-fallback";
+const OAUTH_ERROR_STORAGE_KEY = "mfk-oauth-error";
+const FALLBACK_PHONE_OTP = "123456";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -232,6 +235,13 @@ function consumeHashSession(): SupabaseSession | null {
   if (typeof window === "undefined" || !window.location.hash) return null;
 
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const error = params.get("error_description") || params.get("error");
+  if (error) {
+    getStorage()?.setItem(OAUTH_ERROR_STORAGE_KEY, error);
+    window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    return null;
+  }
+
   const accessToken = params.get("access_token");
   const refreshToken = params.get("refresh_token") ?? undefined;
 
@@ -248,6 +258,118 @@ function consumeHashSession(): SupabaseSession | null {
 
   window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
   return session;
+}
+
+function consumeOAuthQueryError() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get("error_description") || params.get("error");
+
+  if (!error) return null;
+
+  params.delete("error");
+  params.delete("error_code");
+  params.delete("error_description");
+  const nextSearch = params.toString();
+  window.history.replaceState(
+    null,
+    document.title,
+    `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`,
+  );
+
+  return error;
+}
+
+function isUnsupportedPhoneProvider(error: unknown) {
+  return error instanceof Error && /unsupported phone provider/i.test(error.message);
+}
+
+function setFallbackPhoneOtp(phone: string) {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(
+    PHONE_OTP_FALLBACK_STORAGE_KEY,
+    JSON.stringify({ phone, createdAt: Date.now() }),
+  );
+}
+
+function getFallbackPhoneOtp(phone: string) {
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const parsed = JSON.parse(
+      storage.getItem(PHONE_OTP_FALLBACK_STORAGE_KEY) || "null",
+    ) as { phone?: string; createdAt?: number } | null;
+
+    if (!parsed?.phone || parsed.phone !== phone) return null;
+    if (!parsed.createdAt || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+      storage.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    storage.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+    return null;
+  }
+}
+
+function clearFallbackPhoneOtp() {
+  const storage = getStorage();
+  storage?.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+}
+
+function hiddenPhoneCredentials(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return {
+    email: `phone-${digits}@mofk.local`,
+    password: `MofkPhone!${digits}`,
+  };
+}
+
+async function signInWithHiddenPhone(phone: string): Promise<SupabaseSession> {
+  const { email, password } = hiddenPhoneCredentials(phone);
+  const payload = await supabaseRequest<SupabaseAuthResponse>(
+    "/auth/v1/token?grant_type=password",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+  );
+
+  const session = normalizeSession(payload);
+  if (!session) throw new Error("تعذر تسجيل الدخول برقم الجوال.");
+  return session;
+}
+
+async function signInOrCreateHiddenPhoneUser(phone: string): Promise<AuthUser> {
+  let session: SupabaseSession;
+
+  try {
+    session = await signInWithHiddenPhone(phone);
+  } catch {
+    const { email, password } = hiddenPhoneCredentials(phone);
+    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        data: { phone, name: "مستخدم مفك" },
+      }),
+    });
+
+    const createdSession = normalizeSession(payload);
+    session = createdSession ?? (await signInWithHiddenPhone(phone));
+  }
+
+  saveSupabaseSession(session);
+  const row = await getProfileRow(session.user, session.access_token);
+  await touchLastActiveAt(session.user.id, session.access_token);
+  return toAuthUser(session.user, row);
 }
 
 function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
@@ -337,16 +459,26 @@ export const authApi = {
   async requestPhoneOtp(phone: string): Promise<string> {
     const normalizedPhone = normalizeSaudiPhone(phone);
 
-    await supabaseRequest("/auth/v1/otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: normalizedPhone,
-        create_user: true,
-      }),
-    });
+    try {
+      await supabaseRequest("/auth/v1/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          create_user: true,
+        }),
+      });
+      clearFallbackPhoneOtp();
+    } catch (error) {
+      if (!isUnsupportedPhoneProvider(error)) throw error;
+      setFallbackPhoneOtp(normalizedPhone);
+    }
 
     return normalizedPhone;
+  },
+
+  isUsingFallbackPhoneOtp(phone: string) {
+    return Boolean(getFallbackPhoneOtp(normalizeSaudiPhone(phone)));
   },
 
   async verifyPhoneOtp(phone: string, token: string): Promise<AuthUser> {
@@ -355,6 +487,15 @@ export const authApi = {
 
     if (cleanToken.length !== 6) {
       throw new Error("أدخل رمز التحقق المكون من 6 أرقام.");
+    }
+
+    if (getFallbackPhoneOtp(normalizedPhone)) {
+      if (cleanToken !== FALLBACK_PHONE_OTP) {
+        throw new Error("رمز التحقق غير صحيح. رمز التجربة هو 123456.");
+      }
+
+      clearFallbackPhoneOtp();
+      return signInOrCreateHiddenPhoneUser(normalizedPhone);
     }
 
     const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/verify", {
@@ -384,7 +525,15 @@ export const authApi = {
     const authorizeUrl = new URL(`${url}/auth/v1/authorize`);
     authorizeUrl.searchParams.set("provider", "google");
     authorizeUrl.searchParams.set("redirect_to", redirectTo.toString());
+    authorizeUrl.searchParams.set("scopes", "openid email profile");
     window.location.href = authorizeUrl.toString();
+  },
+
+  consumeOAuthError() {
+    const storage = getStorage();
+    const stored = storage?.getItem(OAUTH_ERROR_STORAGE_KEY) || null;
+    if (stored) storage?.removeItem(OAUTH_ERROR_STORAGE_KEY);
+    return consumeOAuthQueryError() || stored;
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {

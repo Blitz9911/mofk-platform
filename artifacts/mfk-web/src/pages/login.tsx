@@ -16,11 +16,13 @@ export default function Login() {
   const hasNextPath = params.has("next");
   const nextPath = params.get("next") || "/app";
   const selectedPlan = params.get("plan");
+  const shouldStartGoogle = params.get("google") === "1";
 
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [normalizedPhone, setNormalizedPhone] = useState("");
+  const [isFallbackOtp, setIsFallbackOtp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,6 +33,27 @@ export default function Login() {
         : nextPath,
     [nextPath, selectedPlan],
   );
+
+  useEffect(() => {
+    const oauthError = authApi.consumeOAuthError();
+    if (oauthError) {
+      setError(
+        oauthError.includes("Unsupported provider") ||
+          oauthError.includes("provider is not enabled")
+          ? "تسجيل الدخول عبر Google غير مفعّل في Supabase. فعّل Google من Auth Providers وأضف رابط الرجوع."
+          : oauthError,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!shouldStartGoogle) return;
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("google");
+    window.history.replaceState(null, document.title, cleanUrl.pathname + cleanUrl.search);
+    authApi.signInWithGoogle(destination);
+  }, [destination, shouldStartGoogle]);
 
   useEffect(() => {
     if (!user) return;
@@ -46,6 +69,7 @@ export default function Login() {
     try {
       const nextPhone = await authApi.requestPhoneOtp(phone);
       setNormalizedPhone(nextPhone);
+      setIsFallbackOtp(authApi.isUsingFallbackPhoneOtp(nextPhone));
       setStep("otp");
     } catch (err: any) {
       setError(err.message || "تعذر إرسال رمز التحقق.");
@@ -154,6 +178,12 @@ export default function Login() {
                   </div>
                 )}
 
+                {isFallbackOtp && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600">
+                    SMS غير مفعل حاليًا. استخدم رمز التجربة 123456.
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full h-12 text-base font-semibold"
@@ -219,6 +249,7 @@ export default function Login() {
                     setStep("phone");
                     setOtp("");
                     setError("");
+                    setIsFallbackOtp(false);
                   }}
                 >
                   <ArrowRight className="h-4 w-4" />
