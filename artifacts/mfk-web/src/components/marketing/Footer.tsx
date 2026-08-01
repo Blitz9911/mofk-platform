@@ -70,7 +70,7 @@ export function Footer() {
               <li><Link href="/about"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">من نحن</span></Link></li>
               <li><Link href="/careers"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">الوظائف</span></Link></li>
               <li><Link href="/blog"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">المدونة</span></Link></li>
-              <li><Link href="/contact"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">تواصل معنا</span></Link></li>
+              <li><Link href="/contact"><span className="text-muted-foreground hover:text-primary transition-colors cursor-pointer">تواصل مع فريق مفك</span></Link></li>
             </ul>
           </div>
 

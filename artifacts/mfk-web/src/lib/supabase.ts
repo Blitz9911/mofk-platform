@@ -5,6 +5,7 @@ type JsonRecord = Record<string, unknown>;
 type SupabaseAuthUser = {
   id: string;
   email?: string;
+  phone?: string;
   user_metadata?: JsonRecord;
 };
 
@@ -214,7 +215,39 @@ function fallbackName(user: SupabaseAuthUser) {
 }
 
 function fallbackPhone(user: SupabaseAuthUser) {
-  return metadataValue(user, "phone") || `user-${user.id.slice(0, 12)}`;
+  return metadataValue(user, "phone") || user.phone || `user-${user.id.slice(0, 12)}`;
+}
+
+function normalizeSaudiPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.startsWith("9665") && digits.length === 12) return `+${digits}`;
+  if (digits.startsWith("05") && digits.length === 10) return `+966${digits.slice(1)}`;
+  if (digits.startsWith("5") && digits.length === 9) return `+966${digits}`;
+
+  throw new Error("أدخل رقم جوال سعودي صحيح.");
+}
+
+function consumeHashSession(): SupabaseSession | null {
+  if (typeof window === "undefined" || !window.location.hash) return null;
+
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token") ?? undefined;
+
+  if (!accessToken) return null;
+
+  const session: SupabaseSession = {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at:
+      Math.floor(Date.now() / 1000) + Number(params.get("expires_in") ?? 3600),
+    expires_in: Number(params.get("expires_in") ?? 3600),
+    user: { id: "" },
+  };
+
+  window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+  return session;
 }
 
 function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
@@ -297,23 +330,45 @@ async function touchLastActiveAt(userId: string, accessToken: string) {
 }
 
 export const authApi = {
-  async register(name: string, phone: string, email: string, password: string): Promise<AuthUser> {
-    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
+  normalizePhone(phone: string) {
+    return normalizeSaudiPhone(phone);
+  },
+
+  async requestPhoneOtp(phone: string): Promise<string> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+
+    await supabaseRequest("/auth/v1/otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email,
-        password,
-        data: { name, phone },
+        phone: normalizedPhone,
+        create_user: true,
+      }),
+    });
+
+    return normalizedPhone;
+  },
+
+  async verifyPhoneOtp(phone: string, token: string): Promise<AuthUser> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+    const cleanToken = token.replace(/\D/g, "");
+
+    if (cleanToken.length !== 6) {
+      throw new Error("أدخل رمز التحقق المكون من 6 أرقام.");
+    }
+
+    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        phone: normalizedPhone,
+        token: cleanToken,
+        type: "sms",
       }),
     });
 
     const session = normalizeSession(payload);
-    if (!session) {
-      throw new Error(
-        "تم إنشاء الحساب، لكن Supabase يطلب تأكيد البريد قبل الدخول. عطّل Email confirmations مؤقتًا من Supabase Auth للتجربة الأولى.",
-      );
-    }
+    if (!session) throw new Error("تعذر تأكيد رقم الجوال. حاول مرة أخرى.");
 
     saveSupabaseSession(session);
     const row = await getProfileRow(session.user, session.access_token);
@@ -321,27 +376,36 @@ export const authApi = {
     return toAuthUser(session.user, row);
   },
 
-  async login(email: string, password: string): Promise<AuthUser> {
-    const payload = await supabaseRequest<SupabaseAuthResponse>(
-      "/auth/v1/token?grant_type=password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      },
-    );
+  signInWithGoogle(nextPath = "/app") {
+    const { url } = getSupabaseConfig();
+    const redirectTo = new URL("/login", window.location.origin);
+    redirectTo.searchParams.set("next", nextPath);
 
-    const session = normalizeSession(payload);
-    if (!session) throw new Error("تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.");
-
-    saveSupabaseSession(session);
-    const row = await getProfileRow(session.user, session.access_token);
-    await touchLastActiveAt(session.user.id, session.access_token);
-    return toAuthUser(session.user, row);
+    const authorizeUrl = new URL(`${url}/auth/v1/authorize`);
+    authorizeUrl.searchParams.set("provider", "google");
+    authorizeUrl.searchParams.set("redirect_to", redirectTo.toString());
+    window.location.href = authorizeUrl.toString();
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
-    const session = await getValidSupabaseSession();
+    let session = await getValidSupabaseSession();
+    const hashSession = consumeHashSession();
+
+    if (!session && hashSession) {
+      try {
+        const authUser = await supabaseRequest<SupabaseAuthUser>(
+          "/auth/v1/user",
+          { method: "GET" },
+          hashSession.access_token,
+        );
+        session = { ...hashSession, user: authUser };
+        saveSupabaseSession(session);
+      } catch {
+        clearSupabaseSession();
+        return null;
+      }
+    }
+
     if (!session) return null;
 
     try {

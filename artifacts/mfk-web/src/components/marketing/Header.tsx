@@ -13,7 +13,7 @@ const NAV_LINKS = [
   { href: "/#how-it-works", label: "كيف تعمل", hash: true },
   { href: "/pricing", label: "الباقات", hash: false },
   { href: "/about", label: "من نحن", hash: false },
-  { href: "/contact", label: "تواصل معنا", hash: false },
+  { href: "/contact", label: "تواصل مع فريق مفك", hash: false },
 ];
 
 export function Header() {
