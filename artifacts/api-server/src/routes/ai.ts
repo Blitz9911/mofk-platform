@@ -1,48 +1,37 @@
-import { Router, type IRouter } from "express";
-import { and, desc, eq } from "drizzle-orm";
-import {
-  db,
-  vehiclesTable,
-  recommendationsTable,
-  dtcCodesTable,
-} from "@workspace/db";
-import {
-  AiChatBody,
-  AiChatResponse,
-  GetAiRecommendationsParams,
-  GetAiRecommendationsResponse,
-} from "@workspace/api-zod";
-import { DEMO_USER_ID } from "../lib/demo";
+import { Router, type IRouter, type Response } from "express";
+import { and, eq } from "drizzle-orm";
+import { db, vehiclesTable } from "@workspace/db";
+import { GetAiRecommendationsParams } from "@workspace/api-zod";
+import { z } from "zod";
+import { logger } from "../lib/logger";
+import { MofkAiError, generateMofkAiAnswer } from "../services/mofk-ai";
+import { persistEvaluation } from "./recommendations";
 
 const router: IRouter = Router();
 
+const AiChatRequestBody = z.object({
+  message: z.string().trim().min(2).max(2000),
+}).strict();
+
 router.post("/ai/chat", async (req, res): Promise<void> => {
-  const body = AiChatBody.safeParse(req.body);
+  const body = AiChatRequestBody.safeParse(req.body);
   if (!body.success) {
-    res.status(400).json({ error: body.error.message });
+    res.status(400).json({
+      success: false,
+      error: {
+        code: "INVALID_MESSAGE",
+        message: "اكتب سؤالك بشكل واضح بين حرفين و2000 حرف.",
+      },
+    });
     return;
   }
-  const msg = body.data.message.trim();
-  let vehicleContext = "";
-  if (body.data.vehicleId) {
-    const [v] = await db
-      .select()
-      .from(vehiclesTable)
-      .where(
-        and(
-          eq(vehiclesTable.id, body.data.vehicleId),
-          eq(vehiclesTable.userId, DEMO_USER_ID),
-        ),
-      );
-    if (v) {
-      vehicleContext = ` بناءً على بيانات ${v.nickname ?? `${v.make} ${v.model}`} (${v.year})`;
-    }
+
+  try {
+    const result = await generateMofkAiAnswer(body.data.message);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    sendAiError(res, error, body.data.message.length, (req as { id?: string }).id);
   }
-
-  const reply = generateReply(msg, vehicleContext);
-  const suggestedActions = suggestActions(msg);
-
-  res.json(AiChatResponse.parse({ reply, suggestedActions }));
 });
 
 router.get(
@@ -59,58 +48,84 @@ router.get(
       .where(
         and(
           eq(vehiclesTable.id, params.data.vehicleId),
-          eq(vehiclesTable.userId, DEMO_USER_ID),
+          eq(vehiclesTable.userId, req.userId),
         ),
       );
     if (!v) {
       res.status(404).json({ error: "Vehicle not found" });
       return;
     }
-    const rows = await db
-      .select()
-      .from(recommendationsTable)
-      .where(eq(recommendationsTable.vehicleId, params.data.vehicleId))
-      .orderBy(desc(recommendationsTable.createdAt));
-    res.json(GetAiRecommendationsResponse.parse(rows));
+    const evaluated = await persistEvaluation(params.data.vehicleId, req.userId);
+    res.json(evaluated ?? []);
   },
 );
 
-function generateReply(message: string, ctx: string): string {
-  const m = message.toLowerCase();
-  if (m.includes("حرارة") || m.includes("سخن")) {
-    return `ارتفاع حرارة المحرك${ctx} له عدة أسباب محتملة: نقص في سائل التبريد، خلل في المروحة أو الترموستات، أو انسداد في الرديتر. أنصحك بإيقاف السيارة فوراً إن كان المؤشر في الأحمر، وفحص مستوى السائل بعد أن يبرد المحرك. إذا تكررت المشكلة، سجّل صيانة عاجلة وراجع فني مختص.`;
+function sendAiError(
+  res: Response,
+  error: unknown,
+  messageLength: number,
+  requestId?: string,
+) {
+  const normalized = error instanceof MofkAiError
+    ? error
+    : new MofkAiError("provider_error", "Unexpected AI error.", { cause: error });
+
+  const response = mapErrorResponse(normalized);
+  const logPayload = {
+    requestId,
+    code: normalized.code,
+    messageLength,
+  };
+
+  if (response.status >= 500) {
+    logger.error({ ...logPayload, err: normalized }, "Mofk AI chat failed");
+  } else {
+    logger.warn(logPayload, "Mofk AI chat rejected");
   }
-  if (m.includes("زيت")) {
-    return `تغيير الزيت يعتمد على نوع الزيت ونمط القيادة. عموماً، الزيت الاصطناعي يتحمّل بين 8,000 و10,000 كم، والزيت العادي بين 5,000 و7,000 كم${ctx}. أوصي بالالتزام بدورة التغيير الموصى بها من الشركة المصنّعة، خاصة في المناخ الحار.`;
-  }
-  if (m.includes("اشتراك") || m.includes("باقة")) {
-    return `MFK يقدّم ثلاث باقات: المجانية للتشخيص الأساسي، المميزة بـ 29 ر.س شهرياً تشمل التوصيات الذكية وتاريخ غير محدود، وباقة الأساطيل للشركات. يمكنك الترقية في أي وقت من صفحة الاشتراك.`;
-  }
-  if (m.includes("dtc") || m.includes("كود") || m.includes("p0")) {
-    return `أكواد DTC هي إشارات يرسلها كمبيوتر السيارة عند اكتشاف مشكلة. كل كود يبدأ بحرف (P للمحرك، B للجسم، C للهيكل، U للشبكة). MFK يفسّرها لك بلغة بسيطة ويوصي بالخطوة المناسبة. شارك الكود معي وسأشرحه لك.`;
-  }
-  if (m.includes("موعد")) {
-    return `أقدر أساعدك بتسجيل الصيانة، تجهيز قائمة فحص، أو شرح العطل قبل مراجعة فني مختص.`;
-  }
-  return `شكراً لسؤالك${ctx}. أنا مساعد MFK الذكي، أستطيع مساعدتك في فهم أعطال سيارتك، اقتراح صيانة، أو تفسير أكواد DTC. اطرح سؤالاً محدداً لأتمكن من مساعدتك بشكل أفضل.`;
+
+  res.status(response.status).json({
+    success: false,
+    error: {
+      code: response.code,
+      message: response.message,
+    },
+  });
 }
 
-function suggestActions(
-  message: string,
-): { labelAr: string; kind: "view_dtc" | "schedule_maintenance" | "view_vehicle"; targetId?: string }[] {
-  const m = message.toLowerCase();
-  const out: { labelAr: string; kind: "view_dtc" | "schedule_maintenance" | "view_vehicle" }[] = [];
-  if (m.includes("حرارة") || m.includes("سخن")) {
-    out.push({ labelAr: "سجّل صيانة عاجلة", kind: "schedule_maintenance" });
-    out.push({ labelAr: "اعرض أكواد الأعطال", kind: "view_dtc" });
-  } else if (m.includes("زيت")) {
-    out.push({ labelAr: "جدولة تغيير الزيت", kind: "schedule_maintenance" });
-  } else if (m.includes("dtc") || m.includes("كود")) {
-    out.push({ labelAr: "اعرض جميع الأكواد", kind: "view_dtc" });
-  } else if (m.includes("موعد")) {
-    out.push({ labelAr: "فتح الصيانة", kind: "schedule_maintenance" });
+function mapErrorResponse(error: MofkAiError): { status: number; code: string; message: string } {
+  switch (error.code) {
+    case "missing_config":
+      return {
+        status: 500,
+        code: "AI_NOT_CONFIGURED",
+        message: "خدمة المساعد الذكي غير مهيأة حالياً.",
+      };
+    case "rate_limit":
+      return {
+        status: 429,
+        code: "AI_RATE_LIMITED",
+        message: "المساعد الذكي مشغول حالياً، جرّب بعد قليل.",
+      };
+    case "timeout":
+      return {
+        status: 504,
+        code: "AI_TIMEOUT",
+        message: "تأخر رد المساعد الذكي، جرّب مرة أخرى.",
+      };
+    case "invalid_response":
+      return {
+        status: 502,
+        code: "AI_INVALID_RESPONSE",
+        message: "وصل رد غير مكتمل من المساعد الذكي، جرّب مرة أخرى.",
+      };
+    case "provider_error":
+    default:
+      return {
+        status: 500,
+        code: "AI_INTERNAL_ERROR",
+        message: "تعذر تشغيل المساعد الذكي حالياً.",
+      };
   }
-  return out;
 }
 
 export default router;

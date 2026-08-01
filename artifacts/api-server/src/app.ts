@@ -17,7 +17,7 @@ function securityHeaders(_req: express.Request, res: express.Response, next: exp
 }
 
 function sensitiveRouteRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!/^\/api\/(auth|checkout\/payment)/.test(req.path)) {
+  if (!/^\/api\/(auth|checkout\/payment|ai\/chat)/.test(req.path)) {
     next();
     return;
   }
