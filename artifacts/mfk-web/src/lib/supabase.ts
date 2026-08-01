@@ -322,10 +322,10 @@ function clearFallbackPhoneOtp() {
 }
 
 function hiddenPhoneCredentials(phone: string) {
-  const digits = phone.replace(/\D/g, "");
+  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
   return {
-    email: `phone-${digits}@mofk.local`,
-    password: `MofkPhone!${digits}`,
+    email: `${digits}@phone.mofk.local`,
+    password: `MofkPhoneOtp@${digits}`,
   };
 }
 
