@@ -34,6 +34,12 @@ declare module "react-native-ble-plx" {
       valueBase64: string,
       transactionId?: string,
     ): Promise<Characteristic>;
+    writeCharacteristicWithoutResponseForService(
+      serviceUUID: string,
+      characteristicUUID: string,
+      valueBase64: string,
+      transactionId?: string,
+    ): Promise<Characteristic>;
     onDisconnected(
       listener: (error: BleError | null, device: Device | null) => void,
       transactionId?: string,

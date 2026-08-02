@@ -14,6 +14,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -21,6 +22,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useThemeMode } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -46,6 +48,7 @@ type MenuItemProps = {
   label: string;
   description?: string;
   onPress: () => void;
+  tone?: string;
   danger?: boolean;
 };
 
@@ -54,9 +57,11 @@ function MenuItem({
   label,
   description,
   onPress,
+  tone,
   danger,
 }: MenuItemProps) {
   const colors = useColors();
+  const accent = danger ? "#ef4444" : tone ?? colors.primary;
 
   return (
     <Pressable
@@ -64,7 +69,8 @@ function MenuItem({
         styles.menuItem,
         {
           backgroundColor: colors.card,
-          borderColor: colors.border,
+          borderColor: danger ? "#ef444430" : `${accent}32`,
+          borderRightColor: accent,
           opacity: pressed ? 0.76 : 1,
         },
       ]}
@@ -74,16 +80,14 @@ function MenuItem({
         style={[
           styles.iconBox,
           {
-            backgroundColor: danger
-              ? "#ef444420"
-              : `${colors.primary}18`,
+            backgroundColor: `${accent}18`,
           },
         ]}
       >
         <Ionicons
           name={icon}
           size={19}
-          color={danger ? "#ef4444" : colors.primary}
+          color={accent}
         />
       </View>
       <View style={styles.menuTextWrap}>
@@ -113,6 +117,46 @@ function MenuItem({
   );
 }
 
+function ThemeToggleRow() {
+  const colors = useColors();
+  const { isDark, toggleMode } = useThemeMode();
+  const accent = isDark ? "#8B5CF6" : "#F59E0B";
+
+  return (
+    <View
+      style={[
+        styles.themeToggle,
+        {
+          backgroundColor: colors.card,
+          borderColor: `${accent}32`,
+          borderRightColor: accent,
+        },
+      ]}
+    >
+      <View style={[styles.iconBox, { backgroundColor: `${accent}18` }]}>
+        <Ionicons name={isDark ? "moon" : "sunny"} size={19} color={accent} />
+      </View>
+      <View style={styles.menuTextWrap}>
+        <Text style={[styles.menuLabel, { color: colors.foreground }]}>
+          المظهر
+        </Text>
+        <Text numberOfLines={1} style={[styles.menuDesc, { color: colors.mutedForeground }]}>
+          {isDark ? "الوضع الداكن مفعل" : "الوضع الفاتح مفعل"}
+        </Text>
+      </View>
+      <Switch
+        value={!isDark}
+        onValueChange={() => {
+          void toggleMode();
+        }}
+        trackColor={{ false: "#3A3A3A", true: "#FFD2B0" }}
+        thumbColor={!isDark ? colors.primary : "#F4F4F4"}
+        ios_backgroundColor="#3A3A3A"
+      />
+    </View>
+  );
+}
+
 function Sheet({
   visible,
   title,
@@ -138,7 +182,11 @@ function Sheet({
         <View
           style={[
             styles.sheet,
-            { backgroundColor: colors.card, borderColor: colors.border },
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderRightColor: `${colors.primary}70`,
+            },
           ]}
         >
           <View style={styles.sheetHandle} />
@@ -200,6 +248,7 @@ function Field({
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const isDark = colors.mode === "dark";
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout, updateProfile } = useAuth();
@@ -224,17 +273,13 @@ export default function ProfileScreen() {
     PLAN_LABELS[sub?.tier ?? user?.subscriptionTier ?? "free"] ??
     currentPlan?.nameAr ??
     "باقة مجانية";
-  const firstLetter = (user?.name || "مفك").charAt(0);
-
   const planFeatures = useMemo(() => {
     if (!currentPlan) return ["مركبة واحدة", "سجل الصيانة", "متابعة المركبات"];
     return currentPlan.featuresAr?.slice(0, 3) ?? currentPlan.features.slice(0, 3);
   }, [currentPlan]);
 
   const openEdit = () => {
-    setName(user?.name ?? "");
-    setPhone(user?.phone ?? "");
-    setEditVisible(true);
+    router.push("/profile-edit");
   };
 
   const saveProfile = async () => {
@@ -356,9 +401,6 @@ export default function ProfileScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>{firstLetter}</Text>
-          </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.foreground }]}>
               {user?.name ?? "مستخدم مفك"}
@@ -369,18 +411,15 @@ export default function ProfileScreen() {
               {user?.phone || "لا يوجد رقم"}{user?.email ? `  •  ${user.email}` : ""}
             </Text>
           </View>
-          <Pressable
-            onPress={openEdit}
-            style={[styles.editBtn, { backgroundColor: `${colors.primary}18` }]}
-          >
-            <Ionicons name="create-outline" size={18} color={colors.primary} />
-          </Pressable>
         </View>
 
         <View
           style={[
             styles.planCard,
-            { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}45` },
+            {
+              backgroundColor: isDark ? "#17120D" : "#FFF5ED",
+              borderColor: `${colors.primary}55`,
+            },
           ]}
         >
           <View style={styles.planTop}>
@@ -417,13 +456,13 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.planActions}>
             <Pressable
-              onPress={() => router.push("/subscription")}
+              onPress={() => router.navigate("/(tabs)/subscription-tab" as never)}
               style={[styles.primarySmallBtn, { backgroundColor: colors.primary }]}
             >
               <Text style={styles.primarySmallText}>إدارة الباقة</Text>
             </Pressable>
             <Pressable
-              onPress={() => setDeviceVisible(true)}
+              onPress={() => router.push("/order-device")}
               style={[
                 styles.secondarySmallBtn,
                 { backgroundColor: colors.card, borderColor: colors.border },
@@ -437,47 +476,32 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.quickGrid}>
-          <Pressable
-            onPress={() => router.push("/assistant")}
-            style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <Ionicons name="sparkles" size={22} color={colors.primary} />
-            <Text style={[styles.quickTitle, { color: colors.foreground }]}>المساعد</Text>
-            <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>اسأل عن الأعطال والصيانة</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/recommendations")}
-            style={[styles.quickCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <Ionicons name="bulb-outline" size={22} color={colors.primary} />
-            <Text style={[styles.quickTitle, { color: colors.foreground }]}>التوصيات</Text>
-            <Text style={[styles.quickSub, { color: colors.mutedForeground }]}>متابعة مبنية على بياناتك</Text>
-          </Pressable>
-        </View>
-
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
             الإعدادات
           </Text>
           <View style={styles.menuGroup}>
+            <ThemeToggleRow />
             <MenuItem
               icon="person-circle-outline"
               label="الملف الشخصي"
               description="تعديل الاسم ورقم الجوال والمدينة"
+              tone="#FF6A00"
               onPress={openEdit}
             />
             <MenuItem
               icon="language-outline"
               label="تغيير اللغة"
-              description="العربية حاليا، الإنجليزية لاحقا"
-              onPress={() => setSheet("language")}
+              description="العربية حاليا، الإنجليزية جاهزة للتفعيل"
+              tone="#38BDF8"
+              onPress={() => router.push("/language")}
             />
             <MenuItem
               icon="lock-closed-outline"
               label="الأمان والخصوصية"
               description="الجلسات، البيانات، وصلاحيات الحساب"
-              onPress={() => setSheet("security")}
+              tone="#22C55E"
+              onPress={() => router.push("/security-privacy")}
             />
           </View>
         </View>
@@ -487,22 +511,32 @@ export default function ProfileScreen() {
             الخدمة والدعم
           </Text>
           <View style={styles.menuGroup}>
+            {false ? <MenuItem
+              icon="water-outline"
+              label="البنزين والصرفية"
+              description="تسجيل التعبئة ومتابعة متوسط الصرفية"
+              tone="#0EA5E9"
+              onPress={() => router.push("/fuel")}
+            /> : null}
             <MenuItem
-              icon="help-buoy-outline"
-              label="الدعم والمساعدة"
-              description="الأسئلة الشائعة وطرق التواصل"
-              onPress={() => setSheet("support")}
+              icon="receipt-outline"
+              label="طلباتي"
+              description="متابعة الدفع والشحن والتفعيل"
+              tone="#FF6A00"
+              onPress={() => router.push("/my-orders")}
             />
             <MenuItem
               icon="hardware-chip-outline"
               label="طلب قطعة مفك"
               description="جهاز OBD للتشخيص والمتابعة"
-              onPress={() => setDeviceVisible(true)}
+              tone="#A855F7"
+              onPress={() => router.push("/order-device")}
             />
             <MenuItem
               icon="share-social-outline"
               label="مشاركة التطبيق"
               description="أرسل رابط مفك لأصدقائك"
+              tone="#F59E0B"
               onPress={shareApp}
             />
           </View>
@@ -517,13 +551,15 @@ export default function ProfileScreen() {
               icon="document-text-outline"
               label="الشروط والأحكام"
               description="شروط استخدام التطبيق والخدمات"
-              onPress={() => setSheet("terms")}
+              tone="#94A3B8"
+              onPress={() => router.push("/terms")}
             />
             <MenuItem
               icon="information-circle-outline"
               label="عن التطبيق"
               description="إصدار مفك ومعلومات المنتج"
-              onPress={() => setSheet("about")}
+              tone="#14B8A6"
+              onPress={() => router.push("/about")}
             />
           </View>
         </View>
@@ -727,9 +763,10 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     alignItems: "center",
     gap: 12,
-    padding: 16,
+    padding: 18,
     borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
+    borderRightWidth: 4,
   },
   avatar: {
     width: 58,
@@ -739,9 +776,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 24, fontFamily: "Inter_700Bold" },
-  profileInfo: { flex: 1, alignItems: "flex-end", gap: 3 },
-  profileName: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
-  profileMeta: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  profileInfo: { flex: 1, alignItems: "flex-end", gap: 6 },
+  profileName: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right" },
+  profileMeta: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right" },
   editBtn: {
     width: 38,
     height: 38,
@@ -808,6 +845,16 @@ const styles = StyleSheet.create({
     padding: 13,
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: 3,
+  },
+  themeToggle: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 12,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRightWidth: 3,
   },
   iconBox: {
     width: 38,

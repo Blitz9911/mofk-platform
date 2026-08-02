@@ -10,10 +10,7 @@ export const ELM327_INITIALIZATION_SEQUENCE = [
   { command: "ATL0", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
   { command: "ATS0", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
   { command: "ATH0", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
-  { command: "ATAT1", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
   { command: "ATSP0", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: false },
-  { command: "ATI", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: false },
-  { command: "ATRV", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
   { command: "0100", timeoutMs: 6_000, optional: false },
   { command: "ATDP", timeoutMs: ELM327_DEFAULT_TIMEOUT_MS, optional: true },
 ] as const;

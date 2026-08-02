@@ -18,6 +18,7 @@ import Animated, { FadeInDown, FadeInLeft, FadeInRight } from "react-native-rean
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 
 interface Message {
   id: string;
@@ -44,7 +45,7 @@ export default function AssistantScreen() {
   const { mutateAsync: sendChat, isPending } = useAiChat();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 0 : insets.bottom;
+  const bottomPad = Platform.OS === "web" ? 12 : insets.bottom + 96;
 
   const handleSend = async (text?: string) => {
     const msg = (text ?? input).trim();
@@ -85,7 +86,7 @@ export default function AssistantScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => smoothBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerCenter}>
@@ -164,7 +165,7 @@ export default function AssistantScreen() {
       )}
 
       {/* Input bar */}
-      <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad + 12, backgroundColor: colors.background }]}>
+      <View style={[styles.inputBar, { borderTopColor: colors.border, paddingBottom: bottomPad, backgroundColor: colors.background }]}>
         <Pressable
           style={({ pressed }) => [styles.sendBtn, { backgroundColor: input.trim() && !isPending ? colors.primary : colors.muted, opacity: pressed ? 0.8 : 1 }]}
           onPress={() => handleSend()}
@@ -184,6 +185,8 @@ export default function AssistantScreen() {
           multiline
           maxLength={500}
           textAlign="right"
+          textAlignVertical="top"
+          returnKeyType="send"
           onSubmitEditing={() => handleSend()}
         />
       </View>
@@ -231,22 +234,25 @@ const styles = StyleSheet.create({
   assistantAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 2 },
   bubbleText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22, flexShrink: 1 },
   inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
+    flexDirection: "row-reverse",
+    alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   input: {
     flex: 1,
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 50,
+    borderRadius: 18,
+    borderWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
+    paddingTop: 12,
+    paddingBottom: 10,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
-    maxHeight: 120,
+    lineHeight: 22,
+    maxHeight: 112,
   },
   sendBtn: {
     width: 44,

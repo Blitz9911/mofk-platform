@@ -1,12 +1,14 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SESSION_STORAGE_KEY = "mfk-supabase-session";
+export const DEV_PHONE_OTP_CODE = process.env.EXPO_PUBLIC_DEV_OTP_CODE || "123456";
 
 type JsonRecord = Record<string, unknown>;
 
 export type SupabaseAuthUser = {
   id: string;
   email?: string;
+  phone?: string;
   user_metadata?: JsonRecord;
 };
 
@@ -76,6 +78,10 @@ export function getSupabaseConfig() {
 function buildSupabaseUrl(baseUrl: string, path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
+}
+
+export function isMockPhoneOtpEnabled(): boolean {
+  return process.env.EXPO_PUBLIC_AUTH_OTP_MODE !== "sms";
 }
 
 function getErrorMessage(data: unknown, fallback: string): string {
@@ -276,27 +282,38 @@ function fallbackName(user: SupabaseAuthUser): string {
 
 function fallbackPhone(user: SupabaseAuthUser): string {
   return (
+    user.phone ||
     metadataValue(user, "phone") ||
     `user-${user.id.slice(0, 12)}`
   );
 }
 
-function normalizeSaudiPhone(phone: string): string {
-  const cleaned = phone.replace(/[\s()-]/g, "");
+export function normalizeSaudiPhone(phone: string): string {
+  const digits = phone
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/\D/g, "");
+
+  let cleaned = digits;
+
+  if (cleaned.startsWith("00966")) {
+    cleaned = cleaned.slice(2);
+  }
 
   if (cleaned.startsWith("+")) {
     return cleaned;
   }
 
   if (cleaned.startsWith("966")) {
-    return `+${cleaned}`;
+    const localPart = cleaned.slice(3).replace(/^0+/, "");
+    return `+966${localPart}`;
   }
 
   if (cleaned.startsWith("0")) {
     return `+966${cleaned.slice(1)}`;
   }
 
-  return `+966${cleaned}`;
+  return `+966${cleaned.slice(-9)}`;
 }
 
 function toAuthUser(
@@ -315,6 +332,16 @@ function toAuthUser(
     subscriptionAutoRenew: row?.subscription_auto_renew ?? true,
     isActive: row?.is_active ?? true,
   };
+}
+
+function phoneAuthEmail(phone: string): string {
+  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
+  return `${digits}@phone.mofk.local`;
+}
+
+function phoneAuthPassword(phone: string): string {
+  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
+  return `MofkPhoneOtp@${digits}`;
 }
 
 async function upsertUserRow(
@@ -401,6 +428,149 @@ async function touchLastActiveAt(
 }
 
 export const authApi = {
+  async startPhoneLogin(phone: string): Promise<string> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+
+    if (isMockPhoneOtpEnabled()) {
+      return normalizedPhone;
+    }
+
+    await supabaseRequest(
+      "/auth/v1/otp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          create_user: false,
+        }),
+      },
+    );
+
+    return normalizedPhone;
+  },
+
+  async startPhoneRegistration(phone: string): Promise<string> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+
+    if (isMockPhoneOtpEnabled()) {
+      return normalizedPhone;
+    }
+
+    await supabaseRequest(
+      "/auth/v1/otp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          create_user: true,
+        }),
+      },
+    );
+
+    return normalizedPhone;
+  },
+
+  async verifyPhoneOtp(phone: string, token: string, mode: "login" | "register" = "login"): Promise<AuthUser> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+
+    if (isMockPhoneOtpEnabled()) {
+      if (token !== DEV_PHONE_OTP_CODE) {
+        throw new Error("رمز التحقق غير صحيح. استخدم رمز الاختبار 123456.");
+      }
+
+      const email = phoneAuthEmail(normalizedPhone);
+      const password = phoneAuthPassword(normalizedPhone);
+
+      let payload: SupabaseAuthResponse;
+
+      try {
+        payload = await supabaseRequest<SupabaseAuthResponse>(
+          "/auth/v1/token?grant_type=password",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email,
+              password,
+            }),
+          },
+        );
+      } catch {
+        if (mode === "login") {
+          throw new Error("هذا الرقم غير مسجل. أنشئ حساب جديد أولاً.");
+        }
+
+        payload = await supabaseRequest<SupabaseAuthResponse>(
+          "/auth/v1/signup",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email,
+              password,
+              data: {
+                name: "مستخدم مفك",
+                full_name: "مستخدم مفك",
+                phone: normalizedPhone,
+              },
+            }),
+          },
+        );
+      }
+
+      const session = normalizeSession(payload);
+
+      if (!session) {
+        throw new Error("تعذر إنشاء جلسة الاختبار. تحقق من إعدادات Supabase Auth.");
+      }
+
+      await saveSupabaseSession(session);
+
+      const row = await getProfileRow(session.user, session.access_token);
+      await touchLastActiveAt(session.user.id, session.access_token);
+
+      return toAuthUser(session.user, row);
+    }
+
+    const payload = await supabaseRequest<SupabaseAuthResponse>(
+      "/auth/v1/verify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          token,
+          type: "sms",
+        }),
+      },
+    );
+
+    const session = normalizeSession(payload);
+
+    if (!session) {
+      throw new Error("رمز التحقق غير صحيح أو انتهت صلاحيته.");
+    }
+
+    await saveSupabaseSession(session);
+
+    const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
+
+    return toAuthUser(session.user, row);
+  },
+
   async register(
     name: string,
     phone: string,

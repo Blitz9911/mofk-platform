@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 
 /* ── Brand / Model data (identical to web) ───────────────── */
 const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
@@ -57,71 +58,163 @@ const FUEL_OPTIONS: { value: "petrol" | "diesel" | "hybrid" | "ev"; label: strin
 ];
 
 /* ── KSA Plate Input (RN port of web PlateInput) ─────────── */
+function normalizeDigit(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+}
+
+function normalizeLetter(value: string) {
+  const char = value.slice(-1);
+  const map: Record<string, string> = {
+    ا: "ا",
+    أ: "أ",
+    إ: "إ",
+    آ: "آ",
+    ب: "ب",
+    ح: "ح",
+    د: "د",
+    ر: "ر",
+    س: "س",
+    ص: "ص",
+    ط: "ط",
+    ع: "ع",
+    ق: "ق",
+    ك: "ك",
+    ل: "ل",
+    م: "م",
+    ن: "ن",
+    ه: "هـ",
+    هـ: "هـ",
+    و: "و",
+    ي: "ي",
+  };
+
+  return map[char] || char.toUpperCase();
+}
+
+function parsePlate(value: string) {
+  const normalized = normalizeDigit(value || "");
+  const digits = normalized.replace(/[^0-9]/g, "").slice(0, 4).split("");
+  const letters = normalized
+    .replace(/[0-9\s\-_/]/g, "")
+    .split("")
+    .filter((char) => /[\u0600-\u06FFa-zA-Z]/.test(char))
+    .slice(0, 3)
+    .map(normalizeLetter);
+
+  return {
+    letters: [letters[0] || "", letters[1] || "", letters[2] || ""],
+    digits: [digits[0] || "", digits[1] || "", digits[2] || "", digits[3] || ""],
+  };
+}
+
 function PlateInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const colors = useColors();
 
-  const parseValue = (v: string) => {
-    const clean = v.replace(/\s/g, "");
-    const letters = clean.split("").filter((c) => /[\u0600-\u06FF]/.test(c)).slice(0, 3);
-    const digits = clean.split("").filter((c) => /[0-9]/.test(c)).slice(0, 4);
-    return { letters, digits };
-  };
-
-  const { letters, digits } = parseValue(value || "");
-
-  const lRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
-  const dRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
+  const letterRefs = useRef<Array<TextInput | null>>([]);
+  const digitRefs = useRef<Array<TextInput | null>>([]);
+  const { letters, digits } = parsePlate(value || "");
 
   const buildValue = (ltrs: string[], dgts: string[]) =>
-    ([...ltrs].join("") + " " + dgts.join("")).trim();
+    [ltrs.filter(Boolean).join(" "), dgts.filter(Boolean).join("")]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+  const focusBox = (index: number) => {
+    if (index < 0 || index > 6) return;
+    setTimeout(() => {
+      const target =
+        index < 3 ? letterRefs.current[index] : digitRefs.current[index - 3];
+      target?.focus();
+    }, 80);
+  };
+
+  const updateBox = (globalIndex: number, nextValue: string) => {
+    const nextLetters = [...letters];
+    const nextDigits = [...digits];
+
+    if (globalIndex < 3) {
+      nextLetters[globalIndex] = nextValue;
+    } else {
+      nextDigits[globalIndex - 3] = nextValue;
+    }
+
+    onChange(buildValue(nextLetters, nextDigits));
+  };
 
   const handleLetter = (idx: number, char: string) => {
-    const c = char.slice(-1);
-    if (c !== "" && !/[\u0600-\u06FF]/.test(c)) return;
-    const n = [...letters];
-    n[idx] = c;
-    onChange(buildValue(n, digits));
-    if (c && idx < 2) lRefs[idx + 1].current?.focus();
-    if (c && idx === 2) dRefs[0].current?.focus();
+    const raw = char.slice(-1);
+
+    if (!raw) {
+      updateBox(idx, "");
+      return;
+    }
+
+    if (!/[\u0600-\u06FFa-zA-Z]/.test(raw)) return;
+
+    updateBox(idx, normalizeLetter(raw));
+    focusBox(idx < 2 ? idx + 1 : 3);
   };
 
   const handleDigit = (idx: number, char: string) => {
-    const c = char.slice(-1);
-    if (c !== "" && !/^[0-9]$/.test(c)) return;
-    const n = [...digits];
-    n[idx] = c;
-    onChange(buildValue(letters, n));
-    if (c && idx < 3) dRefs[idx + 1].current?.focus();
+    const rawDigits = normalizeDigit(char).replace(/[^0-9]/g, "");
+    const raw = rawDigits.slice(-1);
+
+    if (!raw) {
+      updateBox(idx + 3, "");
+      return;
+    }
+
+    const nextDigits = [...digits];
+    const incoming = rawDigits.slice(0, 4 - idx).split("");
+    incoming.forEach((digit, offset) => {
+      nextDigits[idx + offset] = digit;
+    });
+
+    onChange(buildValue(letters, nextDigits));
+    focusBox(Math.min(idx + incoming.length + 3, 6));
   };
 
-  const handleLetterKey = (idx: number, key: string) => {
-    if (key === "Backspace" && !letters[idx] && idx > 0) lRefs[idx - 1].current?.focus();
-  };
+  const handleKey = (globalIndex: number, key: string) => {
+    if (key !== "Backspace") return;
 
-  const handleDigitKey = (idx: number, key: string) => {
-    if (key === "Backspace" && !digits[idx]) {
-      if (idx > 0) dRefs[idx - 1].current?.focus();
-      else lRefs[2].current?.focus();
+    const currentValue =
+      globalIndex < 3 ? letters[globalIndex] : digits[globalIndex - 3];
+
+    if (currentValue) {
+      updateBox(globalIndex, "");
+      focusBox(Math.max(globalIndex - 1, 0));
+      return;
+    }
+
+    const previousIndex = globalIndex - 1;
+    if (previousIndex >= 0) {
+      updateBox(previousIndex, "");
+      focusBox(previousIndex);
     }
   };
 
   const Box = ({
-    val, refObj, onInput, onKey, hint, isLetter,
+    globalIndex, val, onInput, setRef, hint, isLetter,
   }: {
+    globalIndex: number;
     val: string;
-    refObj: React.RefObject<TextInput | null>;
     onInput: (v: string) => void;
-    onKey: (key: string) => void;
+    setRef: (input: TextInput | null) => void;
     hint: string;
     isLetter?: boolean;
   }) => (
     <TextInput
-      ref={refObj}
+      ref={setRef}
       value={val}
-      maxLength={1}
+      maxLength={isLetter ? 1 : 4}
       onChangeText={onInput}
-      onKeyPress={(e) => onKey(e.nativeEvent.key)}
+      onKeyPress={(event) => handleKey(globalIndex, event.nativeEvent.key)}
       keyboardType={isLetter ? "default" : "number-pad"}
+      blurOnSubmit={false}
+      selectTextOnFocus
       placeholder={hint}
       placeholderTextColor={colors.mutedForeground}
       style={[
@@ -135,7 +228,9 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
     />
   );
 
-  const hasContent = letters.length > 0 || digits.length > 0;
+  const hasContent = letters.some(Boolean) || digits.some(Boolean);
+  const previewDigits = digits.filter(Boolean).join("") || "1111";
+  const previewLetters = letters.filter(Boolean).join(" ") || "أ ب ج";
 
   return (
     <View style={{ gap: 12 }}>
@@ -145,9 +240,11 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
           <Box
             key={`l${i}`}
             val={letters[i] || ""}
-            refObj={lRefs[i]}
+            globalIndex={i}
             onInput={(v) => handleLetter(i, v)}
-            onKey={(k) => handleLetterKey(i, k)}
+            setRef={(input) => {
+              letterRefs.current[i] = input;
+            }}
             hint="أ"
             isLetter
           />
@@ -157,9 +254,11 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
           <Box
             key={`d${i}`}
             val={digits[i] || ""}
-            refObj={dRefs[i]}
+            globalIndex={i + 3}
             onInput={(v) => handleDigit(i, v)}
-            onKey={(k) => handleDigitKey(i, k)}
+            setRef={(input) => {
+              digitRefs.current[i] = input;
+            }}
             hint={String(i + 1)}
           />
         ))}
@@ -170,15 +269,15 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
         <View style={plateStyles.plate}>
           {/* Numbers — left side */}
           <View style={plateStyles.numCell}>
-            <Text style={plateStyles.numText}>{digits.join("") || "---"}</Text>
-            <Text style={plateStyles.subText}>{digits.join("") || ""}</Text>
+            <Text style={plateStyles.numText}>{previewDigits}</Text>
+            <Text style={plateStyles.subText}>{previewDigits}</Text>
           </View>
           {/* Vertical separator */}
           <View style={plateStyles.plateSep} />
           {/* Letters — middle */}
           <View style={plateStyles.letterCell}>
-            <Text style={plateStyles.letterText}>{letters.join(" ") || "- -"}</Text>
-            <Text style={plateStyles.subText}>{letters.join(" ") || ""}</Text>
+            <Text style={plateStyles.letterText}>{previewLetters}</Text>
+            <Text style={plateStyles.subText}>{previewLetters}</Text>
           </View>
           {/* Green KSA badge — rightmost */}
           <View style={plateStyles.ksaBadge}>
@@ -287,6 +386,12 @@ export default function AddVehicleScreen() {
     if (!model.trim()) e.model = "مطلوب";
     if (!year || year < 1990 || year > CURRENT_YEAR + 1) e.year = `بين 1990 و ${CURRENT_YEAR + 1}`;
     if (!["petrol", "diesel", "hybrid", "ev"].includes(fuelType)) e.fuelType = "مطلوب";
+    const parsedPlate = parsePlate(plateNumber);
+    if (!plateNumber.trim()) {
+      e.plateNumber = "رقم اللوحة إجباري";
+    } else if (!parsedPlate.letters.every(Boolean) || !parsedPlate.digits.every(Boolean)) {
+      e.plateNumber = "أدخل ٣ أحرف و٤ أرقام للوحة";
+    }
     if (odometerKm.trim() && (!/^\d+$/.test(odometerKm.trim()) || Number(odometerKm) < 0)) {
       e.odometerKm = "رقم غير صحيح";
     }
@@ -304,7 +409,7 @@ export default function AddVehicleScreen() {
           model: model.trim(),
           year,
           fuelType,
-          plateNumber: plateNumber.trim() || undefined,
+          plateNumber: plateNumber.trim(),
           odometerKm: Number.isFinite(odo) ? odo : undefined,
           vin: vin.trim() || undefined,
         },
@@ -312,9 +417,9 @@ export default function AddVehicleScreen() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
-          if (Platform.OS === "web") router.back();
+          if (Platform.OS === "web") smoothBack(router);
           else Alert.alert("✓ تمت الإضافة", "تم إضافة المركبة بنجاح", [
-            { text: "حسناً", onPress: () => router.back() },
+            { text: "حسناً", onPress: () => smoothBack(router) },
           ]);
         },
         onError: (err: any) => {
@@ -350,15 +455,15 @@ export default function AddVehicleScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
+        <Pressable onPress={() => smoothBack(router)} hitSlop={10} style={styles.backBtn}>
           <Ionicons name="close" size={26} color={colors.foreground} />
         </Pressable>
-        <View style={{ alignItems: "center" }}>
+        {false ? <View style={{ alignItems: "center" }}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>إضافة مركبة جديدة</Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
             أدخل بيانات مركبتك للبدء في مراقبتها
           </Text>
-        </View>
+        </View> : null}
         <View style={{ width: 26 }} />
       </View>
 
@@ -481,8 +586,9 @@ export default function AddVehicleScreen() {
 
           {/* Plate Number — KSA Box Style */}
           <View style={styles.row}>
-            <Text style={[styles.label, { color: colors.foreground }]}>رقم اللوحة</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>رقم اللوحة <Text style={{ color: "#ef4444" }}>*</Text></Text>
             <PlateInput value={plateNumber} onChange={setPlateNumber} />
+            {errors.plateNumber ? <Text style={styles.errorText}>{errors.plateNumber}</Text> : null}
           </View>
 
           {/* Odometer + VIN */}
@@ -519,7 +625,7 @@ export default function AddVehicleScreen() {
           {/* Submit */}
           <View style={styles.actions}>
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => smoothBack(router)}
               style={[styles.cancelBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
             >
               <Text style={[styles.cancelText, { color: colors.foreground }]}>إلغاء</Text>

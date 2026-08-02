@@ -62,7 +62,7 @@ export default function OnboardingScreen() {
 
   const goNext = () => {
     if (isLast) {
-      router.replace("/pair-device");
+      router.replace("/order-device");
       return;
     }
 
@@ -75,7 +75,7 @@ export default function OnboardingScreen() {
       <LinearGradient colors={["#090A0B", "#070707"]} style={StyleSheet.absoluteFill} />
       <StatusBarMock />
 
-      <Pressable onPress={() => router.replace("/pair-device")} style={styles.skipButton}>
+      <Pressable onPress={() => router.replace("/order-device")} style={styles.skipButton}>
         <Text style={styles.skipText}>تخطي</Text>
       </Pressable>
 
