@@ -5,7 +5,7 @@
 - جدول المركبات الحالي هو `public.vehicles` وفيه الحقول الأساسية `user_id`, `make`, `model`, `year`, `plate_number`, `odometer_km`, `fuel_type`, `adapter_mac`, `health_score`, `image_url`.
 - المركبات مرتبطة بالمستخدمين عبر `user_id -> public.users(id)`، وسياسات RLS الحالية تسمح للمستخدم بإدارة مركباته فقط وتسمح للإدارة بقراءة كل المركبات.
 - لا توجد جداول مرجعية حالية للماركات أو الموديلات أو الأجيال، لذلك لا يوجد ما يكرر الغرض المطلوب.
-- ملفات Supabase الحالية موجودة في `supabase1/supabase`، وأسلوبها SQL مباشر مع `create table if not exists`, `drop policy if exists`, وRLS.
+- ملفات Supabase الحالية موجودة في `supabase1/supabase`. تم اعتماد مسار migrations القياسي داخل نفس مجلد Supabase الحالي: `supabase1/supabase/migrations`.
 - الاتصال بـ Supabase في الويب والجوال يتم عبر REST/Auth helpers داخل `artifacts/mfk-web/src/lib/supabase.ts` و`artifacts/mfk-mobile/lib/supabase.ts`.
 - صفحة تفاصيل المركبة موجودة في الويب والجوال، لكن المرحلة الأولى لا تضيف UI حسب الطلب.
 - تخزين الصور الحالي غير واضح كبنية Supabase Storage؛ الموجود الآن حقول URL نصية مثل `vehicles.image_url`. لذلك جعلت صور خطوات الدليل وبلاغات العملاء URL اختياري فقط، بدون bucket جديد.
@@ -25,7 +25,7 @@
 
 الملف:
 
-`supabase1/supabase/20260802_obd_installation_guides_phase1.sql`
+`supabase1/supabase/migrations/20260802000000_obd_installation_guides_phase1.sql`
 
 لم يتم تطبيقه على Supabase production. الملف قابل للمراجعة والتشغيل اليدوي بعد الموافقة.
 
@@ -61,7 +61,24 @@
 
 `supabase1/supabase/20260802_obd_installation_guides_phase1_rollback.sql`
 
-يحذف فقط الجداول والدوال والأعمدة التي أضافتها هذه المرحلة.
+يحذف فقط الجداول والدوال الخاصة بميزة OBD والأعمدة التي أضافتها هذه المرحلة.
+
+ملاحظة مهمة: حذف أعمدة `vehicles.vehicle_model_id`, `vehicles.vehicle_generation_id`, و`vehicles.market` يؤدي إلى فقدان قيم الربط إذا استُخدمت لاحقًا.
+
+الـ rollback لا يحذف `public.current_user_is_admin()` ولا `public.set_updated_at()` أو أي كائن مشترك سابق.
+
+## الاختبارات
+
+ملف اختبار PostgreSQL الفعلي:
+
+`artifacts/api-server/test/obd-installation-guides-postgres.test.mjs`
+
+الاختبار يشغّل migration وseed مرتين ثم يتحقق من RLS والـ rollback على قاعدة اختبار فقط. يحتاج:
+
+- `TEST_DATABASE_URL`
+- `ALLOW_DESTRUCTIVE_POSTGRES_TESTS=true`
+
+لا تشغّله على Production لأنه يعيد بناء `public` و`auth` داخل قاعدة الاختبار.
 
 ## قرارات تحتاج موافقتك قبل المرحلة الثانية
 

@@ -5,7 +5,7 @@ begin;
 
 create extension if not exists "pgcrypto";
 
-create or replace function public.set_updated_at()
+create or replace function public.obd_guides_set_updated_at()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
@@ -16,7 +16,7 @@ begin
 end;
 $$;
 
-revoke all on function public.set_updated_at() from public;
+revoke all on function public.obd_guides_set_updated_at() from public;
 
 create or replace function public.normalize_vehicle_name(value text)
 returns text
@@ -172,27 +172,27 @@ create index if not exists idx_vehicles_model_generation on public.vehicles(vehi
 drop trigger if exists set_vehicle_makes_updated_at on public.vehicle_makes;
 create trigger set_vehicle_makes_updated_at
 before update on public.vehicle_makes
-for each row execute function public.set_updated_at();
+for each row execute function public.obd_guides_set_updated_at();
 
 drop trigger if exists set_vehicle_models_updated_at on public.vehicle_models;
 create trigger set_vehicle_models_updated_at
 before update on public.vehicle_models
-for each row execute function public.set_updated_at();
+for each row execute function public.obd_guides_set_updated_at();
 
 drop trigger if exists set_vehicle_generations_updated_at on public.vehicle_generations;
 create trigger set_vehicle_generations_updated_at
 before update on public.vehicle_generations
-for each row execute function public.set_updated_at();
+for each row execute function public.obd_guides_set_updated_at();
 
 drop trigger if exists set_obd_installation_guides_updated_at on public.obd_installation_guides;
 create trigger set_obd_installation_guides_updated_at
 before update on public.obd_installation_guides
-for each row execute function public.set_updated_at();
+for each row execute function public.obd_guides_set_updated_at();
 
 drop trigger if exists set_obd_installation_steps_updated_at on public.obd_installation_steps;
 create trigger set_obd_installation_steps_updated_at
 before update on public.obd_installation_steps
-for each row execute function public.set_updated_at();
+for each row execute function public.obd_guides_set_updated_at();
 
 create or replace function public.match_vehicle_generation(
   p_make text,
