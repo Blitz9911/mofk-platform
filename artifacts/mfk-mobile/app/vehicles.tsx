@@ -45,6 +45,15 @@ export default function VehiclesScreen() {
     setRefreshing(false);
   };
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/");
+  };
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   return (
@@ -58,13 +67,21 @@ export default function VehiclesScreen() {
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addBtnText}>إضافة مركبة</Text>
         </Pressable>
-        <View style={styles.headerRight}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>مركباتي</Text>
-          {vehicles && (
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-              {vehicles.length} مركبة مسجلة في حسابك
-            </Text>
-          )}
+        <View style={styles.headerMain}>
+          <Pressable
+            onPress={goBack}
+            style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          >
+            <Ionicons name="chevron-forward" size={19} color={colors.foreground} />
+          </Pressable>
+          <View style={styles.headerRight}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>مركباتي</Text>
+            {vehicles && (
+              <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+                {vehicles.length} مركبة مسجلة في حسابك
+              </Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -211,6 +228,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerMain: { flexDirection: "row-reverse", alignItems: "center", gap: 10, flex: 1, justifyContent: "flex-start" },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: StyleSheet.hairlineWidth,
   },
   headerRight: { alignItems: "flex-end", gap: 2 },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },

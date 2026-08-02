@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db, fuelLogsTable, vehiclesTable } from "@workspace/db";
 import { z } from "zod";
+import { persistEvaluation } from "./recommendations";
 
 const router: IRouter = Router();
 
@@ -265,6 +266,7 @@ router.post("/fuel", async (req, res): Promise<void> => {
   await db.update(vehiclesTable)
     .set({ odometerKm })
     .where(and(eq(vehiclesTable.id, vehicleId), sql`odometer_km < ${odometerKm}`));
+  await persistEvaluation(vehicleId, req.userId).catch(() => null);
 
   res.status(201).json({
     id: log.id,

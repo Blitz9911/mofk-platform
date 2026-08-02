@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { ArrowRight, CheckCircle2, KeyRound, Phone, UserPlus } from "lucide-react";
+import { ArrowRight, CheckCircle2, KeyRound, Phone, User, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MfkLogo } from "@/components/MfkLogo";
@@ -17,6 +17,7 @@ export default function Register() {
   const selectedPlan = params.get("plan");
 
   const [step, setStep] = useState<AuthStep>("phone");
+  const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [normalizedPhone, setNormalizedPhone] = useState("");
@@ -32,6 +33,10 @@ export default function Register() {
   const handleRequestOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
+    if (!name.trim()) {
+      setError("اكتب اسمك.");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -52,7 +57,7 @@ export default function Register() {
 
     setIsLoading(true);
     try {
-      const user = await authApi.verifyPhoneOtp(normalizedPhone || phone, otp);
+      const user = await authApi.verifyPhoneOtp(normalizedPhone || phone, otp, name);
       login(user);
       setLocation(destination);
     } catch (err: any) {
@@ -117,7 +122,7 @@ export default function Register() {
               <h2 className="text-3xl font-bold mb-2">إنشاء حساب</h2>
               <p className="text-muted-foreground">
                 {step === "phone"
-                  ? "أنشئ حسابك برقم الجوال أو تابع باستخدام Google."
+                  ? "اكتب اسمك ورقم جوالك فقط."
                   : `أدخل رمز التحقق المرسل إلى ${normalizedPhone}.`}
               </p>
             </div>
@@ -145,6 +150,22 @@ export default function Register() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium block">الاسم</label>
+                  <div className="relative">
+                    <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="اكتب اسمك"
+                      className="h-12 pr-10 text-base"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                      autoComplete="name"
+                    />
+                  </div>
+                </div>
+
                 {error && (
                   <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
                     {error}
@@ -160,7 +181,7 @@ export default function Register() {
                 <Button
                   type="submit"
                   className="w-full h-12 text-base font-semibold"
-                  disabled={!phone.trim() || isLoading}
+                  disabled={!name.trim() || !phone.trim() || isLoading}
                 >
                   {isLoading ? "جاري إرسال الرمز..." : "إرسال رمز التحقق"}
                 </Button>

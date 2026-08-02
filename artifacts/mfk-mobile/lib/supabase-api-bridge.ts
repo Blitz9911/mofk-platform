@@ -39,17 +39,36 @@ type MaintenanceLogRow = {
   vehicle_id: string;
   user_id: string;
   service_type: string;
+  custom_service_name?: string | null;
   done_at: string;
   done_at_km?: number | null;
+  actual_cost_sar?: number | string | null;
   cost_sar?: number | string | null;
   notes?: string | null;
+  source?: string | null;
   created_at?: string;
+  updated_at?: string | null;
   vehicles?: {
     make?: string | null;
     model?: string | null;
     nickname?: string | null;
     odometer_km?: number | null;
   } | null;
+};
+
+type FuelLogRow = {
+  id: string;
+  vehicle_id: string;
+  user_id: string;
+  filled_at: string;
+  odometer_km: number;
+  liters: number | string;
+  price_per_liter_halalas: number;
+  total_cost_halalas: number;
+  fuel_grade: string;
+  station_name_ar?: string | null;
+  is_full?: boolean | null;
+  notes?: string | null;
 };
 
 type DiagnosticCodeRow = {
@@ -114,6 +133,23 @@ type DeviceOrderRow = {
   id: string;
   status: string;
   created_at: string;
+};
+
+type NotificationRow = {
+  id: string;
+  user_id: string;
+  vehicle_id?: string | null;
+  type: string;
+  severity: string;
+  title_ar: string;
+  body_ar?: string | null;
+  action_url?: string | null;
+  dedupe_key?: string | null;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  scheduled_at?: string | null;
+  sent_at?: string | null;
+  created_at?: string | null;
 };
 
 type ApiBridgeResult =
@@ -629,13 +665,22 @@ function buildMaintenanceRecommendations(
 function completedMaintenanceItem(
   row: MaintenanceLogRow,
 ) {
+  const actualCostSar =
+    row.actual_cost_sar ?? row.cost_sar ?? null;
+
   return {
     id: row.id,
+    userId: row.user_id,
     vehicleId: row.vehicle_id,
     serviceType: row.service_type,
     serviceTypeAr:
-      MAINTENANCE_LABELS[row.service_type] ||
-      row.service_type,
+      row.service_type === "other" &&
+      row.custom_service_name
+        ? row.custom_service_name
+        : MAINTENANCE_LABELS[row.service_type] ||
+          row.service_type,
+    customServiceName:
+      row.custom_service_name ?? null,
     intervalKm: null,
     intervalDays: null,
     lastDoneKm: row.done_at_km ?? null,
@@ -644,10 +689,25 @@ function completedMaintenanceItem(
     nextDueAt: null,
     status: "done" as const,
     estimatedCost:
-      row.cost_sar !== null &&
-      row.cost_sar !== undefined
-        ? Number(row.cost_sar)
+      actualCostSar !== null &&
+      actualCostSar !== undefined
+        ? Number(actualCostSar)
         : null,
+    actualCostSar:
+      actualCostSar !== null &&
+      actualCostSar !== undefined
+        ? Number(actualCostSar)
+        : null,
+    cost:
+      actualCostSar !== null &&
+      actualCostSar !== undefined
+        ? Number(actualCostSar)
+        : null,
+    notes: row.notes ?? null,
+    source: row.source ?? "manual",
+    createdAt: row.created_at,
+    updatedAt:
+      row.updated_at ?? row.created_at,
   };
 }
 
@@ -1278,6 +1338,21 @@ async function handleMaintenance(
   const session = await requireSession();
 
   if (
+    path === "/api/maintenance/logs" &&
+    method === "GET"
+  ) {
+    const rows = await listMaintenanceLogs(
+      session.access_token,
+      session.user.id,
+    );
+
+    return {
+      handled: true,
+      data: rows.map(completedMaintenanceItem),
+    };
+  }
+
+  if (
     path ===
       "/api/maintenance/upcoming" &&
     method === "GET"
@@ -1326,14 +1401,22 @@ async function handleMaintenance(
   const logMatch = path.match(
     /^\/api\/maintenance\/([^/]+)\/log$/,
   );
+  const createLogMatch =
+    path === "/api/maintenance/logs" &&
+    method === "POST";
 
   if (
-    logMatch &&
-    method === "POST"
+    (logMatch && method === "POST") ||
+    createLogMatch
   ) {
-    const vehicleId = decodeURIComponent(
-      logMatch[1],
+    const body = await readJsonBody(
+      input,
+      init,
     );
+
+    const vehicleId = logMatch
+      ? decodeURIComponent(logMatch[1])
+      : String(body.vehicleId ?? "");
 
     const vehicle = await getVehicleRow(
       vehicleId,
@@ -1348,11 +1431,6 @@ async function handleMaintenance(
       );
     }
 
-    const body = await readJsonBody(
-      input,
-      init,
-    );
-
     const serviceType = String(
       body.serviceType ?? "",
     ).trim();
@@ -1362,9 +1440,29 @@ async function handleMaintenance(
         new Date().toISOString(),
     ).trim();
 
-    const doneAtKm = Number(
-      body.doneAtKm,
-    );
+    const doneAtKm =
+      body.doneAtKm !== undefined &&
+      body.doneAtKm !== null &&
+      body.doneAtKm !== ""
+        ? Number(body.doneAtKm)
+        : null;
+    const actualCostSar =
+      body.actualCostSar !==
+        undefined &&
+      body.actualCostSar !== null &&
+      body.actualCostSar !== ""
+        ? Number(body.actualCostSar)
+        : body.cost !== undefined &&
+            body.cost !== null &&
+            body.cost !== ""
+          ? Number(body.cost)
+          : null;
+    const customServiceName =
+      typeof body.customServiceName ===
+        "string" &&
+      body.customServiceName.trim()
+        ? body.customServiceName.trim()
+        : null;
 
     if (!serviceType) {
       throw new ApiBridgeError(
@@ -1374,8 +1472,9 @@ async function handleMaintenance(
     }
 
     if (
-      !Number.isFinite(doneAtKm) ||
-      doneAtKm < 0
+      doneAtKm !== null &&
+      (!Number.isFinite(doneAtKm) ||
+        doneAtKm < 0)
     ) {
       throw new ApiBridgeError(
         "قراءة العداد غير صحيحة.",
@@ -1400,19 +1499,22 @@ async function handleMaintenance(
             vehicle_id: vehicleId,
             user_id: session.user.id,
             service_type: serviceType,
+            custom_service_name:
+              customServiceName,
             done_at: doneAt,
             done_at_km: doneAtKm,
+            actual_cost_sar:
+              actualCostSar,
             cost_sar:
-              body.cost !== undefined &&
-              body.cost !== null &&
-              body.cost !== ""
-                ? Number(body.cost)
-                : null,
+              actualCostSar,
             notes:
               typeof body.notes === "string" &&
               body.notes.trim()
                 ? body.notes.trim()
                 : null,
+            source: String(
+              body.source ?? "manual",
+            ),
           }),
         },
         session.access_token,
@@ -1431,6 +1533,86 @@ async function handleMaintenance(
         rows[0],
       ),
       status: 201,
+    };
+  }
+
+  const updateLogMatch = path.match(/^\/api\/maintenance\/logs\/([^/]+)$/);
+  if (updateLogMatch && (method === "PATCH" || method === "DELETE")) {
+    const id = decodeURIComponent(updateLogMatch[1]);
+
+    if (method === "DELETE") {
+      await supabaseRequest(
+        `/rest/v1/maintenance_logs?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+        { method: "DELETE" },
+        session.access_token,
+      );
+      return { handled: true, status: 204 };
+    }
+
+    const body = await readJsonBody(input, init);
+    const patch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (typeof body.serviceType === "string") {
+      patch.service_type = body.serviceType.trim();
+    }
+    if (typeof body.customServiceName === "string") {
+      patch.custom_service_name = body.customServiceName.trim() || null;
+    }
+    if (body.doneAt) {
+      patch.done_at = String(body.doneAt);
+    }
+    if (body.doneAtKm !== undefined) {
+      const doneAtKm =
+        body.doneAtKm === "" || body.doneAtKm === null
+          ? null
+          : Number(body.doneAtKm);
+      if (doneAtKm !== null && (!Number.isFinite(doneAtKm) || doneAtKm < 0)) {
+        throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
+      }
+      patch.done_at_km = doneAtKm;
+    }
+    if (body.actualCostSar !== undefined || body.cost !== undefined) {
+      const value = body.actualCostSar ?? body.cost;
+      const actualCostSar =
+        value === "" || value === null ? null : Number(value);
+      if (
+        actualCostSar !== null &&
+        (!Number.isFinite(actualCostSar) || actualCostSar < 0)
+      ) {
+        throw new ApiBridgeError("التكلفة غير صحيحة.", 400);
+      }
+      patch.actual_cost_sar = actualCostSar;
+      patch.cost_sar = actualCostSar;
+    }
+    if (typeof body.notes === "string" || body.notes === null) {
+      patch.notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
+    }
+    if (typeof body.source === "string") {
+      patch.source = body.source;
+    }
+
+    const rows = await supabaseRequest<MaintenanceLogRow[]>(
+      `/rest/v1/maintenance_logs?select=*&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(patch),
+      },
+      session.access_token,
+    );
+
+    if (!rows[0]) {
+      throw new ApiBridgeError("سجل الصيانة غير موجود.", 404);
+    }
+
+    return {
+      handled: true,
+      data: completedMaintenanceItem(rows[0]),
     };
   }
 
@@ -1538,6 +1720,258 @@ async function handleBookings(
   };
 }
 
+function toFuelLog(row: FuelLogRow, consumption: unknown = null) {
+  return {
+    id: row.id,
+    vehicleId: row.vehicle_id,
+    filledAt: row.filled_at,
+    odometerKm: row.odometer_km,
+    liters: Number(row.liters),
+    pricePerLiterSar: row.price_per_liter_halalas / 100,
+    totalCostSar: row.total_cost_halalas / 100,
+    fuelGrade: row.fuel_grade,
+    stationNameAr: row.station_name_ar ?? undefined,
+    isFull: row.is_full ?? false,
+    notes: row.notes ?? undefined,
+    consumption,
+  };
+}
+
+function withFuelConsumption(rows: FuelLogRow[]) {
+  const asc = [...rows].sort((a, b) => Number(a.odometer_km) - Number(b.odometer_km));
+  const map = new Map<string, unknown>();
+
+  asc.forEach((row, index) => {
+    const prev = asc[index - 1];
+
+    if (!prev) {
+      map.set(row.id, null);
+      return;
+    }
+
+    const distanceKm = Number(row.odometer_km) - Number(prev.odometer_km);
+    const liters = Number(row.liters);
+
+    if (distanceKm <= 0 || liters <= 0) {
+      map.set(row.id, null);
+      return;
+    }
+
+    map.set(row.id, {
+      distanceKm,
+      consumptionL100km: Number(((liters / distanceKm) * 100).toFixed(2)),
+      kmPerLiter: Number((distanceKm / liters).toFixed(2)),
+    });
+  });
+
+  return rows.map((row) => toFuelLog(row, map.get(row.id) ?? null));
+}
+
+async function listFuelRows(
+  accessToken: string,
+  userId: string,
+  vehicleId?: string | null,
+) {
+  const vehicleFilter = vehicleId
+    ? `&vehicle_id=eq.${encodeURIComponent(vehicleId)}`
+    : "";
+
+  return supabaseRequest<FuelLogRow[]>(
+    `/rest/v1/fuel_logs?select=*&user_id=eq.${encodeURIComponent(userId)}${vehicleFilter}&order=filled_at.desc`,
+    { method: "GET" },
+    accessToken,
+  );
+}
+
+function filterFuelRowsByPeriod(rows: FuelLogRow[], period: string) {
+  if (period === "all") return rows;
+
+  const now = new Date();
+  const from = new Date(now);
+
+  if (period === "week") {
+    from.setDate(now.getDate() - 7);
+  } else if (period === "month") {
+    from.setMonth(now.getMonth() - 1);
+  } else if (period === "year") {
+    from.setFullYear(now.getFullYear() - 1);
+  } else {
+    return rows;
+  }
+
+  return rows.filter((row) => new Date(row.filled_at) >= from);
+}
+
+function buildFuelStats(rows: FuelLogRow[], period: string) {
+  const filtered = filterFuelRowsByPeriod(rows, period);
+  const logs = withFuelConsumption(filtered);
+
+  const totalLiters = logs.reduce((sum, log) => sum + Number(log.liters || 0), 0);
+  const totalCostSar = logs.reduce((sum, log) => sum + Number(log.totalCostSar || 0), 0);
+  const validConsumption = logs.map((log) => log.consumption as any).filter(Boolean);
+
+  const avgConsumptionL100km = validConsumption.length
+    ? Number((validConsumption.reduce((sum: number, item: any) => sum + item.consumptionL100km, 0) / validConsumption.length).toFixed(2))
+    : null;
+  const avgKmPerLiter = validConsumption.length
+    ? Number((validConsumption.reduce((sum: number, item: any) => sum + item.kmPerLiter, 0) / validConsumption.length).toFixed(2))
+    : null;
+
+  const byDay = new Map<string, { date: string; liters: number; costSar: number; fills: number }>();
+
+  filtered.forEach((row) => {
+    const date = row.filled_at.slice(0, 10);
+    const current = byDay.get(date) ?? { date, liters: 0, costSar: 0, fills: 0 };
+    current.liters += Number(row.liters || 0);
+    current.costSar += Number(row.total_cost_halalas || 0) / 100;
+    current.fills += 1;
+    byDay.set(date, current);
+  });
+
+  const trendByDay = Array.from(byDay.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((item) => ({
+      ...item,
+      liters: Number(item.liters.toFixed(2)),
+      costSar: Number(item.costSar.toFixed(2)),
+    }));
+
+  return {
+    totalLiters: Number(totalLiters.toFixed(2)),
+    totalCostSar: Number(totalCostSar.toFixed(2)),
+    avgConsumptionL100km,
+    avgKmPerLiter,
+    fillCount: filtered.length,
+    trendByDay,
+  };
+}
+
+async function handleFuel(
+  url: URL,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  const path = url.pathname;
+  const session = await requireSession();
+
+  if (path === "/api/fuel" && method === "GET") {
+    const vehicleId = url.searchParams.get("vehicleId");
+    const rows = await listFuelRows(session.access_token, session.user.id, vehicleId);
+
+    return {
+      handled: true,
+      data: { logs: withFuelConsumption(rows) },
+    };
+  }
+
+  if (path === "/api/fuel/stats" && method === "GET") {
+    const vehicleId = url.searchParams.get("vehicleId");
+    const period = url.searchParams.get("period") ?? "month";
+    const rows = await listFuelRows(session.access_token, session.user.id, vehicleId);
+
+    return {
+      handled: true,
+      data: buildFuelStats(rows, period),
+    };
+  }
+
+  if (path === "/api/fuel" && method === "POST") {
+    const body = await readJsonBody(input, init);
+    const vehicleId = String(body.vehicleId ?? "").trim();
+    const liters = Number(body.liters);
+    const pricePerLiterSar = Number(body.pricePerLiterSar);
+    const fuelGrade = String(body.fuelGrade ?? "91").trim();
+    const filledAt = String(body.filledAt ?? new Date().toISOString()).trim();
+    const rawOdometer =
+      body.odometerKm !== undefined && body.odometerKm !== null && body.odometerKm !== ""
+        ? Number(body.odometerKm)
+        : null;
+
+    if (!vehicleId) {
+      throw new ApiBridgeError("اختر المركبة أولًا.", 400);
+    }
+
+    if (!Number.isFinite(liters) || liters <= 0) {
+      throw new ApiBridgeError("كمية الوقود غير صحيحة.", 400);
+    }
+
+    if (!Number.isFinite(pricePerLiterSar) || pricePerLiterSar <= 0) {
+      throw new ApiBridgeError("سعر اللتر غير صحيح.", 400);
+    }
+
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+
+    if (!vehicle) {
+      throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    }
+
+    if (rawOdometer !== null && (!Number.isFinite(rawOdometer) || rawOdometer < 0)) {
+      throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
+    }
+
+    const odometerKm = rawOdometer !== null ? rawOdometer : Number(vehicle.odometer_km ?? 0);
+    const pricePerLiterHalalas = Math.round(pricePerLiterSar * 100);
+    const totalCostHalalas = Math.round(liters * pricePerLiterSar * 100);
+
+    const rows = await supabaseRequest<FuelLogRow[]>(
+      "/rest/v1/fuel_logs?select=*",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          vehicle_id: vehicleId,
+          user_id: session.user.id,
+          filled_at: filledAt,
+          odometer_km: odometerKm,
+          liters,
+          price_per_liter_halalas: pricePerLiterHalalas,
+          total_cost_halalas: totalCostHalalas,
+          fuel_grade: fuelGrade,
+          station_name_ar:
+            typeof body.stationNameAr === "string" && body.stationNameAr.trim()
+              ? body.stationNameAr.trim()
+              : null,
+          is_full: true,
+          notes:
+            typeof body.notes === "string" && body.notes.trim()
+              ? body.notes.trim()
+              : null,
+        }),
+      },
+      session.access_token,
+    );
+
+    return {
+      handled: true,
+      data: toFuelLog(rows[0]),
+      status: 201,
+    };
+  }
+
+  const deleteMatch = path.match(/^\/api\/fuel\/([^/]+)$/);
+
+  if (deleteMatch && method === "DELETE") {
+    const fuelLogId = decodeURIComponent(deleteMatch[1]);
+
+    await supabaseRequest(
+      `/rest/v1/fuel_logs?id=eq.${encodeURIComponent(fuelLogId)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      { method: "DELETE" },
+      session.access_token,
+    );
+
+    return {
+      handled: true,
+      data: { ok: true },
+    };
+  }
+
+  return { handled: false };
+}
+
 async function handleDtc(
   url: URL,
   method: string,
@@ -1590,7 +2024,6 @@ async function handleAi(
         403,
       );
     }
-
     const body = await readJsonBody(input, init);
     const message = String(body.message ?? "").trim();
     const lower = message.toLowerCase();
@@ -1744,6 +2177,317 @@ async function handleDeviceOrders(
   };
 }
 
+function toNotification(row: NotificationRow) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    vehicleId: row.vehicle_id ?? null,
+    type: row.type,
+    severity: row.severity,
+    titleAr: row.title_ar,
+    bodyAr: row.body_ar ?? null,
+    actionUrl: row.action_url ?? null,
+    isRead: Boolean(row.is_read),
+    readAt: row.read_at ?? null,
+    scheduledAt: row.scheduled_at ?? null,
+    sentAt: row.sent_at ?? null,
+    dedupeKey: row.dedupe_key ?? null,
+    createdAt: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+function maintenanceNotificationFromItem(
+  userId: string,
+  item: ReturnType<typeof buildMaintenanceRecommendations>[number],
+): NotificationRow {
+  const isOverdue = item.status === "overdue";
+  const serviceLabel = item.serviceTypeAr || item.serviceType;
+  const vehicleLabel =
+    item.vehicleNickname ||
+    [item.vehicleMake, item.vehicleModel].filter(Boolean).join(" ") ||
+    "مركبتك";
+  const dueHint =
+    item.nextDueKm !== null && item.nextDueKm !== undefined
+      ? `الموعد عند ${Number(item.nextDueKm).toLocaleString("ar-SA")} كم.`
+      : item.nextDueAt
+        ? `الموعد بتاريخ ${new Date(item.nextDueAt).toLocaleDateString("ar-SA")}.`
+        : "راجع جدول الصيانة.";
+
+  return {
+    id: `maintenance-${item.vehicleId}-${item.serviceType}-${item.status}`,
+    user_id: userId,
+    vehicle_id: item.vehicleId,
+    type: "maintenance",
+    severity: isOverdue ? "critical" : "warning",
+    title_ar: isOverdue
+      ? `${serviceLabel} متأخرة`
+      : `${serviceLabel} قريبة`,
+    body_ar: `${vehicleLabel}: ${dueHint}`,
+    action_url: "/maintenance",
+    dedupe_key: [
+      "maintenance",
+      item.vehicleId,
+      item.serviceType,
+      item.status,
+      item.nextDueKm ?? item.nextDueAt ?? "na",
+    ].join(":"),
+    is_read: false,
+    created_at: new Date().toISOString(),
+  };
+}
+
+async function listGeneratedNotificationRows(
+  accessToken: string,
+  userId: string,
+) {
+  const maintenanceRows = await listMaintenanceLogs(
+    accessToken,
+    userId,
+  );
+
+  return buildMaintenanceRecommendations(maintenanceRows)
+    .filter((item) => item.status === "overdue" || item.status === "upcoming")
+    .map((item) => maintenanceNotificationFromItem(userId, item));
+}
+
+async function listNotificationRows(
+  accessToken: string,
+  userId: string,
+) {
+  return supabaseRequest<NotificationRow[]>(
+    `/rest/v1/notifications?select=*&user_id=eq.${encodeURIComponent(
+      userId,
+    )}&order=created_at.desc&limit=50`,
+    {
+      method: "GET",
+    },
+    accessToken,
+  );
+}
+
+async function createNotificationIfMissing(
+  accessToken: string,
+  payload: {
+    userId: string;
+    vehicleId?: string | null;
+    type: string;
+    severity: string;
+    titleAr: string;
+    bodyAr?: string | null;
+    actionUrl?: string | null;
+    dedupeKey?: string | null;
+    scheduledAt?: string | null;
+  },
+) {
+  if (payload.dedupeKey) {
+    const existing = await supabaseRequest<Pick<NotificationRow, "id">[]>(
+      `/rest/v1/notifications?select=id&user_id=eq.${encodeURIComponent(
+        payload.userId,
+      )}&dedupe_key=eq.${encodeURIComponent(payload.dedupeKey)}&limit=1`,
+      {
+        method: "GET",
+      },
+      accessToken,
+    );
+
+    if (existing.length > 0) {
+      return null;
+    }
+  }
+
+  const rows = await supabaseRequest<NotificationRow[]>(
+    "/rest/v1/notifications?select=*",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        user_id: payload.userId,
+        vehicle_id: payload.vehicleId ?? null,
+        type: payload.type,
+        severity: payload.severity,
+        title_ar: payload.titleAr,
+        body_ar: payload.bodyAr ?? null,
+        action_url: payload.actionUrl ?? null,
+        dedupe_key: payload.dedupeKey ?? null,
+        scheduled_at: payload.scheduledAt ?? null,
+      }),
+    },
+    accessToken,
+  );
+
+  return rows[0] ?? null;
+}
+
+async function generateMaintenanceNotifications(
+  accessToken: string,
+  userId: string,
+) {
+  const generatedRows = await listGeneratedNotificationRows(
+    accessToken,
+    userId,
+  );
+
+  for (const row of generatedRows) {
+    try {
+      await createNotificationIfMissing(accessToken, {
+        userId,
+        vehicleId: row.vehicle_id ?? null,
+        type: row.type,
+        severity: row.severity,
+        titleAr: row.title_ar,
+        bodyAr: row.body_ar ?? null,
+        actionUrl: row.action_url ?? null,
+        dedupeKey: row.dedupe_key ?? null,
+        scheduledAt: row.scheduled_at ?? null,
+      });
+    } catch {
+      return generatedRows;
+    }
+  }
+
+  return generatedRows;
+}
+
+async function handleNotifications(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  const session = await requireSession();
+  const userId = session.user.id;
+  const accessToken = session.access_token;
+
+  if (path === "/api/notifications" && method === "GET") {
+    const generatedRows = await generateMaintenanceNotifications(
+      accessToken,
+      userId,
+    );
+
+    try {
+      const rows = await listNotificationRows(accessToken, userId);
+
+      return {
+        handled: true,
+        data: rows.map(toNotification),
+      };
+    } catch {
+      return {
+        handled: true,
+        data: generatedRows.map(toNotification),
+      };
+    }
+  }
+
+  if (path === "/api/notifications" && method === "POST") {
+    const body = await readJsonBody(input, init);
+
+    const row = await createNotificationIfMissing(accessToken, {
+      userId,
+      vehicleId: typeof body.vehicleId === "string" ? body.vehicleId : null,
+      type: String(body.type ?? "system"),
+      severity: String(body.severity ?? "info"),
+      titleAr: String(body.titleAr ?? "تنبيه"),
+      bodyAr: typeof body.bodyAr === "string" ? body.bodyAr : null,
+      actionUrl: typeof body.actionUrl === "string" ? body.actionUrl : null,
+      dedupeKey: typeof body.dedupeKey === "string" ? body.dedupeKey : null,
+      scheduledAt: typeof body.scheduledAt === "string" ? body.scheduledAt : null,
+    });
+
+    return {
+      handled: true,
+      status: 201,
+      data: row ? toNotification(row) : { ok: true },
+    };
+  }
+
+  if (path === "/api/notifications/read-all" && method === "PATCH") {
+    try {
+      await supabaseRequest(
+        `/rest/v1/notifications?user_id=eq.${encodeURIComponent(
+          userId,
+        )}&is_read=eq.false`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_read: true,
+            read_at: new Date().toISOString(),
+          }),
+        },
+        accessToken,
+      );
+    } catch {
+      // Keep the in-app fallback notifications usable even before the table exists.
+    }
+
+    return {
+      handled: true,
+      data: { ok: true },
+    };
+  }
+
+  const readMatch = path.match(/^\/api\/notifications\/([^/]+)\/read$/);
+
+  if (readMatch && method === "PATCH") {
+    const id = decodeURIComponent(readMatch[1]);
+
+    try {
+      await supabaseRequest(
+        `/rest/v1/notifications?id=eq.${encodeURIComponent(
+          id,
+        )}&user_id=eq.${encodeURIComponent(userId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            is_read: true,
+            read_at: new Date().toISOString(),
+          }),
+        },
+        accessToken,
+      );
+    } catch {
+      // Generated maintenance notifications are read-only until persisted.
+    }
+
+    return {
+      handled: true,
+      data: { ok: true },
+    };
+  }
+
+  const deleteMatch = path.match(/^\/api\/notifications\/([^/]+)$/);
+
+  if (deleteMatch && method === "DELETE") {
+    const id = decodeURIComponent(deleteMatch[1]);
+
+    await supabaseRequest(
+      `/rest/v1/notifications?id=eq.${encodeURIComponent(
+        id,
+      )}&user_id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: "DELETE",
+      },
+      accessToken,
+    );
+
+    return {
+      handled: true,
+      data: { ok: true },
+    };
+  }
+
+  return { handled: false };
+}
+
 function getRawUrl(
   input: RequestInfo | URL,
 ) {
@@ -1834,6 +2578,17 @@ async function handleRequest(
     return deviceOrdersResult;
   }
 
+  const notificationsResult = await handleNotifications(
+    path,
+    method,
+    input,
+    init,
+  );
+
+  if (notificationsResult.handled) {
+    return notificationsResult;
+  }
+
   const aiResult = await handleAi(
     path,
     method,
@@ -1849,6 +2604,17 @@ async function handleRequest(
 
   if (dtcResult.handled) {
     return dtcResult;
+  }
+
+  const fuelResult = await handleFuel(
+    url,
+    method,
+    input,
+    init,
+  );
+
+  if (fuelResult.handled) {
+    return fuelResult;
   }
 
   const vehiclesResult =

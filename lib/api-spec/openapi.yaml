@@ -374,6 +374,79 @@ paths:
                   $ref: "#/components/schemas/TrendingDtc"
 
   # ========== MAINTENANCE ==========
+  /maintenance/logs:
+    get:
+      operationId: listMaintenanceLogs
+      tags: [maintenance]
+      summary: Completed maintenance history for the signed-in user
+      parameters:
+        - in: query
+          name: vehicleId
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MaintenanceLog"
+    post:
+      operationId: createMaintenanceLog
+      tags: [maintenance]
+      summary: Create a completed maintenance log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceLogBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceLog"
+
+  /maintenance/logs/{logId}:
+    parameters:
+      - in: path
+        name: logId
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateMaintenanceLog
+      tags: [maintenance]
+      summary: Update a completed maintenance log
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaintenanceLogBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenanceLog"
+    delete:
+      operationId: deleteMaintenanceLog
+      tags: [maintenance]
+      summary: Delete a completed maintenance log
+      responses:
+        "204":
+          description: Deleted
+
   /maintenance/{vehicleId}/schedule:
     parameters:
       - in: path
@@ -828,13 +901,64 @@ components:
 
     LogMaintenanceBody:
       type: object
-      required: [serviceType, doneAt, doneAtKm]
+      required: [serviceType, doneAt]
       properties:
         serviceType: { type: string }
+        customServiceName: { type: string, nullable: true }
         doneAt: { type: string, format: date-time }
-        doneAtKm: { type: integer }
-        cost: { type: integer }
-        notes: { type: string }
+        doneAtKm: { type: integer, nullable: true }
+        actualCostSar: { type: integer, nullable: true }
+        cost: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+
+    MaintenanceLog:
+      type: object
+      required: [id, userId, vehicleId, serviceType, doneAt, source, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        vehicleId: { type: string }
+        serviceType: { type: string }
+        serviceTypeAr: { type: string }
+        customServiceName: { type: string, nullable: true }
+        doneAt: { type: string, format: date-time }
+        doneAtKm: { type: integer, nullable: true }
+        actualCostSar: { type: integer, nullable: true }
+        cost: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+        source:
+          type: string
+          enum: [manual, recommendation, workshop]
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        vehicleNickname: { type: string, nullable: true }
+        vehicleMake: { type: string }
+        vehicleModel: { type: string }
+
+    CreateMaintenanceLogBody:
+      allOf:
+        - $ref: "#/components/schemas/LogMaintenanceBody"
+        - type: object
+          required: [vehicleId]
+          properties:
+            vehicleId: { type: string }
+            source:
+              type: string
+              enum: [manual, recommendation, workshop]
+
+    UpdateMaintenanceLogBody:
+      type: object
+      properties:
+        serviceType: { type: string }
+        customServiceName: { type: string, nullable: true }
+        doneAt: { type: string, format: date-time }
+        doneAtKm: { type: integer, nullable: true }
+        actualCostSar: { type: integer, nullable: true }
+        cost: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+        source:
+          type: string
+          enum: [manual, recommendation, workshop]
 
     AiChatBody:
       type: object
@@ -954,7 +1078,7 @@ components:
         upcomingMaintenanceCount: { type: integer }
         overdueMaintenanceCount: { type: integer }
         avgHealthScore: { type: integer }
-                totalSessionsLast30d: { type: integer }
+        totalSessionsLast30d: { type: integer }
         kmDrivenLast30d: { type: integer }
         estimatedSavingsSar: { type: integer }
 
@@ -996,7 +1120,7 @@ components:
         revenueTrendPct: { type: number }
         nps: { type: number }
         premiumSubscribers: { type: integer }
-                avgHealthScore: { type: integer }
+        avgHealthScore: { type: integer }
 
     AdminUser:
       type: object

@@ -345,8 +345,32 @@ async function signInWithHiddenPhone(phone: string): Promise<SupabaseSession> {
   return session;
 }
 
-async function signInOrCreateHiddenPhoneUser(phone: string): Promise<AuthUser> {
+async function setProfileName(userId: string, accessToken: string, name?: string | null): Promise<UserRow | null> {
+  const cleanName = name?.trim();
+  if (!cleanName) return null;
+
+  try {
+    const rows = await supabaseRequest<UserRow[]>(
+      `/rest/v1/users?id=eq.${encodeURIComponent(userId)}&select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ name: cleanName }),
+      },
+      accessToken,
+    );
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function signInOrCreateHiddenPhoneUser(phone: string, name?: string): Promise<AuthUser> {
   let session: SupabaseSession;
+  const cleanName = name?.trim() || "مستخدم مفك";
 
   try {
     session = await signInWithHiddenPhone(phone);
@@ -358,7 +382,7 @@ async function signInOrCreateHiddenPhoneUser(phone: string): Promise<AuthUser> {
       body: JSON.stringify({
         email,
         password,
-        data: { phone, name: "مستخدم مفك" },
+        data: { phone, name: cleanName },
       }),
     });
 
@@ -367,9 +391,12 @@ async function signInOrCreateHiddenPhoneUser(phone: string): Promise<AuthUser> {
   }
 
   saveSupabaseSession(session);
-  const row = await getProfileRow(session.user, session.access_token);
+  const row =
+    (await getProfileRow(session.user, session.access_token)) ??
+    (await setProfileName(session.user.id, session.access_token, cleanName));
+  const namedRow = await setProfileName(session.user.id, session.access_token, name);
   await touchLastActiveAt(session.user.id, session.access_token);
-  return toAuthUser(session.user, row);
+  return toAuthUser(session.user, namedRow ?? row);
 }
 
 function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
@@ -481,7 +508,7 @@ export const authApi = {
     return Boolean(getFallbackPhoneOtp(normalizeSaudiPhone(phone)));
   },
 
-  async verifyPhoneOtp(phone: string, token: string): Promise<AuthUser> {
+  async verifyPhoneOtp(phone: string, token: string, name?: string): Promise<AuthUser> {
     const normalizedPhone = normalizeSaudiPhone(phone);
     const cleanToken = token.replace(/\D/g, "");
 
@@ -495,7 +522,7 @@ export const authApi = {
       }
 
       clearFallbackPhoneOtp();
-      return signInOrCreateHiddenPhoneUser(normalizedPhone);
+      return signInOrCreateHiddenPhoneUser(normalizedPhone, name);
     }
 
     const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/verify", {
@@ -513,8 +540,9 @@ export const authApi = {
 
     saveSupabaseSession(session);
     const row = await getProfileRow(session.user, session.access_token);
+    const namedRow = await setProfileName(session.user.id, session.access_token, name);
     await touchLastActiveAt(session.user.id, session.access_token);
-    return toAuthUser(session.user, row);
+    return toAuthUser(session.user, namedRow ?? row);
   },
 
   signInWithGoogle(nextPath = "/app") {

@@ -460,6 +460,116 @@ export const GetTrendingDtcCodesResponse = zod.array(
   GetTrendingDtcCodesResponseItem,
 );
 
+/**
+ * @summary Completed maintenance history for the signed-in user
+ */
+export const listMaintenanceLogsQueryLimitDefault = 100;
+export const listMaintenanceLogsQueryLimitMax = 200;
+
+export const listMaintenanceLogsQueryOffsetDefault = 0;
+export const listMaintenanceLogsQueryOffsetMin = 0;
+
+export const ListMaintenanceLogsQueryParams = zod.object({
+  vehicleId: zod.coerce.string().optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listMaintenanceLogsQueryLimitMax)
+    .default(listMaintenanceLogsQueryLimitDefault),
+  offset: zod.coerce
+    .number()
+    .min(listMaintenanceLogsQueryOffsetMin)
+    .default(listMaintenanceLogsQueryOffsetDefault),
+});
+
+export const ListMaintenanceLogsResponseItem = zod.object({
+  id: zod.string(),
+  userId: zod.string(),
+  vehicleId: zod.string(),
+  serviceType: zod.string(),
+  serviceTypeAr: zod.string().optional(),
+  customServiceName: zod.string().nullish(),
+  doneAt: zod.coerce.date(),
+  doneAtKm: zod.number().nullish(),
+  actualCostSar: zod.number().nullish(),
+  cost: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  source: zod.enum(["manual", "recommendation", "workshop"]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  vehicleNickname: zod.string().nullish(),
+  vehicleMake: zod.string().optional(),
+  vehicleModel: zod.string().optional(),
+});
+export const ListMaintenanceLogsResponse = zod.array(
+  ListMaintenanceLogsResponseItem,
+);
+
+/**
+ * @summary Create a completed maintenance log
+ */
+export const CreateMaintenanceLogBody = zod
+  .object({
+    serviceType: zod.string(),
+    customServiceName: zod.string().nullish(),
+    doneAt: zod.coerce.date(),
+    doneAtKm: zod.number().nullish(),
+    actualCostSar: zod.number().nullish(),
+    cost: zod.number().nullish(),
+    notes: zod.string().nullish(),
+  })
+  .and(
+    zod.object({
+      vehicleId: zod.string(),
+      source: zod.enum(["manual", "recommendation", "workshop"]).optional(),
+    }),
+  );
+
+/**
+ * @summary Update a completed maintenance log
+ */
+export const UpdateMaintenanceLogParams = zod.object({
+  logId: zod.coerce.string(),
+});
+
+export const UpdateMaintenanceLogBody = zod.object({
+  serviceType: zod.string().optional(),
+  customServiceName: zod.string().nullish(),
+  doneAt: zod.coerce.date().optional(),
+  doneAtKm: zod.number().nullish(),
+  actualCostSar: zod.number().nullish(),
+  cost: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  source: zod.enum(["manual", "recommendation", "workshop"]).optional(),
+});
+
+export const UpdateMaintenanceLogResponse = zod.object({
+  id: zod.string(),
+  userId: zod.string(),
+  vehicleId: zod.string(),
+  serviceType: zod.string(),
+  serviceTypeAr: zod.string().optional(),
+  customServiceName: zod.string().nullish(),
+  doneAt: zod.coerce.date(),
+  doneAtKm: zod.number().nullish(),
+  actualCostSar: zod.number().nullish(),
+  cost: zod.number().nullish(),
+  notes: zod.string().nullish(),
+  source: zod.enum(["manual", "recommendation", "workshop"]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  vehicleNickname: zod.string().nullish(),
+  vehicleMake: zod.string().optional(),
+  vehicleModel: zod.string().optional(),
+});
+
+/**
+ * @summary Delete a completed maintenance log
+ */
+export const DeleteMaintenanceLogParams = zod.object({
+  logId: zod.coerce.string(),
+});
+
 export const GetMaintenanceScheduleParams = zod.object({
   vehicleId: zod.coerce.string(),
 });
@@ -488,10 +598,12 @@ export const LogMaintenanceParams = zod.object({
 
 export const LogMaintenanceBody = zod.object({
   serviceType: zod.string(),
+  customServiceName: zod.string().nullish(),
   doneAt: zod.coerce.date(),
-  doneAtKm: zod.number(),
-  cost: zod.number().optional(),
-  notes: zod.string().optional(),
+  doneAtKm: zod.number().nullish(),
+  actualCostSar: zod.number().nullish(),
+  cost: zod.number().nullish(),
+  notes: zod.string().nullish(),
 });
 
 /**
@@ -536,11 +648,7 @@ export const AiChatResponse = zod.object({
       zod.object({
         labelAr: zod.string().optional(),
         kind: zod
-          .enum([
-            "view_dtc",
-            "schedule_maintenance",
-            "view_vehicle",
-          ])
+          .enum(["view_dtc", "schedule_maintenance", "view_vehicle"])
           .optional(),
         targetId: zod.string().optional(),
       }),
@@ -600,7 +708,9 @@ export const ListSubscriptionPlansResponseItem = zod.object({
   priceMonthlySar: zod.number(),
   priceYearlySar: zod.number().optional(),
   maxVehicles: zod.number().nullish(),
-  tier: zod.enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"]).optional(),
+  tier: zod
+    .enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"])
+    .optional(),
   features: zod.array(zod.string()),
   featuresAr: zod.array(zod.string()).optional(),
   isPopular: zod.boolean().optional(),
@@ -642,7 +752,15 @@ export const ListAdminUsersResponseItem = zod.object({
   name: zod.string(),
   phone: zod.string(),
   email: zod.string().nullish(),
-  subscriptionTier: zod.enum(["free", "plus", "mofk", "family", "pro", "premium", "fleet"]),
+  subscriptionTier: zod.enum([
+    "free",
+    "plus",
+    "mofk",
+    "family",
+    "pro",
+    "premium",
+    "fleet",
+  ]),
   vehicleCount: zod.number(),
   sessionsCount: zod.number().optional(),
   lastActiveAt: zod.coerce.date().nullish(),
@@ -704,6 +822,9 @@ export const GetCommonIssuesResponseItem = zod.object({
 });
 export const GetCommonIssuesResponse = zod.array(GetCommonIssuesResponseItem);
 
+/**
+ * @summary Subscription revenue, last 12 months
+ */
 export const GetRevenueBreakdownResponseItem = zod.object({
   month: zod.string(),
   subscriptionRevenue: zod.number(),

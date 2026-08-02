@@ -8,8 +8,10 @@
 
 export interface LogMaintenanceBody {
   serviceType: string;
+  customServiceName?: string | null;
   doneAt: Date;
-  doneAtKm: number;
-  cost?: number;
-  notes?: string;
+  doneAtKm?: number | null;
+  actualCostSar?: number | null;
+  cost?: number | null;
+  notes?: string | null;
 }

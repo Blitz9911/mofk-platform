@@ -3,12 +3,15 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -91,6 +94,8 @@ export default function WelcomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const slidesRef = React.useRef<ScrollView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -98,9 +103,24 @@ export default function WelcomeScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 24 : insets.bottom + 16;
 
+  const goToSlide = (index: number, animated = true) => {
+    setActiveIdx(index);
+    requestAnimationFrame(() => {
+      slidesRef.current?.scrollTo({ x: width * index, animated });
+    });
+  };
+
   const goNext = () => {
-    if (activeIdx < SLIDES.length - 1) setActiveIdx(activeIdx + 1);
-    else setShowAbout(true);
+    if (activeIdx < SLIDES.length - 1) {
+      goToSlide(activeIdx + 1);
+    } else {
+      setShowAbout(true);
+    }
+  };
+
+  const handleSlideMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    setActiveIdx(Math.max(0, Math.min(SLIDES.length - 1, nextIndex)));
   };
 
   /* ── About / Story page ─────────────────────────────────── */
@@ -342,43 +362,61 @@ export default function WelcomeScreen() {
         </Pressable>
       </View>
 
-      {/* Illustration */}
-      <View style={s.illustArea}>
-        {isPain ? (
-          /* Pain slide: show problem cards instead of icon */
-          <View style={{ gap: 10, width: "100%", paddingHorizontal: 28 }}>
-            {PAIN_POINTS.map((p, i) => (
-              <View key={i} style={[s.painCard, { backgroundColor: colors.card, borderColor: "#EF444430" }]}>
-                <Ionicons name={p.icon} size={18} color="#EF4444" />
-                <Text style={[s.painTxt, { color: colors.foreground }]}>{p.text}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          /* Normal icon slide */
-          <>
-            <View style={[s.ringOuter, { borderColor: slide.color + "10" }]} />
-            <View style={[s.ringMid, { borderColor: slide.color + "1E" }]} />
-            <View style={[s.ringInner, { backgroundColor: slide.color + "18", borderColor: slide.color + "35" }]}>
-              <Ionicons name={slide.icon} size={96} color={slide.color} />
-            </View>
-            <View style={[s.floatBadge, { backgroundColor: slide.color, shadowColor: slide.color }]}>
-              <Text style={s.floatBadgeTxt}>{slide.badge}</Text>
-            </View>
-          </>
-        )}
-      </View>
+      <ScrollView
+        ref={slidesRef}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={width}
+        snapToAlignment="center"
+        disableIntervalMomentum
+        onMomentumScrollEnd={handleSlideMomentumEnd}
+        contentContainerStyle={s.slidesTrack}
+      >
+        {SLIDES.map((item, index) => {
+          const itemIsPain = index === 1;
 
-      {/* Text */}
-      <View style={s.slideText}>
-        <Text style={[s.slideTitle, { color: colors.foreground }]}>{slide.title}</Text>
-        <Text style={[s.slideDesc, { color: colors.mutedForeground }]}>{slide.desc}</Text>
-      </View>
+          return (
+            <View key={item.title} style={[s.slidePage, { width }]}>
+              <View style={s.illustArea}>
+                {itemIsPain ? (
+                  <View style={{ gap: 10, width: "100%", paddingHorizontal: 28 }}>
+                    {PAIN_POINTS.map((p, i) => (
+                      <View key={i} style={[s.painCard, { backgroundColor: colors.card, borderColor: "#EF444430" }]}>
+                        <Ionicons name={p.icon} size={18} color="#EF4444" />
+                        <Text style={[s.painTxt, { color: colors.foreground }]}>{p.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <>
+                    <View style={[s.ringOuter, { borderColor: item.color + "10" }]} />
+                    <View style={[s.ringMid, { borderColor: item.color + "1E" }]} />
+                    <View style={[s.ringInner, { backgroundColor: item.color + "18", borderColor: item.color + "35" }]}>
+                      <Ionicons name={item.icon} size={96} color={item.color} />
+                    </View>
+                    <View style={[s.floatBadge, { backgroundColor: item.color, shadowColor: item.color }]}>
+                      <Text style={s.floatBadgeTxt}>{item.badge}</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              <View style={s.slideText}>
+                <Text style={[s.slideTitle, { color: colors.foreground }]}>{item.title}</Text>
+                <Text style={[s.slideDesc, { color: colors.mutedForeground }]}>{item.desc}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
 
       {/* Dots */}
       <View style={s.dotsRow}>
         {SLIDES.map((sl, i) => (
-          <Pressable key={i} onPress={() => setActiveIdx(i)} hitSlop={8}>
+          <Pressable key={i} onPress={() => goToSlide(i)} hitSlop={8}>
             <View style={[s.dot, { width: i === activeIdx ? 28 : 7, backgroundColor: i === activeIdx ? slide.color : colors.border }]} />
           </Pressable>
         ))}
@@ -388,7 +426,7 @@ export default function WelcomeScreen() {
       <View style={[s.ctaBar, { paddingBottom: botPad, borderTopWidth: 0, backgroundColor: "transparent" }]}>
         <Pressable onPress={goNext} style={[s.primaryBtn, { backgroundColor: slide.color, shadowColor: slide.color }]}>
           <Text style={s.primaryTxt}>{activeIdx < SLIDES.length - 1 ? "التالي" : "ابدأ الآن"}</Text>
-          <Ionicons name={activeIdx < SLIDES.length - 1 ? "arrow-back" : "checkmark"} size={18} color="#fff" />
+          <Ionicons name={activeIdx < SLIDES.length - 1 ? "arrow-forward" : "checkmark"} size={18} color="#fff" />
         </Pressable>
         <Pressable onPress={() => router.push("/login")} style={[s.ghostBtn, { borderColor: colors.border }]}>
           <Text style={[s.ghostTxt, { color: colors.mutedForeground }]}>لدي حساب بالفعل</Text>
@@ -401,11 +439,13 @@ export default function WelcomeScreen() {
 /* ── Styles ──────────────────────────────────────────────── */
 const s = StyleSheet.create({
   root: { flex: 1 },
+  slidesTrack: { alignItems: "stretch" },
 
   topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 8 },
   topLink: { fontSize: 13, fontFamily: "Inter_500Medium" },
   topLogo: { width: 88, height: 32 },
 
+  slidePage: { flex: 1, justifyContent: "center" },
   illustArea: { flex: 1, alignItems: "center", justifyContent: "center" },
   ringOuter: { position: "absolute", width: 310, height: 310, borderRadius: 155, borderWidth: 1 },
   ringMid: { position: "absolute", width: 250, height: 250, borderRadius: 125, borderWidth: 1.5 },

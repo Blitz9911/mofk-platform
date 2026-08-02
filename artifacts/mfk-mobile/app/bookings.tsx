@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 
 type Booking = {
   id: string;
@@ -76,7 +77,7 @@ export default function BookingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>حجوزاتي</Text>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => smoothBack(router)}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
       </View>

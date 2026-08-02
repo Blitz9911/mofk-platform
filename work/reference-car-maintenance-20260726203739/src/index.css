@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://static.figma.com/font/Cairo_slnt_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('https://static.figma.com/font/Orbitron_wght__1') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('https://static.figma.com/font/JetBrainsMono_wght__1') format('woff2');
+}
+
+@theme {
+  --font-sans: 'Cairo', sans-serif;
+  --font-display: 'Orbitron', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-orange-primary: #FF6500;
+  --color-orange-bright: #FF8C00;
+  --color-orange-glow: rgba(255, 101, 0, 0.3);
+  --color-bg-deep: #080808;
+  --color-bg-card: #111111;
+  --color-bg-surface: #1a1a1a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: #080808;
+  color: #f0f0f0;
+  direction: rtl;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #FF6500; border-radius: 2px; }
+
+.font-display { font-family: 'Orbitron', sans-serif; }
+.font-mono-data { font-family: 'JetBrains Mono', monospace; }
+
+@keyframes pulse-orange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 101, 0, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 101, 0, 0); }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes counter-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pulse-anim { animation: pulse-orange 2s infinite; }
+.float-anim { animation: float 3s ease-in-out infinite; }
+.spin-slow { animation: spin-slow 8s linear infinite; }
+.blink-anim { animation: blink 1.5s ease-in-out infinite; }

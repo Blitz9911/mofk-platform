@@ -66,6 +66,15 @@ type FuelStats = {
   trendByDay: { date: string; liters: number; costSar: number; fills: number }[];
 };
 
+type RecommendationCounts = {
+  total: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+};
+
 const apiFetch = async <T,>(path: string): Promise<T> => {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -214,6 +223,11 @@ export default function Dashboard() {
     enabled: Boolean(activeVehicleId),
   });
 
+  const { data: recommendationCounts } = useQuery<RecommendationCounts>({
+    queryKey: ["dashboard-recommendation-counts"],
+    queryFn: () => apiFetch<RecommendationCounts>("/api/recommendations/counts"),
+  });
+
   const firstName = user?.name?.split(" ")[0] || "بك";
   const healthScore = activeVehicle?.healthScore ?? overview?.avgHealthScore ?? 0;
   const healthLabel = getHealthLabel(healthScore);
@@ -222,6 +236,9 @@ export default function Dashboard() {
     return (upcomingMaintenance || []).filter((item) => item.status === "overdue")
       .length;
   }, [upcomingMaintenance]);
+
+  const importantRecommendationsCount =
+    (recommendationCounts?.critical ?? 0) + (recommendationCounts?.high ?? 0);
 
   const getActivityIcon = (
     kind: ActivityItemKind,
@@ -720,9 +737,13 @@ export default function Dashboard() {
               </div>
 
               <div>
-                <p className="font-semibold">راجع توصيات الصيانة</p>
+                <p className="font-semibold">
+                  {importantRecommendationsCount > 0 ? "توصيات مهمة نشطة" : "لا توجد توصيات عاجلة"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  لديك {overview?.upcomingMaintenanceCount || 0} توصية تحتاج متابعة.
+                  {importantRecommendationsCount > 0
+                    ? `لديك ${importantRecommendationsCount.toLocaleString("ar-SA")} توصية تحتاج متابعة.`
+                    : "سيارتك لا تحتاج إلى إجراء عاجل حاليًا."}
                 </p>
               </div>
             </div>

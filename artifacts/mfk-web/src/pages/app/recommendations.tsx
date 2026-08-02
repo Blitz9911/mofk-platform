@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import {
@@ -10,13 +11,12 @@ import {
   ShieldAlert,
   Zap,
   Gauge,
-  Calculator,
   Calendar,
   CheckCircle2,
+  Route,
 } from "lucide-react";
 import {
   useListVehicles,
-  useGetAiRecommendations,
   RecommendationSeverity,
   RecommendationKind,
 } from "@workspace/api-client-react";
@@ -32,7 +32,55 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+type RecommendationPriority = "critical" | "high" | "medium" | "low" | "info";
+type RecommendationCategory = "maintenance" | "diagnostic" | "battery" | "fuel" | "safety" | "data_quality" | "general";
+type RecommendationStatus = "active" | "completed" | "dismissed" | "expired";
+
+type SmartRecommendation = {
+  id: string;
+  vehicleId: string;
+  category?: RecommendationCategory;
+  kind: RecommendationKind | string;
+  priority?: RecommendationPriority;
+  severity: RecommendationSeverity | RecommendationPriority;
+  status?: RecommendationStatus;
+  source?: string | null;
+  sourceReferenceId?: string | null;
+  title?: string;
+  titleAr: string;
+  summary?: string;
+  summaryAr?: string;
+  reason?: string;
+  reasonAr?: string;
+  descriptionAr?: string;
+  recommendedAction?: string | null;
+  recommendedActionAr?: string | null;
+  confidencePct?: number;
+  suggestedAction?: string | null;
+  suggestedCostSar?: number | null;
+  dueDate?: string | Date | null;
+  dueMileage?: number | null;
+  metadata?: Record<string, unknown>;
+  createdAt?: string | Date;
+};
+
+function hasRealConfidence(rec: SmartRecommendation) {
+  return rec.metadata?.confidenceSource === "real" && rec.confidencePct !== undefined;
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  const raw = await response.text();
+  const data = raw ? JSON.parse(raw) : null;
+  if (!response.ok) throw new Error(data?.error || data?.message || "تعذر الاتصال بالخادم.");
+  return data as T;
+}
 
 function formatKm(value: unknown) {
   const num = Number(value);
@@ -84,75 +132,80 @@ function getRemainingText(rec: any) {
   return "غير محدد";
 }
 
-function buildEquation(rec: any) {
-  if (
-    rec.lastDoneKm !== undefined &&
-    rec.lastDoneKm !== null &&
-    rec.intervalKm !== undefined &&
-    rec.intervalKm !== null &&
-    rec.nextDueKm !== undefined &&
-    rec.nextDueKm !== null
-  ) {
-    return `${formatKm(rec.lastDoneKm)} + ${formatKm(rec.intervalKm)} = ${formatKm(rec.nextDueKm)}`;
-  }
-
-  if (
-    rec.intervalDays !== undefined &&
-    rec.intervalDays !== null &&
-    rec.lastDoneAt
-  ) {
-    return `آخر صيانة ${safeDate(rec.lastDoneAt)} + ${rec.intervalDays} يوم = ${safeDate(rec.nextDueAt)}`;
-  }
-
-  return null;
-}
-
 export default function Recommendations() {
+  const queryClient = useQueryClient();
   const { data: vehicles, isLoading: vehiclesLoading } = useListVehicles();
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"all" | "urgent" | RecommendationCategory>("all");
 
   const activeVehicleId = selectedVehicleId || (vehicles?.[0]?.id ?? "");
 
   const {
     data: recommendations,
     isLoading: recommendationsLoading,
-  } = useGetAiRecommendations(activeVehicleId, {
-    query: { enabled: !!activeVehicleId } as any,
+    refetch: refetchRecommendations,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["smart-recommendations", activeVehicleId],
+    queryFn: () => apiFetch<SmartRecommendation[]>(`/api/recommendations?vehicleId=${encodeURIComponent(activeVehicleId)}`),
+    enabled: !!activeVehicleId,
   });
 
-  const getSeverityColor = (sev: RecommendationSeverity) => {
+  const completeMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/recommendations/${encodeURIComponent(id)}/complete`, { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["smart-recommendations", activeVehicleId] }),
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/recommendations/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["smart-recommendations", activeVehicleId] }),
+  });
+
+  const getSeverityColor = (sev: RecommendationSeverity | RecommendationPriority | string) => {
     switch (sev) {
       case "critical":
+      case "high":
         return "border-destructive bg-destructive/5";
       case "warning":
+      case "medium":
         return "border-amber-500 bg-amber-500/5";
       case "info":
+      case "low":
         return "border-blue-500 bg-blue-500/5";
       default:
         return "border-border bg-card";
     }
   };
 
-  const getSeverityIcon = (sev: RecommendationSeverity) => {
+  const getSeverityIcon = (sev: RecommendationSeverity | RecommendationPriority | string) => {
     switch (sev) {
       case "critical":
+      case "high":
         return <ShieldAlert className="w-5 h-5 text-destructive" />;
       case "warning":
+      case "medium":
         return <AlertTriangle className="w-5 h-5 text-amber-500" />;
       case "info":
+      case "low":
         return <Info className="w-5 h-5 text-blue-500" />;
       default:
         return <Lightbulb className="w-5 h-5 text-muted-foreground" />;
     }
   };
 
-  const getSeverityLabel = (sev: RecommendationSeverity) => {
+  const getSeverityLabel = (sev: RecommendationSeverity | RecommendationPriority | string) => {
     switch (sev) {
       case "critical":
         return "حرجة";
+      case "high":
+        return "مهمة";
       case "warning":
+      case "medium":
         return "تحتاج انتباه";
+      case "low":
+        return "متابعة";
       case "info":
         return "معلومة";
       default:
@@ -188,16 +241,56 @@ export default function Recommendations() {
     }
   };
 
+  const getCategoryLabel = (category?: string | null) => {
+    switch (category) {
+      case "maintenance":
+        return "الصيانة";
+      case "diagnostic":
+        return "الأعطال";
+      case "fuel":
+        return "الوقود";
+      case "battery":
+        return "البطارية";
+      case "data_quality":
+        return "البيانات";
+      default:
+        return "عام";
+    }
+  };
+
+  const getSourceLabel = (source?: string | null) => {
+    switch (source) {
+      case "maintenance_record":
+        return "سجل الصيانة";
+      case "odometer":
+        return "قراءة العداد";
+      case "dtc":
+        return "أكواد الأعطال";
+      case "live_data":
+        return "البيانات الحية";
+      case "fuel_record":
+        return "سجل الوقود";
+      case "vehicle_profile":
+        return "بيانات المركبة";
+      default:
+        return "نظام مفك";
+    }
+  };
+
   const criticalRecs =
-    recommendations?.filter((r) => r.severity === "critical") || [];
+    recommendations?.filter((r) => (r.priority ?? r.severity) === "critical" || (r.priority ?? r.severity) === "high") || [];
 
   const warningRecs =
-    recommendations?.filter((r) => r.severity === "warning") || [];
+    recommendations?.filter((r) => (r.priority ?? r.severity) === "medium" || r.severity === "warning") || [];
 
   const infoRecs =
-    recommendations?.filter((r) => r.severity === "info") || [];
+    recommendations?.filter((r) => ["low", "info"].includes(String(r.priority ?? r.severity))) || [];
 
-  const sortedRecs = [...criticalRecs, ...warningRecs, ...infoRecs];
+  const sortedRecs = [...criticalRecs, ...warningRecs, ...infoRecs].filter((rec) => {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "urgent") return ["critical", "high"].includes(String(rec.priority ?? rec.severity));
+    return rec.category === activeFilter;
+  });
 
   const activeVehicle = vehicles?.find((v) => v.id === activeVehicleId);
 
@@ -231,6 +324,50 @@ export default function Recommendations() {
           </TabsList>
 
           <TabsContent value={activeVehicleId} className="mt-0 space-y-6">
+            {activeVehicle && (
+              <div className="space-y-4">
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-5">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">المركبة المحددة</p>
+                        <h2 className="text-2xl font-black">
+                          {activeVehicle.nickname || `${activeVehicle.make} ${activeVehicle.model}`}
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          لديك {criticalRecs.length.toLocaleString("ar-SA")} توصية مهمة و{(warningRecs.length + infoRecs.length).toLocaleString("ar-SA")} توصيات للمتابعة.
+                        </p>
+                      </div>
+                      <Button onClick={() => refetchRecommendations()} variant="outline">
+                        إعادة التقييم
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ["all", "الكل"],
+                    ["urgent", "عاجلة"],
+                    ["maintenance", "الصيانة"],
+                    ["diagnostic", "الأعطال"],
+                    ["fuel", "الوقود"],
+                    ["battery", "البطارية"],
+                  ].map(([value, label]) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={activeFilter === value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setActiveFilter(value as typeof activeFilter)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {activeVehicle && (
               <div className="grid gap-4 md:grid-cols-4">
                 <Card>
@@ -313,57 +450,64 @@ export default function Recommendations() {
                   <Skeleton key={i} className="h-64 w-full" />
                 ))}
               </div>
+            ) : isError ? (
+              <EmptyState
+                icon={<AlertTriangle className="w-12 h-12 text-amber-500" />}
+                title="تعذر تحميل التوصيات"
+                description={(error as Error)?.message || "حدث خطأ غير متوقع أثناء تحميل التوصيات."}
+                action={<Button onClick={() => refetchRecommendations()}>إعادة المحاولة</Button>}
+              />
             ) : !sortedRecs.length ? (
               <EmptyState
                 icon={<CheckCircle2 className="w-12 h-12 text-green-500" />}
-                title="لا توجد توصيات حالياً"
-                description="لا توجد توصيات تحتاج انتباهك الآن. سجّل صيانة جديدة أو حدّث قراءة العداد حتى تظهر توصيات أدق."
+                title={recommendations?.length ? "لا توجد توصيات ضمن هذا الفلتر" : "لا توجد توصيات عاجلة"}
+                description={recommendations?.length ? "غيّر الفلتر لعرض بقية التوصيات." : "سيارتك لا تحتاج إلى إجراء عاجل حالياً. حدّث العداد وسجل الصيانة للحصول على توصيات أدق."}
               />
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {sortedRecs.map((rec) => {
                   const item = rec as any;
-                  const equation = buildEquation(item);
+                  const severityKey = String(rec.priority ?? rec.severity);
 
                   return (
                     <Card
                       key={rec.id}
                       className={cn(
                         "overflow-hidden border-2",
-                        getSeverityColor(rec.severity),
+                        getSeverityColor(severityKey),
                       )}
                     >
                       <CardHeader className="pb-2">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="bg-background">
-                              {getKindIcon(rec.kind)}
-                              {getKindLabel(rec.kind)}
+                              {getKindIcon(rec.kind as RecommendationKind)}
+                              {getCategoryLabel(rec.category)}
                             </Badge>
 
                             <Badge
                               variant={
-                                rec.severity === "critical"
+                                severityKey === "critical" || severityKey === "high"
                                   ? "destructive"
                                   : "secondary"
                               }
                               className={
-                                rec.severity === "warning"
+                                severityKey === "warning" || severityKey === "medium"
                                   ? "bg-amber-500/20 text-amber-600 hover:bg-amber-500/30"
-                                  : rec.severity === "info"
+                                  : severityKey === "info" || severityKey === "low"
                                     ? "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30"
                                     : ""
                               }
                             >
-                              {getSeverityLabel(rec.severity)}
+                              {getSeverityLabel(severityKey)}
                             </Badge>
                           </div>
 
-                          {getSeverityIcon(rec.severity)}
+                          {getSeverityIcon(severityKey)}
                         </div>
 
                         <CardTitle className="text-xl leading-tight">
-                          {rec.titleAr}
+                          {rec.titleAr || rec.title}
                         </CardTitle>
 
                         {rec.createdAt && (
@@ -376,16 +520,27 @@ export default function Recommendations() {
                       </CardHeader>
 
                       <CardContent className="space-y-4">
-                        {rec.descriptionAr && (
+                        {(rec.summaryAr || rec.summary || rec.descriptionAr) && (
                           <div className="rounded-lg border border-border/60 bg-background/60 p-3">
                             <div className="flex items-start gap-2">
                               <Info className="w-4 h-4 shrink-0 text-muted-foreground mt-0.5" />
                               <p className="text-sm leading-relaxed text-muted-foreground">
-                                {rec.descriptionAr}
+                                {rec.summaryAr || rec.summary || rec.descriptionAr}
                               </p>
                             </div>
                           </div>
                         )}
+
+                        <div className="grid gap-2 text-sm">
+                          <div className="rounded-lg bg-muted p-3">
+                            <span className="block text-xs text-muted-foreground">سبب التوصية</span>
+                            <span className="font-medium leading-relaxed">{rec.reasonAr || rec.reason || rec.descriptionAr || "تم إنشاء التوصية بناءً على بيانات المركبة المتوفرة."}</span>
+                          </div>
+                          <div className="rounded-lg bg-muted p-3">
+                            <span className="block text-xs text-muted-foreground">الإجراء المقترح</span>
+                            <span className="font-bold leading-relaxed">{rec.recommendedActionAr || rec.recommendedAction || rec.suggestedAction || "راجع التوصية واتخذ الإجراء المناسب."}</span>
+                          </div>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="rounded-lg bg-muted p-3">
@@ -411,7 +566,7 @@ export default function Recommendations() {
                               القادمة عند
                             </span>
                             <span className="font-bold">
-                              {item.nextDueKm ? formatKm(item.nextDueKm) : safeDate(item.nextDueAt)}
+                              {rec.dueMileage ? formatKm(rec.dueMileage) : item.nextDueKm ? formatKm(item.nextDueKm) : safeDate(rec.dueDate ?? item.nextDueAt)}
                             </span>
                           </div>
 
@@ -422,9 +577,9 @@ export default function Recommendations() {
                             <span
                               className={cn(
                                 "font-bold",
-                                rec.severity === "critical"
+                                severityKey === "critical" || severityKey === "high"
                                   ? "text-destructive"
-                                  : rec.severity === "warning"
+                                  : severityKey === "warning" || severityKey === "medium"
                                     ? "text-amber-500"
                                     : "text-blue-500",
                               )}
@@ -434,17 +589,20 @@ export default function Recommendations() {
                           </div>
                         </div>
 
-                        {equation && (
-                          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
-                            <div className="flex items-center gap-2 text-sm font-bold text-primary">
-                              <Calculator className="w-4 h-4" />
-                              معادلة التوصية
-                            </div>
-                            <p className="text-sm font-mono leading-relaxed">
-                              {equation}
-                            </p>
+                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+                          <div className="flex items-center gap-2 text-sm font-bold text-primary">
+                            <Route className="w-4 h-4" />
+                            لماذا ظهرت هذه التوصية؟
                           </div>
-                        )}
+                          <p className="text-sm leading-relaxed text-muted-foreground">
+                            نعتمد على آخر صيانة مسجلة، قراءة العداد الحالية، والموعد المتوقع للخدمة. إذا كانت الخدمة قريبة أو متأخرة نعرضها هنا حتى تتخذ الإجراء المناسب قبل ظهور مشكلة أكبر.
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border border-border/60 p-3 text-sm">
+                          <span className="block text-xs text-muted-foreground">مصدر التوصية</span>
+                          <span className="font-medium">{getSourceLabel(rec.source)}</span>
+                        </div>
 
                         {(item.lastDoneAt || item.nextDueAt) && (
                           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -481,9 +639,9 @@ export default function Recommendations() {
                                 value={item.progressPct}
                                 className={cn(
                                   "h-2",
-                                  rec.severity === "critical"
+                                  severityKey === "critical" || severityKey === "high"
                                     ? "[&>div]:bg-destructive"
-                                    : rec.severity === "warning"
+                                    : severityKey === "warning" || severityKey === "medium"
                                       ? "[&>div]:bg-amber-500"
                                       : "[&>div]:bg-blue-500",
                                 )}
@@ -491,7 +649,7 @@ export default function Recommendations() {
                             </div>
                           )}
 
-                        {rec.confidencePct !== undefined && (
+                        {hasRealConfidence(rec) && (
                           <div className="space-y-1.5">
                             <div className="flex justify-between text-xs font-medium">
                               <span>نسبة الثقة بالتوصية</span>
@@ -501,9 +659,9 @@ export default function Recommendations() {
                               value={rec.confidencePct}
                               className={cn(
                                 "h-2",
-                                rec.severity === "critical"
-                                  ? "[&>div]:bg-destructive"
-                                  : rec.severity === "warning"
+                                  severityKey === "critical" || severityKey === "high"
+                                    ? "[&>div]:bg-destructive"
+                                  : severityKey === "warning" || severityKey === "medium"
                                     ? "[&>div]:bg-amber-500"
                                     : "[&>div]:bg-blue-500",
                               )}
@@ -535,6 +693,24 @@ export default function Recommendations() {
                             )}
                           </div>
                         )}
+
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button
+                            className="flex-1"
+                            onClick={() => completeMutation.mutate(rec.id)}
+                            disabled={completeMutation.isPending || dismissMutation.isPending}
+                          >
+                            تم التنفيذ
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            variant="outline"
+                            onClick={() => dismissMutation.mutate(rec.id)}
+                            disabled={completeMutation.isPending || dismissMutation.isPending}
+                          >
+                            تجاهل مؤقتًا
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   );

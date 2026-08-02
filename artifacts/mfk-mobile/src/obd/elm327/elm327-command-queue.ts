@@ -87,7 +87,10 @@ export class Elm327CommandQueue {
     command.sentAt = Date.now();
 
     try {
-      obdLogger.log("debug", "command_sent", "إرسال أمر ELM327", { command: command.command });
+      obdLogger.log("debug", "command_sent", "إرسال أمر ELM327", {
+        command: command.command,
+        sentAt: command.sentAt,
+      });
       await this.transport.write(`${command.command}\r`);
       this.timeout = setTimeout(() => this.handleTimeout(), command.timeoutMs);
     } catch (error) {
@@ -115,7 +118,13 @@ export class Elm327CommandQueue {
     const active = this.active;
     this.active = null;
     this.buffer = "";
-    obdLogger.log("debug", "command_response", "اكتمل رد ELM327", { command: completed.command });
+    obdLogger.log("debug", "command_response", "اكتمل رد ELM327", {
+      command: completed.command,
+      completedAt: completed.completedAt,
+      durationMs: completed.sentAt ? completed.completedAt - completed.sentAt : null,
+      rawResponse: completed.rawResponse,
+      normalizedResponse: completed.normalizedResponse,
+    });
     active.resolve(completed);
     setTimeout(() => void this.pump(), ELM327_INTER_COMMAND_DELAY_MS);
   }

@@ -116,6 +116,9 @@ export class ObdService {
         userMessage: "تم العثور على الجهاز",
       });
     });
+    if (this.snapshot.state === "scanning") {
+      this.setSnapshot({ state: "idle", userMessage: "لم يتم العثور على جهاز مفك قريب" });
+    }
   }
 
   async stopScan() {

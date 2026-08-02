@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   NativeSyntheticEvent,
   Platform,
@@ -15,35 +16,42 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAuth } from "@/context/AuthContext";
+import { authApi, useAuth } from "@/context/AuthContext";
+import { DEV_PHONE_OTP_CODE, isMockPhoneOtpEnabled } from "@/lib/supabase";
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 
 const OTP_LENGTH = 6;
-
-function StatusBarMock() {
-  return (
-    <View style={styles.status}>
-      <Text style={styles.statusText}>٩:٤١</Text>
-      <Text style={styles.statusText}>◉ WiFi ▰</Text>
-    </View>
-  );
-}
 
 export default function VerifyScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const params = useLocalSearchParams<{ phone?: string; mode?: string }>();
+  const { login } = useAuth();
   const inputs = useRef<Array<TextInput | null>>([]);
+
+  const phone = typeof params.phone === "string" ? params.phone : "";
+  const mode = params.mode === "register" ? "register" : "login";
+  const isMockOtp = isMockPhoneOtpEnabled();
+
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [seconds, setSeconds] = useState(45);
   const [error, setError] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const code = digits.join("");
   const maskedPhone = useMemo(() => {
-    const phone = user?.phone ?? "+9665XXXXXXX";
-    return phone.length > 4 ? `${phone.slice(0, 5)}••••${phone.slice(-2)}` : phone;
-  }, [user?.phone]);
+    if (!phone) return "+966 5X XXX XXXX";
+    return phone.length > 6 ? `${phone.slice(0, 5)} •••• ${phone.slice(-3)}` : phone;
+  }, [phone]);
+
+  useEffect(() => {
+    if (!phone) {
+      router.replace(mode === "register" ? "/register" : "/login");
+    }
+  }, [mode, phone, router]);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -72,20 +80,46 @@ export default function VerifyScreen() {
     inputs.current[index - 1]?.focus();
   };
 
-  const handleResend = () => {
-    setDigits(Array(OTP_LENGTH).fill(""));
-    setSeconds(45);
-    inputs.current[0]?.focus();
+  const handleResend = async () => {
+    if (seconds > 0 || !phone) return;
+
+    setError("");
+    setIsResending(true);
+    try {
+      if (mode === "register") {
+        await authApi.startPhoneRegistration(phone);
+      } else {
+        await authApi.startPhoneLogin(phone);
+      }
+
+      setDigits(Array(OTP_LENGTH).fill(""));
+      setSeconds(45);
+      inputs.current[0]?.focus();
+    } catch (err: any) {
+      setError(err.message || "تعذر إعادة إرسال الرمز. حاول مرة أخرى.");
+    } finally {
+      setIsResending(false);
+    }
   };
 
-  const handleVerify = () => {
-    if (code.length !== OTP_LENGTH) {
-      setError("أدخل رمز التحقق المكون من 6 أرقام");
+  const handleVerify = async () => {
+    setError("");
+
+    if (code.length !== OTP_LENGTH || !phone) {
+      setError("أدخل رمز التحقق المكون من 6 أرقام.");
       return;
     }
 
-    // TODO: Replace this Phase 1 mock with Supabase OTP verification.
-    router.replace("/onboarding");
+    setIsVerifying(true);
+    try {
+      const user = await authApi.verifyPhoneOtp(phone, code, mode);
+      await login(user);
+      router.replace(mode === "register" ? "/complete-profile" : "/");
+    } catch (err: any) {
+      setError(err.message || "رمز التحقق غير صحيح أو انتهت صلاحيته.");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -95,10 +129,8 @@ export default function VerifyScreen() {
     >
       <LinearGradient colors={["#090A0B", "#070707", "#120B05"]} style={StyleSheet.absoluteFill} />
       <View style={styles.content}>
-        <StatusBarMock />
-
         <View style={styles.topbar}>
-          <Pressable style={styles.iconButton} onPress={() => router.back()}>
+          <Pressable style={styles.iconButton} onPress={() => smoothBack(router, mode === "register" ? "/register" : "/login")}>
             <Ionicons name="chevron-forward" size={18} color="#F5F5F5" />
           </Pressable>
           <Text style={styles.topbarTitle}>تأكيد الجوال</Text>
@@ -108,7 +140,9 @@ export default function VerifyScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>أدخل رمز التحقق</Text>
           <Text style={styles.description}>
-            أرسلنا رمزًا مكونًا من 6 أرقام إلى{"\n"}{maskedPhone}
+            {isMockOtp
+              ? `وضع الاختبار مفعل. استخدم الرمز ${DEV_PHONE_OTP_CODE} للمتابعة.\n${maskedPhone}`
+              : `أرسلنا رمزًا مكونًا من 6 أرقام إلى\n${maskedPhone}`}
           </Text>
         </View>
 
@@ -136,21 +170,33 @@ export default function VerifyScreen() {
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <Pressable onPress={handleResend} disabled={seconds > 0} style={styles.resendButton}>
-          <Text style={[styles.resendText, { color: seconds > 0 ? "#8E949D" : colors.primary }]}>
-            {seconds > 0 ? `إعادة الإرسال خلال ${seconds} ثانية` : "إعادة إرسال الرمز"}
-          </Text>
+        <Pressable
+          onPress={handleResend}
+          disabled={seconds > 0 || isResending}
+          style={styles.resendButton}
+        >
+          {isResending ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <Text style={[styles.resendText, { color: seconds > 0 ? "#8E949D" : colors.primary }]}>
+              {seconds > 0 ? `إعادة الإرسال خلال ${seconds} ثانية` : "إعادة إرسال الرمز"}
+            </Text>
+          )}
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [
             styles.primaryButton,
-            { opacity: pressed || code.length !== OTP_LENGTH ? 0.72 : 1 },
+            { opacity: pressed || code.length !== OTP_LENGTH || isVerifying ? 0.72 : 1 },
           ]}
           onPress={handleVerify}
-          disabled={code.length !== OTP_LENGTH}
+          disabled={code.length !== OTP_LENGTH || isVerifying}
         >
-          <Text style={styles.primaryText}>تأكيد ومتابعة</Text>
+          {isVerifying ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryText}>تأكيد ومتابعة</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -160,8 +206,6 @@ export default function VerifyScreen() {
 const styles = StyleSheet.create({
   root: { backgroundColor: "#050505", flex: 1, paddingHorizontal: 22 },
   content: { flex: 1 },
-  status: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
-  statusText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 12 },
   topbar: {
     alignItems: "center",
     flexDirection: "row",
@@ -180,7 +224,7 @@ const styles = StyleSheet.create({
   },
   iconButtonGhost: { height: 36, width: 36 },
   topbarTitle: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 18 },
-  hero: { alignItems: "flex-end", marginTop: 42 },
+  hero: { alignItems: "flex-end", marginTop: 54 },
   title: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 24, marginBottom: 14, textAlign: "right" },
   description: {
     color: "#8E949D",
@@ -189,7 +233,7 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     textAlign: "right",
   },
-  otpRow: { direction: "ltr", flexDirection: "row", gap: 8, justifyContent: "center", marginTop: 28 },
+  otpRow: { direction: "ltr", flexDirection: "row", gap: 8, justifyContent: "center", marginTop: 30 },
   otpInput: {
     backgroundColor: "#111214",
     borderRadius: 15,
@@ -201,7 +245,7 @@ const styles = StyleSheet.create({
     width: 46,
   },
   errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 12, textAlign: "center" },
-  resendButton: { alignItems: "center", marginTop: 18, paddingVertical: 8 },
+  resendButton: { alignItems: "center", minHeight: 36, justifyContent: "center", marginTop: 18, paddingVertical: 8 },
   resendText: { fontFamily: "Inter_700Bold", fontSize: 14 },
   primaryButton: {
     alignItems: "center",

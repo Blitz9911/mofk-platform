@@ -22,11 +22,15 @@ type MaintenanceLogRow = {
   vehicle_id: string;
   user_id: string;
   service_type: string;
+  custom_service_name?: string | null;
   done_at: string;
   done_at_km?: number | null;
+  actual_cost_sar?: number | string | null;
   cost_sar?: number | string | null;
   notes?: string | null;
+  source?: string | null;
   created_at?: string;
+  updated_at?: string | null;
   vehicles?: {
     make?: string | null;
     model?: string | null;
@@ -83,6 +87,7 @@ type ApiBridgeResult =
   | { handled: false };
 
 let installed = false;
+const recommendationStatusKey = "mofk.recommendation.status";
 
 class ApiBridgeError extends Error {
   status: number;
@@ -423,11 +428,17 @@ function statusRank(status: string) {
 }
 
 function completedMaintenanceItem(row: MaintenanceLogRow) {
+  const actualCostSar = row.actual_cost_sar ?? row.cost_sar ?? null;
   return {
     id: row.id,
+    userId: row.user_id,
     vehicleId: row.vehicle_id,
     serviceType: row.service_type,
-    serviceTypeAr: MAINTENANCE_LABELS[row.service_type] || row.service_type,
+    serviceTypeAr:
+      row.service_type === "other" && row.custom_service_name
+        ? row.custom_service_name
+        : MAINTENANCE_LABELS[row.service_type] || row.service_type,
+    customServiceName: row.custom_service_name ?? null,
     intervalKm: null,
     intervalDays: null,
     lastDoneKm: row.done_at_km ?? null,
@@ -440,14 +451,16 @@ function completedMaintenanceItem(row: MaintenanceLogRow) {
     daysUntilDue: null,
     progressPct: null,
     status: "done",
-    estimatedCost:
-      row.cost_sar !== null && row.cost_sar !== undefined
-        ? Number(row.cost_sar)
-        : null,
+    estimatedCost: actualCostSar !== null && actualCostSar !== undefined ? Number(actualCostSar) : null,
+    actualCostSar: actualCostSar !== null && actualCostSar !== undefined ? Number(actualCostSar) : null,
+    cost: actualCostSar !== null && actualCostSar !== undefined ? Number(actualCostSar) : null,
     vehicleNickname: row.vehicles?.nickname ?? null,
     vehicleMake: row.vehicles?.make ?? "",
     vehicleModel: row.vehicles?.model ?? "",
     notes: row.notes ?? null,
+    source: row.source ?? "manual",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
     recommendationReason: null,
     isRecommendation: false,
   };
@@ -638,31 +651,54 @@ function toAiRecommendation(item: any) {
 
   const descriptionParts = [
     item.recommendationReason,
-    item.intervalKm
-      ? `المعادلة: آخر صيانة (${formatNumber(item.lastDoneKm)} كم) + الفاصل (${formatNumber(item.intervalKm)} كم) = الاستحقاق (${formatNumber(item.nextDueKm)} كم).`
-      : null,
-    item.intervalDays && item.nextDueAt
-      ? `المعادلة الزمنية: تاريخ آخر صيانة (${item.lastDoneAt?.slice(0, 10) || "-"}) + ${item.intervalDays} يوم = ${item.nextDueAt.slice(0, 10)}.`
-      : null,
     item.remainingKm !== null && item.remainingKm !== undefined
       ? item.remainingKm < 0
-        ? `متأخرة بمقدار ${formatNumber(Math.abs(item.remainingKm))} كم.`
-        : `المتبقي تقريبًا ${formatNumber(item.remainingKm)} كم.`
+        ? `الخدمة متأخرة بمقدار ${formatNumber(Math.abs(item.remainingKm))} كم، لذلك الأفضل تنفيذها قريبًا.`
+        : `باقي تقريبًا ${formatNumber(item.remainingKm)} كم قبل موعد الخدمة.`
       : null,
     item.daysUntilDue !== null && item.daysUntilDue !== undefined
       ? item.daysUntilDue < 0
-        ? `متأخرة ${Math.abs(item.daysUntilDue)} يوم.`
-        : `المتبقي زمنيًا ${item.daysUntilDue} يوم.`
+        ? `الخدمة متأخرة ${Math.abs(item.daysUntilDue)} يوم، لذلك الأفضل تنفيذها قريبًا.`
+        : `باقي تقريبًا ${item.daysUntilDue} يوم قبل موعد الخدمة.`
       : null,
   ].filter(Boolean);
 
   return {
     id: item.id,
     vehicleId: item.vehicleId,
+    category: "maintenance",
     kind: "maintenance_due",
+    priority: isOverdue ? "high" : isUpcoming ? "medium" : "info",
     severity: isOverdue ? "critical" : isUpcoming ? "warning" : "info",
+    status: "active",
+    source: "maintenance_record",
+    sourceReferenceId: item.sourceLogId ?? item.id,
+    ruleCode: isOverdue ? "MAINTENANCE_OVERDUE" : isUpcoming ? "MAINTENANCE_DUE_SOON" : "NO_URGENT_RECOMMENDATIONS",
     titleAr: `${titlePrefix}: ${label}`,
+    title: `${titlePrefix}: ${label}`,
+    summaryAr: isOverdue
+      ? `${label} متأخرة وتحتاج متابعة.`
+      : isUpcoming
+        ? `${label} قريبة من موعدها.`
+        : `${label} ضمن المتابعة القادمة.`,
+    summary: isOverdue
+      ? `${label} متأخرة وتحتاج متابعة.`
+      : isUpcoming
+        ? `${label} قريبة من موعدها.`
+        : `${label} ضمن المتابعة القادمة.`,
+    reasonAr: item.recommendationReason,
+    reason: item.recommendationReason,
     descriptionAr: descriptionParts.join(" "),
+    recommendedActionAr: isOverdue
+      ? `سجل ${label} أو رتب موعد صيانة قريب.`
+      : isUpcoming
+        ? `خطط لتنفيذ ${label} قريبًا.`
+        : `تابع ${label} حسب العداد أو التاريخ القادم.`,
+    recommendedAction: isOverdue
+      ? `سجل ${label} أو رتب موعد صيانة قريب.`
+      : isUpcoming
+        ? `خطط لتنفيذ ${label} قريبًا.`
+        : `تابع ${label} حسب العداد أو التاريخ القادم.`,
     confidencePct: item.progressPct !== null && item.progressPct !== undefined
       ? Math.min(99, Math.max(60, Number(item.progressPct)))
       : isOverdue
@@ -676,7 +712,13 @@ function toAiRecommendation(item: any) {
         ? `خطط لتنفيذ ${label} قريبًا.`
         : `تابع ${label} حسب العداد أو التاريخ القادم.`,
     suggestedCostSar: item.estimatedCost ?? undefined,
+    dueDate: item.nextDueAt ?? null,
+    dueMileage: item.nextDueKm ?? null,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    dismissedAt: null,
+    completedAt: null,
+    expiresAt: null,
     metadata: {
       serviceType: item.serviceType,
       status: item.status,
@@ -717,6 +759,11 @@ async function handleMaintenance(
 ): Promise<ApiBridgeResult> {
   const session = await requireSession();
 
+  if (path === "/api/maintenance/logs" && method === "GET") {
+    const rows = await listMaintenanceLogs(session.access_token);
+    return { handled: true, data: rows.map(toMaintenanceItem) };
+  }
+
   if (path === "/api/maintenance/upcoming" && method === "GET") {
     const rows = await listMaintenanceLogs(session.access_token);
     return { handled: true, data: buildMaintenanceItems(rows) };
@@ -730,20 +777,30 @@ async function handleMaintenance(
   }
 
   const logMatch = path.match(/^\/api\/maintenance\/([^/]+)\/log$/);
-  if (logMatch && method === "POST") {
-    const vehicleId = decodeURIComponent(logMatch[1]);
+  const createLogMatch = path === "/api/maintenance/logs" && method === "POST";
+  if ((logMatch && method === "POST") || createLogMatch) {
     const body = await readJsonBody(input, init);
+    const vehicleId = logMatch ? decodeURIComponent(logMatch[1]) : String(body.vehicleId ?? "");
 
     const serviceType = String(body.serviceType ?? "").trim();
     const doneAt = String(body.doneAt ?? "").trim();
-    const doneAtKm = Number(body.doneAtKm ?? 0) || 0;
-    const cost =
-      body.cost !== undefined && body.cost !== null && body.cost !== ""
-        ? Number(body.cost)
+    const doneAtKm =
+      body.doneAtKm !== undefined && body.doneAtKm !== null && body.doneAtKm !== ""
+        ? Number(body.doneAtKm)
         : null;
+    const cost =
+      body.actualCostSar !== undefined && body.actualCostSar !== null && body.actualCostSar !== ""
+        ? Number(body.actualCostSar)
+        : body.cost !== undefined && body.cost !== null && body.cost !== ""
+          ? Number(body.cost)
+          : null;
     const notes =
       typeof body.notes === "string" && body.notes.trim()
         ? body.notes.trim()
+        : null;
+    const customServiceName =
+      typeof body.customServiceName === "string" && body.customServiceName.trim()
+        ? body.customServiceName.trim()
         : null;
 
     if (!serviceType) {
@@ -752,6 +809,16 @@ async function handleMaintenance(
 
     if (!doneAt) {
       throw new ApiBridgeError("تاريخ الصيانة مطلوب.", 400);
+    }
+
+    if (serviceType === "other" && !customServiceName) {
+      throw new ApiBridgeError("Custom maintenance name is required.", 400);
+    }
+    if (doneAtKm !== null && (!Number.isFinite(doneAtKm) || doneAtKm < 0)) {
+      throw new ApiBridgeError("Invalid odometer reading.", 400);
+    }
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      throw new ApiBridgeError("Invalid maintenance cost.", 400);
     }
 
     const vehicle = await getVehicleRow(vehicleId, session.access_token);
@@ -771,10 +838,13 @@ async function handleMaintenance(
           vehicle_id: vehicleId,
           user_id: session.user.id,
           service_type: serviceType,
+          custom_service_name: customServiceName,
           done_at: doneAt,
           done_at_km: doneAtKm,
+          actual_cost_sar: cost,
           cost_sar: cost,
           notes,
+          source: String(body.source ?? "manual"),
         }),
       },
       session.access_token,
@@ -783,32 +853,131 @@ async function handleMaintenance(
     return { handled: true, data: toMaintenanceItem(rows[0]), status: 201 };
   }
 
+  const updateLogMatch = path.match(/^\/api\/maintenance\/logs\/([^/]+)$/);
+  if (updateLogMatch && (method === "PATCH" || method === "DELETE")) {
+    const id = decodeURIComponent(updateLogMatch[1]);
+
+    if (method === "DELETE") {
+      await supabaseRequest(
+        `/rest/v1/maintenance_logs?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+        { method: "DELETE" },
+        session.access_token,
+      );
+      return { handled: true, status: 204 };
+    }
+
+    const body = await readJsonBody(input, init);
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (typeof body.serviceType === "string") patch.service_type = body.serviceType.trim();
+    if (typeof body.customServiceName === "string") patch.custom_service_name = body.customServiceName.trim() || null;
+    if (body.doneAt) patch.done_at = String(body.doneAt);
+    if (body.doneAtKm !== undefined) {
+      patch.done_at_km = body.doneAtKm === "" || body.doneAtKm === null ? null : Number(body.doneAtKm);
+    }
+    if (body.actualCostSar !== undefined || body.cost !== undefined) {
+      const value = body.actualCostSar ?? body.cost;
+      const numberValue = value === "" || value === null ? null : Number(value);
+      patch.actual_cost_sar = numberValue;
+      patch.cost_sar = numberValue;
+    }
+    if (typeof body.notes === "string" || body.notes === null) {
+      patch.notes = typeof body.notes === "string" ? body.notes.trim() || null : null;
+    }
+    if (typeof body.source === "string") patch.source = body.source;
+
+    const rows = await supabaseRequest<MaintenanceLogRow[]>(
+      `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify(patch),
+      },
+      session.access_token,
+    );
+
+    if (!rows[0]) throw new ApiBridgeError("Maintenance log not found", 404);
+    return { handled: true, data: toMaintenanceItem(rows[0]) };
+  }
+
   return { handled: false };
 }
 
 async function handleRecommendations(
+  url: URL,
   path: string,
   method: string,
 ): Promise<ApiBridgeResult> {
-  const match = path.match(/^\/api\/ai\/recommendations\/([^/]+)$/);
-  if (!match || method !== "GET") {
-    return { handled: false };
+  const legacyMatch = path.match(/^\/api\/ai\/recommendations\/([^/]+)$/);
+  const vehicleMatch = path.match(/^\/api\/vehicles\/([^/]+)\/recommendations$/);
+  const evaluateMatch = path.match(/^\/api\/vehicles\/([^/]+)\/recommendations\/evaluate$/);
+  const completeMatch = path.match(/^\/api\/recommendations\/([^/]+)\/complete$/);
+  const dismissMatch = path.match(/^\/api\/recommendations\/([^/]+)\/dismiss$/);
+
+  if (completeMatch && method === "POST") {
+    const id = decodeURIComponent(completeMatch[1]);
+    setRecommendationStatusOverride(id, "completed");
+    return { handled: true, data: { id, status: "completed", completedAt: new Date().toISOString() } };
   }
 
-  const session = await requireSession();
-  const vehicleId = decodeURIComponent(match[1]);
+  if (dismissMatch && method === "POST") {
+    const id = decodeURIComponent(dismissMatch[1]);
+    setRecommendationStatusOverride(id, "dismissed");
+    return { handled: true, data: { id, status: "dismissed", dismissedAt: new Date().toISOString() } };
+  }
 
-  const vehicle = await getVehicleRow(vehicleId, session.access_token);
-  if (!vehicle) {
+  const listAll = path === "/api/recommendations" && method === "GET";
+  const counts = path === "/api/recommendations/counts" && method === "GET";
+  const vehicleIdFromPath = legacyMatch?.[1] ?? vehicleMatch?.[1] ?? evaluateMatch?.[1] ?? null;
+
+  if (!listAll && !counts && !vehicleIdFromPath) return { handled: false };
+
+  const session = await requireSession();
+  const queryVehicleId = url.searchParams.get("vehicleId");
+  const queryStatus = url.searchParams.get("status") ?? "active";
+  const queryPriority = url.searchParams.get("priority");
+  const queryCategory = url.searchParams.get("category");
+  const vehicleId = vehicleIdFromPath ? decodeURIComponent(vehicleIdFromPath) : queryVehicleId;
+
+  const vehicles = vehicleId
+    ? [await getVehicleRow(vehicleId, session.access_token)].filter(Boolean)
+    : await supabaseRequest<VehicleRow[]>("/rest/v1/vehicles?select=*&order=created_at.desc", { method: "GET" }, session.access_token);
+
+  if (!vehicles.length) {
     throw new ApiBridgeError("المركبة غير موجودة.", 404);
   }
 
-  const rows = await listMaintenanceLogs(session.access_token, vehicleId);
-  const maintenanceRecommendations = buildMaintenanceRecommendations(rows).map(toAiRecommendation);
+  const allRecommendations: any[] = [];
+  for (const vehicle of vehicles as VehicleRow[]) {
+    const rows = await listMaintenanceLogs(session.access_token, vehicle.id);
+    allRecommendations.push(...buildMaintenanceRecommendations(rows).map(toAiRecommendation));
+  }
+
+  const withStatus = applyRecommendationStatusOverrides(allRecommendations);
+  const filtered = withStatus.filter((item) => {
+    if (queryStatus !== "all" && item.status !== queryStatus) return false;
+    if (queryPriority && item.priority !== queryPriority) return false;
+    if (queryCategory && item.category !== queryCategory) return false;
+    return true;
+  });
+  const active = withStatus.filter((item) => item.status === "active");
+
+  if (counts) {
+    return {
+      handled: true,
+      data: {
+        total: active.length,
+        critical: active.filter((item) => item.priority === "critical").length,
+        high: active.filter((item) => item.priority === "high").length,
+        medium: active.filter((item) => item.priority === "medium").length,
+        low: active.filter((item) => item.priority === "low").length,
+        info: active.filter((item) => item.priority === "info").length,
+      },
+    };
+  }
 
   return {
     handled: true,
-    data: maintenanceRecommendations,
+    data: evaluateMatch ? { ok: true, recommendations: active } : filtered,
   };
 }
 
@@ -1602,7 +1771,7 @@ async function handleRequest(
   const fuelResult = await handleFuel(url, method, input, init);
   if (fuelResult.handled) return fuelResult;
 
-  const recommendationResult = await handleRecommendations(path, method);
+  const recommendationResult = await handleRecommendations(url, path, method);
   if (recommendationResult.handled) return recommendationResult;
 
   const liveMatch = path.match(/^\/api\/diagnostics\/live\/([^/]+)$/);
@@ -1921,6 +2090,32 @@ function toProfile(row: UserRow) {
     subscriptionTier: row.subscription_tier || "free",
     isActive: row.is_active ?? true,
   };
+}
+
+function getRecommendationStatusOverrides(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(recommendationStatusKey) || "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function setRecommendationStatusOverride(id: string, status: string) {
+  if (typeof window === "undefined") return;
+  const current = getRecommendationStatusOverrides();
+  current[id] = status;
+  window.localStorage.setItem(recommendationStatusKey, JSON.stringify(current));
+}
+
+function applyRecommendationStatusOverrides(items: any[]) {
+  const overrides = getRecommendationStatusOverrides();
+  return items.map((item) => ({
+    ...item,
+    status: overrides[item.id] ?? item.status ?? "active",
+    dismissedAt: overrides[item.id] === "dismissed" ? new Date().toISOString() : item.dismissedAt,
+    completedAt: overrides[item.id] === "completed" ? new Date().toISOString() : item.completedAt,
+  }));
 }
 
 async function handleProfile(

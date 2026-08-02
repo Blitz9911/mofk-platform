@@ -20,6 +20,7 @@ import {
   GetLiveTelemetryParams,
   GetLiveTelemetryResponse,
 } from "@workspace/api-zod";
+import { persistEvaluation } from "./recommendations";
 
 const router: IRouter = Router();
 
@@ -215,6 +216,7 @@ router.post(
       .select()
       .from(vehiclesTable)
       .where(eq(vehiclesTable.id, s.vehicleId));
+    await persistEvaluation(s.vehicleId, req.userId).catch(() => null);
     res.json(
       CloseDiagnosticSessionResponse.parse({
         ...s,

@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 import { useObdConnection } from "@/src/obd";
 import type { DecodedPidValue, ObdConnectionState } from "@/src/obd";
 
@@ -93,7 +94,7 @@ export default function ObdConnectScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + 8 }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.back()}>
+        <Pressable style={[styles.iconButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => smoothBack(router, "/pair-device")}>
           <Ionicons name="chevron-forward" size={20} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerText}>

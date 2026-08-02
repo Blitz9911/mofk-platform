@@ -11,6 +11,7 @@ import {
   jsonb,
   date,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
@@ -160,6 +161,33 @@ export const maintenanceTable = pgTable(
   }),
 );
 
+export const maintenanceLogsTable = pgTable(
+  "maintenance_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    serviceType: varchar("service_type", { length: 50 }).notNull(),
+    customServiceName: varchar("custom_service_name", { length: 120 }),
+    doneAt: timestamp("done_at", { withTimezone: true }).notNull(),
+    doneAtKm: integer("done_at_km"),
+    actualCostSar: integer("actual_cost_sar"),
+    costSar: integer("cost_sar"),
+    notes: text("notes"),
+    source: varchar("source", { length: 30 }).notNull().default("manual"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userDoneIdx: index("idx_maintenance_logs_user_done").on(t.userId, t.doneAt),
+    vehicleDoneIdx: index("idx_maintenance_logs_vehicle_done").on(t.vehicleId, t.doneAt),
+  }),
+);
+
 export const recommendationsTable = pgTable(
   "recommendations",
   {
@@ -167,17 +195,37 @@ export const recommendationsTable = pgTable(
     vehicleId: uuid("vehicle_id")
       .notNull()
       .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => usersTable.id, { onDelete: "cascade" }),
+    category: varchar("category", { length: 30 }),
     kind: varchar("kind", { length: 30 }).notNull(),
+    priority: varchar("priority", { length: 12 }),
     severity: varchar("severity", { length: 10 }).notNull().default("info"),
+    status: varchar("status", { length: 16 }).notNull().default("active"),
+    source: varchar("source", { length: 40 }),
+    sourceReferenceId: varchar("source_reference_id", { length: 80 }),
+    ruleCode: varchar("rule_code", { length: 80 }),
+    dedupeKey: varchar("dedupe_key", { length: 220 }),
     titleAr: varchar("title_ar", { length: 200 }).notNull(),
+    summaryAr: text("summary_ar"),
+    reasonAr: text("reason_ar"),
     descriptionAr: text("description_ar").notNull(),
+    recommendedActionAr: text("recommended_action_ar"),
     confidencePct: smallint("confidence_pct").notNull().default(80),
     suggestedAction: varchar("suggested_action", { length: 50 }),
     suggestedCostSar: integer("suggested_cost_sar"),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    dueMileage: integer("due_mileage"),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     vehicleIdx: index("idx_recs_vehicle").on(t.vehicleId, t.createdAt),
+    userStatusIdx: index("idx_recs_user_status").on(t.userId, t.status),
+    dedupeIdx: uniqueIndex("idx_recs_dedupe_key").on(t.dedupeKey),
   }),
 );
 

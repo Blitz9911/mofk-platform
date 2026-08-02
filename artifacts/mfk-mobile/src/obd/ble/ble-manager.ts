@@ -1,14 +1,14 @@
 import { Platform } from "react-native";
-import { BleManager, Device, State, Subscription } from "react-native-ble-plx";
+import { BleManager, Characteristic, Device, State, Subscription } from "react-native-ble-plx";
 
 import {
   bleUuidMatches,
-  containsV011Service,
-  expandBleUuid,
+  containsElm327Service,
+  ELM327_NOTIFY_CHARACTERISTIC_UUIDS_SHORT,
+  ELM327_SCAN_TIMEOUT_MS,
+  ELM327_SERVICE_UUIDS_SHORT,
+  ELM327_WRITE_CHARACTERISTIC_UUIDS_SHORT,
   isV011NameHint,
-  V011_NOTIFY_CHARACTERISTIC_UUID_SHORT,
-  V011_SERVICE_UUID_SHORT,
-  V011_WRITE_CHARACTERISTIC_UUID_SHORT,
 } from "./ble.constants";
 import { asciiToBase64, base64ToAscii } from "../utils/base64";
 import { obdLogger } from "../services/obd-logger";
@@ -18,6 +18,7 @@ export type V011Characteristics = {
   serviceUUID: string;
   writeUUID: string;
   notifyUUID: string;
+  writeWithResponse: boolean;
 };
 
 function toBluetoothState(state: State) {
@@ -36,8 +37,20 @@ function toObdDevice(device: Device): ObdDevice {
     name,
     rssi: device.rssi ?? null,
     serviceUUIDs,
-    isV011Candidate: containsV011Service(serviceUUIDs) || isV011NameHint(name),
+    isV011Candidate: containsElm327Service(serviceUUIDs) || isV011NameHint(name),
   };
+}
+
+function characteristicMatches(uuid: string, candidates: readonly string[]) {
+  return candidates.some((candidate) => bleUuidMatches(uuid, candidate));
+}
+
+function canWrite(characteristic: Characteristic) {
+  return Boolean(characteristic.isWritableWithResponse || characteristic.isWritableWithoutResponse);
+}
+
+function canNotify(characteristic: Characteristic) {
+  return Boolean(characteristic.isNotifiable || characteristic.isIndicatable);
 }
 
 export class MfkBleManager implements Elm327Transport {
@@ -83,23 +96,33 @@ export class MfkBleManager implements Elm327Transport {
     this.scanActive = true;
     obdLogger.log("info", "scan_start", "بدء البحث عن أجهزة BLE");
 
-    this.manager.startDeviceScan([expandBleUuid(V011_SERVICE_UUID_SHORT)], { allowDuplicates: false }, (error, device) => {
-      if (error) {
-        obdLogger.log("warn", "scan_error", "تعذر البحث باستخدام service UUID، سيتم الاعتماد على الاختيار اليدوي", {
-          reason: error.message,
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, ELM327_SCAN_TIMEOUT_MS);
+
+      this.manager?.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
+        if (error) {
+          obdLogger.log("warn", "scan_error", "تعذر البحث عن أجهزة BLE", {
+            reason: error.message,
+          });
+          clearTimeout(timer);
+          resolve();
+          return;
+        }
+        if (!device) return;
+        const obdDevice = toObdDevice(device);
+        if (!obdDevice.isV011Candidate) return;
+
+        obdLogger.log("debug", "device_found", "تم العثور على جهاز ELM327 BLE", {
+          id: obdDevice.id,
+          name: obdDevice.name,
+          rssi: obdDevice.rssi,
+          candidate: obdDevice.isV011Candidate,
         });
-        return;
-      }
-      if (!device) return;
-      const obdDevice = toObdDevice(device);
-      obdLogger.log("debug", "device_found", "تم العثور على جهاز BLE", {
-        id: obdDevice.id,
-        name: obdDevice.name,
-        rssi: obdDevice.rssi,
-        candidate: obdDevice.isV011Candidate,
+        onDevice(obdDevice);
       });
-      onDevice(obdDevice);
     });
+
+    await this.stopScan();
   }
 
   async stopScan() {
@@ -162,10 +185,21 @@ export class MfkBleManager implements Elm327Transport {
       throw new Error("BLE transport is not ready");
     }
 
-    await this.connectedDevice.writeCharacteristicWithResponseForService(
+    const value = asciiToBase64(commandWithCarriageReturn);
+
+    if (this.characteristics.writeWithResponse) {
+      await this.connectedDevice.writeCharacteristicWithResponseForService(
+        this.characteristics.serviceUUID,
+        this.characteristics.writeUUID,
+        value,
+      );
+      return;
+    }
+
+    await this.connectedDevice.writeCharacteristicWithoutResponseForService(
       this.characteristics.serviceUUID,
       this.characteristics.writeUUID,
-      asciiToBase64(commandWithCarriageReturn),
+      value,
     );
   }
 
@@ -189,18 +223,42 @@ export class MfkBleManager implements Elm327Transport {
   private async discoverV011Characteristics(device: Device): Promise<V011Characteristics> {
     const services = await device.services();
     for (const service of services) {
-      if (!bleUuidMatches(service.uuid, V011_SERVICE_UUID_SHORT)) continue;
+      const preferredService = ELM327_SERVICE_UUIDS_SHORT.some((candidate) => bleUuidMatches(service.uuid, candidate));
+      if (!preferredService) continue;
       const characteristics = await service.characteristics();
-      const write = characteristics.find((characteristic) => bleUuidMatches(characteristic.uuid, V011_WRITE_CHARACTERISTIC_UUID_SHORT));
-      const notify = characteristics.find((characteristic) => bleUuidMatches(characteristic.uuid, V011_NOTIFY_CHARACTERISTIC_UUID_SHORT));
+      const write =
+        characteristics.find((characteristic) => characteristicMatches(characteristic.uuid, ELM327_WRITE_CHARACTERISTIC_UUIDS_SHORT) && canWrite(characteristic)) ??
+        characteristics.find(canWrite);
+      const notify =
+        characteristics.find((characteristic) => characteristicMatches(characteristic.uuid, ELM327_NOTIFY_CHARACTERISTIC_UUIDS_SHORT) && canNotify(characteristic)) ??
+        characteristics.find(canNotify);
 
-      if (!write) throw new Error("Write characteristic FFE1 missing");
-      if (!notify) throw new Error("Notify characteristic FFE2 missing");
-
-      return { serviceUUID: service.uuid, writeUUID: write.uuid, notifyUUID: notify.uuid };
+      if (write && notify) {
+        return {
+          serviceUUID: service.uuid,
+          writeUUID: write.uuid,
+          notifyUUID: notify.uuid,
+          writeWithResponse: Boolean(write.isWritableWithResponse),
+        };
+      }
     }
 
-    throw new Error("Service FFE0 missing");
+    for (const service of services) {
+      const characteristics = await service.characteristics();
+      const write = characteristics.find(canWrite);
+      const notify = characteristics.find(canNotify);
+
+      if (write && notify) {
+        return {
+          serviceUUID: service.uuid,
+          writeUUID: write.uuid,
+          notifyUUID: notify.uuid,
+          writeWithResponse: Boolean(write.isWritableWithResponse),
+        };
+      }
+    }
+
+    throw new Error("ELM327 BLE characteristics missing");
   }
 
   private cleanupConnection() {

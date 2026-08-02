@@ -15,6 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
+import { exportPdf } from "@/lib/pdf-export";
 
 const SEVERITY: Record<string, { color: string; label: string; icon: string }> = {
   critical: { color: "#ef4444", label: "حرج", icon: "alert-circle" },
@@ -49,17 +51,59 @@ export default function DtcScreen() {
     low:      dtcs?.filter((d) => d.severity === "low").length ?? 0,
   };
 
+  const exportDtcPdf = () => {
+    if (!dtcs?.length) return;
+
+    void exportPdf({
+      title: "تقرير سجل الأعطال",
+      subtitle: "ملخص منسق لأكواد الأعطال المسجلة حسب الفلتر الحالي داخل تطبيق مفك.",
+      fileLabel: "تقرير أعطال مفك",
+      sections: [
+        {
+          title: status === "active" ? "الأعطال النشطة" : "الأعطال المُزالة",
+          items: dtcs.map((item) => {
+            const severity = SEVERITY[item.severity] ?? { label: item.severity };
+            const vehicle = [item.vehicleMake, item.vehicleModel].filter(Boolean).join(" ");
+            const possibleCauses = Array.isArray(item.possibleCauses)
+              ? item.possibleCauses.join("، ")
+              : item.possibleCauses;
+
+            return {
+              title: item.code,
+              subtitle: item.descriptionAr ?? item.descriptionEn ?? "بدون وصف",
+              badge: severity.label,
+              fields: [
+                { label: "المركبة", value: vehicle || "-" },
+                { label: "الحالة", value: status === "active" ? "نشطة" : "مُزالة" },
+                { label: "الشدة", value: severity.label },
+                { label: "تاريخ الاكتشاف", value: item.detectedAt ? new Date(item.detectedAt).toLocaleDateString("ar-SA") : null },
+                { label: "الأسباب المحتملة", value: possibleCauses },
+              ],
+            };
+          }),
+        },
+      ],
+    });
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => smoothBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>سجل الأعطال (DTC)</Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>تتبع وإدارة أعطال مركباتك</Text>
         </View>
+        {!isLoading && dtcs && dtcs.length > 0 ? (
+          <Pressable onPress={exportDtcPdf} style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerGhost} />
+        )}
       </View>
 
       {/* Severity summary row */}
@@ -201,6 +245,15 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: "flex-end", gap: 2 },
   headerTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
   headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerGhost: { width: 36 },
+  exportBtn: {
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
   summaryRow: {
     flexDirection: "row-reverse",
     justifyContent: "space-around",

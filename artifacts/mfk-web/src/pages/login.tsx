@@ -210,6 +210,13 @@ export default function Login() {
                   </span>
                   المتابعة باستخدام Google
                 </Button>
+
+                <p className="text-center text-sm text-muted-foreground">
+                  ما عندك حساب؟{" "}
+                  <Link href="/register">
+                    <span className="text-primary font-semibold cursor-pointer hover:underline">إنشاء حساب</span>
+                  </Link>
+                </p>
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-5">
