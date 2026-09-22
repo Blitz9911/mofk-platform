@@ -236,8 +236,6 @@ export default function Dashboard() {
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case "maintenance_done":
         return <Wrench className="h-4 w-4 text-amber-500" />;
-      case "booking_created":
-        return <Calendar className="h-4 w-4 text-primary" />;
       default:
         return severity === "critical" ? (
           <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -275,7 +273,7 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 min-w-[280px]">
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:w-auto xl:min-w-[280px]">
               <div className="rounded-2xl bg-white/15 border border-white/20 p-4 backdrop-blur">
                 <p className="text-xs text-white/70">المركبة النشطة</p>
                 <p className="text-lg font-black mt-1 truncate">
@@ -332,7 +330,7 @@ export default function Dashboard() {
                 <Card
                   key={vehicle.id}
                   className={cn(
-                    "w-[310px] cursor-pointer transition-all overflow-hidden",
+                    "w-[min(82vw,310px)] cursor-pointer transition-all overflow-hidden sm:w-[310px]",
                     selected
                       ? "border-primary ring-1 ring-primary shadow-md"
                       : "hover:border-primary/50",
@@ -724,7 +722,7 @@ export default function Dashboard() {
               <div>
                 <p className="font-semibold">راجع توصيات الصيانة</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  لديك {overview?.activeRecommendationsCount || 0} توصية تحتاج متابعة.
+                  لديك {overview?.upcomingMaintenanceCount || 0} توصية تحتاج متابعة.
                 </p>
               </div>
             </div>

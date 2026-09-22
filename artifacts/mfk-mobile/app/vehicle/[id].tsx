@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
 
 const SEVERITY_COLOR: Record<string, string> = {
   critical: "#ef4444",
@@ -54,7 +55,7 @@ export default function VehicleDetailScreen() {
         <Text style={[styles.navTitle, { color: colors.foreground }]}>
           {vehicle ? (vehicle.nickname || `${vehicle.make} ${vehicle.model}`) : "المركبة"}
         </Text>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => smoothBack(router, "/vehicles")} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
       </View>

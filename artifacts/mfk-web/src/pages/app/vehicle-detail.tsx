@@ -113,8 +113,21 @@ export default function VehicleDetail() {
     deleteVehicle.mutate({ vehicleId: id! }, {
       onSuccess: () => {
         toast({ title: "تم حذف المركبة" });
+        queryClient.removeQueries({ queryKey: getGetVehicleQueryKey(id!) });
         queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
         setLocation("/app/vehicles");
+      },
+      onError: (error) => {
+        const message =
+          error instanceof Error && !error.message.includes("ترقية")
+            ? error.message
+            : "تعذر حذف المركبة. تأكد أن المركبة موجودة وأن لديك صلاحية حذفها.";
+
+        toast({
+          title: "لم يتم حذف المركبة",
+          description: message,
+          variant: "destructive",
+        });
       }
     });
   };

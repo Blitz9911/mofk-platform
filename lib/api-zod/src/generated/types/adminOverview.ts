@@ -16,6 +16,5 @@ export interface AdminOverview {
   revenueTrendPct?: number;
   nps?: number;
   premiumSubscribers?: number;
-  bookingsLast7d?: number;
   avgHealthScore?: number;
 }
