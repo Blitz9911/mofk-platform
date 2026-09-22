@@ -15,9 +15,21 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mfk.diagnostics"
+      "bundleIdentifier": "com.mfk.diagnostics",
+      "infoPlist": {
+        "UIBackgroundModes": []
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.mfk.diagnostics",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -29,7 +41,15 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "يستخدم تطبيق MFK البلوتوث للاتصال بجهاز V011 وقراءة بيانات مركبتك."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
