@@ -9,10 +9,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Redirect, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { I18nManager } from "react-native";
+import { I18nManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import * as Updates from "expo-updates";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -23,10 +24,19 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 import "@/lib/supabase-api-bridge";
 
-
-
+// I18nManager.forceRTL only takes effect on the next native cold start — it
+// cannot flip the layout of the process that's already running. Without this
+// check, the app silently stays LTR for the entire session it was installed
+// or updated in, and only self-corrects on some later relaunch no one asked
+// for. Detect the mismatch once and reload immediately so RTL applies on
+// the very first launch instead of leaving it to chance.
 I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
+if (!I18nManager.isRTL) {
+  I18nManager.forceRTL(true);
+  if (Platform.OS !== "web") {
+    void Updates.reloadAsync();
+  }
+}
 
 const apiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL ??

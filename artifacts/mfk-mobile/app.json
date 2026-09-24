@@ -55,6 +55,10 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
     "extra": {
       "eas": {
         "projectId": "640f7d9f-6d0b-4f5b-8dba-babc7c5b8d48"
