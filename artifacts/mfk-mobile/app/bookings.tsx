@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useListBookings } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import {
   ActivityIndicator,
@@ -14,6 +14,17 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { smoothBack } from "@/lib/navigation";
+
+type Booking = {
+  id: string;
+  vehicleMake?: string | null;
+  vehicleModel?: string | null;
+  workshopName?: string | null;
+  serviceTypeAr?: string | null;
+  scheduledAt: string;
+  status: string;
+};
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "انتظار",
@@ -29,11 +40,36 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "#ef4444",
 };
 
+function getApiBaseUrl() {
+  const base =
+    process.env.EXPO_PUBLIC_API_BASE_URL ??
+    (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : null);
+
+  if (!base) {
+    throw new Error("إعدادات API ناقصة. أضف EXPO_PUBLIC_API_BASE_URL أو EXPO_PUBLIC_DOMAIN.");
+  }
+
+  return base.replace(/\/+$/, "");
+}
+
+async function listBookings() {
+  const response = await fetch("/api/bookings");
+
+  if (!response.ok) {
+    throw new Error("تعذر تحميل الحجوزات.");
+  }
+
+  return (await response.json()) as Booking[];
+}
+
 export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: bookings, isLoading } = useListBookings();
+  const { data: bookings, isLoading } = useQuery({
+    queryKey: ["mobile-bookings"],
+    queryFn: listBookings,
+  });
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -41,7 +77,7 @@ export default function BookingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>حجوزاتي</Text>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={() => smoothBack(router)}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
       </View>

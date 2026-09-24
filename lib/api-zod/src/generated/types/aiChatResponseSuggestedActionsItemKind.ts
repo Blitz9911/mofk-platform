@@ -10,7 +10,6 @@ export type AiChatResponseSuggestedActionsItemKind =
   (typeof AiChatResponseSuggestedActionsItemKind)[keyof typeof AiChatResponseSuggestedActionsItemKind];
 
 export const AiChatResponseSuggestedActionsItemKind = {
-  book_workshop: "book_workshop",
   view_dtc: "view_dtc",
   schedule_maintenance: "schedule_maintenance",
   view_vehicle: "view_vehicle",

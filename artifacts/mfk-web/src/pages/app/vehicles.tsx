@@ -36,7 +36,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -55,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ─── Car Brand / Model Data ──────────────────────────────── */
 const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
@@ -700,7 +700,14 @@ const createVehicleSchema = z.object({
   make: z.string().min(1, "مطلوب"),
   model: z.string().min(1, "مطلوب"),
   year: z.coerce.number().min(1990).max(new Date().getFullYear() + 1),
-  plateNumber: z.string().optional(),
+  plateNumber: z
+    .string()
+    .trim()
+    .min(1, "رقم اللوحة إجباري")
+    .refine((value) => {
+      const parsed = parsePlate(value);
+      return parsed.letters.every(Boolean) && parsed.digits.every(Boolean);
+    }, "أدخل ٣ أحرف و٤ أرقام للوحة"),
   odometerKm: z.coerce.number().optional(),
   fuelType: z.enum(["petrol", "diesel", "hybrid", "ev"]),
   vin: z.string().optional(),
@@ -717,6 +724,7 @@ const FUEL_LABEL: Record<string, string> = {
 export default function Vehicles() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: vehicles, isLoading } = useListVehicles();
   const createVehicle = useCreateVehicle();
@@ -729,6 +737,15 @@ export default function Vehicles() {
   }>({ open: false, vehicleId: null });
   const [selectedMake, setSelectedMake] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
+  const [upgradeNotice, setUpgradeNotice] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+  });
 
   const form = useForm<z.infer<typeof createVehicleSchema>>({
     resolver: zodResolver(createVehicleSchema),
@@ -747,7 +764,66 @@ export default function Vehicles() {
     defaultValues: { adapterMac: "" },
   });
 
+  const rawTier = user?.subscriptionTier ?? "free";
+  const normalizedTier =
+    rawTier === "mofk" || rawTier === "individual-basic"
+      ? "plus"
+      : rawTier === "premium" || rawTier === "pro" || rawTier === "individual-advanced"
+        ? "family"
+        : rawTier;
+  const vehicleLimit =
+    normalizedTier === "free" || normalizedTier === "plus"
+      ? 1
+      : normalizedTier === "fleet"
+        ? null
+        : 3;
+  const vehicleCount = vehicles?.length ?? 0;
+  const reachedVehicleLimit = vehicleLimit !== null && vehicleCount >= vehicleLimit;
+  const vehicleLimitLabel =
+    vehicleLimit === null
+      ? "بدون حد للمركبات"
+      : vehicleLimit === 1
+        ? "بحد مركبة واحدة"
+        : `بحد حتى ${vehicleLimit.toLocaleString("ar-SA")} مركبات`;
+  const upgradeDescription =
+    normalizedTier === "free"
+      ? "الباقة المجانية تسمح بمركبة واحدة فقط. رقّ إلى باقة مفك أو العائلة."
+      : normalizedTier === "plus"
+        ? "باقة مفك مخصصة لمركبة واحدة. رقّ إلى باقة العائلة لإضافة مركبات أكثر."
+        : "باقة العائلة تسمح حتى 3 مركبات. تواصل معنا لترقية الحساب إلى باقة الاسطول.";
+
+  const getMutationErrorMessage = (error: unknown) => {
+    if (error && typeof error === "object" && "data" in error) {
+      const data = (error as { data?: unknown }).data;
+      if (data && typeof data === "object" && "error" in data) {
+        const message = (data as { error?: unknown }).error;
+        if (typeof message === "string" && message.trim()) return message;
+      }
+    }
+
+    if (error instanceof Error && error.message.trim()) return error.message;
+    return "تعذر إضافة المركبة. حاول مرة أخرى.";
+  };
+
+  const requestCreateVehicle = () => {
+    if (reachedVehicleLimit) {
+      setUpgradeNotice({
+        open: true,
+        title: "يجب الترقية لإضافة مركبة أخرى",
+        description: upgradeDescription,
+      });
+      return;
+    }
+
+    setCreateOpen(true);
+  };
+
   const onSubmit = (values: z.infer<typeof createVehicleSchema>) => {
+    if (reachedVehicleLimit) {
+      requestCreateVehicle();
+      return;
+    }
+
     createVehicle.mutate(
       { data: values },
       {
@@ -758,6 +834,13 @@ export default function Vehicles() {
           form.reset();
           setSelectedMake("");
           setSelectedModel("");
+        },
+        onError: (error) => {
+          toast({
+            title: "لم يتم إضافة المركبة",
+            description: getMutationErrorMessage(error),
+            variant: "destructive",
+          });
         },
       },
     );
@@ -858,10 +941,47 @@ export default function Vehicles() {
           <h1 className="text-3xl font-bold tracking-tight">مركباتي</h1>
           <p className="text-muted-foreground mt-1">
             {vehicles?.length
-              ? `${vehicles.length} مركبة مسجلة في حسابك`
+              ? `${vehicles.length} مركبة مسجلة في حسابك ${vehicleLimitLabel}`
               : "أضف مركباتك وتحكم بها من مكان واحد"}
           </p>
         </div>
+
+        <Dialog
+          open={upgradeNotice.open}
+          onOpenChange={(open) =>
+            setUpgradeNotice((current) => ({ ...current, open }))
+          }
+        >
+          <DialogContent className="sm:max-w-[440px]">
+            <DialogHeader>
+              <DialogTitle>{upgradeNotice.title}</DialogTitle>
+              <DialogDescription className="leading-7">
+                {upgradeNotice.description}
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="gap-2 sm:justify-start">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setUpgradeNotice((current) => ({ ...current, open: false }))
+                }
+              >
+                إغلاق
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setUpgradeNotice((current) => ({ ...current, open: false }));
+                  setLocation("/app/subscription");
+                }}
+              >
+                عرض الباقات
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog
           open={createOpen}
@@ -874,12 +994,10 @@ export default function Vehicles() {
             }
           }}
         >
-          <DialogTrigger asChild>
-            <Button className="gap-2 shrink-0">
-              <Plus className="w-4 h-4" />
-              إضافة مركبة
-            </Button>
-          </DialogTrigger>
+          <Button className="gap-2 shrink-0" onClick={requestCreateVehicle}>
+            <Plus className="w-4 h-4" />
+            {reachedVehicleLimit ? "ترقية الباقة" : "إضافة مركبة"}
+          </Button>
 
           <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -1111,13 +1229,18 @@ export default function Vehicles() {
                   render={({ field }) => (
                     <div className="space-y-2">
                       <label className="text-sm font-medium leading-none">
-                        رقم اللوحة
+                        رقم اللوحة <span className="text-destructive">*</span>
                       </label>
 
                       <PlateInput
                         value={field.value || ""}
                         onChange={field.onChange}
                       />
+                      {form.formState.errors.plateNumber?.message && (
+                        <p className="text-sm font-medium text-destructive">
+                          {form.formState.errors.plateNumber.message}
+                        </p>
+                      )}
                     </div>
                   )}
                 />
@@ -1254,7 +1377,7 @@ export default function Vehicles() {
             </p>
           </div>
 
-          <Button onClick={() => setCreateOpen(true)} className="gap-2">
+          <Button onClick={requestCreateVehicle} className="gap-2">
             <Plus className="w-4 h-4" />
             أضف أول مركبة
           </Button>
@@ -1319,7 +1442,7 @@ export default function Vehicles() {
 
                     <p className="text-sm text-muted-foreground">
                       {v.make} {v.model} • {v.year} •{" "}
-                      {FUEL_LABEL[v.fuelType] || v.fuelType}
+                      {FUEL_LABEL[v.fuelType ?? "petrol"] || v.fuelType || "petrol"}
                     </p>
                   </div>
 

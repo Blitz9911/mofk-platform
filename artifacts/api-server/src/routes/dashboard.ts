@@ -5,7 +5,6 @@ import {
   vehiclesTable,
   dtcCodesTable,
   maintenanceTable,
-  bookingsTable,
   diagnosticSessionsTable,
   activityTable,
   healthHistoryTable,
@@ -32,7 +31,6 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
 
   let activeDtcs: { id: string; severity: string }[] = [];
   let upcomingMaint: { id: string; status: string }[] = [];
-  let upcomingBookings: { id: string }[] = [];
   let recentSessions: { id: string; odometerKm: number | null }[] = [];
 
   if (vehicleIds.length > 0) {
@@ -55,16 +53,6 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
         and(
           inArray(maintenanceTable.vehicleId, vehicleIds),
           inArray(maintenanceTable.status, ["upcoming", "overdue", "scheduled"]),
-        ),
-      );
-    upcomingBookings = await db
-      .select({ id: bookingsTable.id })
-      .from(bookingsTable)
-      .where(
-        and(
-          eq(bookingsTable.userId, userId),
-          inArray(bookingsTable.status, ["pending", "confirmed"]),
-          gte(bookingsTable.scheduledAt, new Date()),
         ),
       );
     recentSessions = await db
@@ -107,7 +95,6 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
       upcomingMaintenanceCount: upcomingMaint.length,
       overdueMaintenanceCount: overdue,
       avgHealthScore: avgHealth,
-      upcomingBookingCount: upcomingBookings.length,
       totalSessionsLast30d: recentSessions.length,
       kmDrivenLast30d: Math.max(0, odoSum > 0 ? 850 : 0),
       estimatedSavingsSar: 1240,

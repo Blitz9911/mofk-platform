@@ -14,7 +14,5 @@ export const ActivityItemKind = {
   dtc_detected: "dtc_detected",
   dtc_cleared: "dtc_cleared",
   maintenance_done: "maintenance_done",
-  booking_created: "booking_created",
-  booking_completed: "booking_completed",
   ai_recommendation: "ai_recommendation",
 } as const;

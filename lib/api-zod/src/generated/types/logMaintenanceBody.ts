@@ -11,6 +11,5 @@ export interface LogMaintenanceBody {
   doneAt: Date;
   doneAtKm: number;
   cost?: number;
-  workshopId?: string;
   notes?: string;
 }
