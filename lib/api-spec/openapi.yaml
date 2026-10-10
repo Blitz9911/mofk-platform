@@ -470,6 +470,65 @@ paths:
                 items:
                   $ref: "#/components/schemas/Recommendation"
 
+  /recommendations/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateRecommendationLifecycle
+      tags: [ai]
+      summary: Defer, dismiss, mark in progress, or link a recommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [defer, dismiss, in_progress, link]
+                deferredUntil: { type: string, format: date-time }
+                maintenanceLogId: { type: string }
+                note: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+
+  /recommendations/{id}/events:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getRecommendationEvents
+      tags: [ai]
+      summary: Recommendation processing history
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    action: { type: string }
+                    fromStatus: { type: string }
+                    toStatus: { type: string }
+                    note: { type: string, nullable: true }
+                    createdAt: { type: string, format: date-time }
+
   /ai/interpret-dtc:
     post:
       operationId: interpretDtc
@@ -835,6 +894,7 @@ components:
         doneAtKm: { type: integer }
         cost: { type: integer }
         notes: { type: string }
+        recommendationId: { type: string }
 
     AiChatBody:
       type: object
@@ -877,6 +937,26 @@ components:
         suggestedAction: { type: string, nullable: true }
         suggestedCostSar: { type: integer, nullable: true }
         createdAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [active, in_progress, resolved, deferred, dismissed]
+        source: { type: string, nullable: true }
+        sourceKey: { type: string, nullable: true }
+        category:
+          type: string
+          enum: [preventive, diagnostic]
+        serviceType: { type: string, nullable: true }
+        linkedMaintenanceLogId: { type: string, nullable: true }
+        linkedMaintenanceItemId: { type: string, nullable: true }
+        lastDoneKm: { type: integer, nullable: true }
+        lastDoneAt: { type: string, format: date-time, nullable: true }
+        intervalKm: { type: integer, nullable: true }
+        intervalDays: { type: integer, nullable: true }
+        nextDueKm: { type: integer, nullable: true }
+        nextDueAt: { type: string, format: date-time, nullable: true }
+        remainingKm: { type: integer, nullable: true }
+        daysUntilDue: { type: integer, nullable: true }
+        metadata: { type: object, additionalProperties: true }
 
     InterpretDtcBody:
       type: object

@@ -14,7 +14,10 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
+import { cacheRecommendations } from "@/lib/recommendation-lifecycle";
 import { smoothBack } from "@/lib/navigation";
 import { exportPdf } from "@/lib/pdf-export";
 
@@ -82,6 +85,14 @@ function hasRealConfidence(rec: any) {
   return rec.metadata?.confidenceSource === "real" && rec.confidencePct !== undefined;
 }
 
+const STATUS_LABEL: Record<string, string> = {
+  active: "نشطة",
+  in_progress: "قيد المعالجة",
+  resolved: "مغلقة",
+  deferred: "مؤجلة",
+  dismissed: "مستبعدة",
+};
+
 function getSeverityColors(sev: string) {
   switch (sev) {
     case "critical": return { border: "#ef4444", bg: "#ef444410", icon: "#ef4444", iconName: "shield-outline" };
@@ -111,6 +122,7 @@ export default function RecommendationsScreen() {
     ...(recommendations?.filter((r) => r.severity === "warning") ?? []),
     ...(recommendations?.filter((r) => r.severity === "info") ?? []),
   ];
+  cacheRecommendations(sortedRecs);
   const criticalCount = recommendations?.filter((r) => r.severity === "critical").length ?? 0;
   const warningCount = recommendations?.filter((r) => r.severity === "warning").length ?? 0;
   const maintenanceCount = recommendations?.filter((r) => r.kind === "maintenance_due").length ?? 0;
@@ -169,11 +181,13 @@ export default function RecommendationsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: rowDir }]}>
         <Pressable onPress={() => smoothBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>التوصيات الذكية</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>التوصيات الذكية</Text>
+        </View>
         {!vehiclesLoading && !recLoading && sortedRecs.length > 0 ? (
           <Pressable onPress={exportRecommendationsPdf} style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="document-text-outline" size={18} color={colors.primary} />
@@ -224,17 +238,17 @@ export default function RecommendationsScreen() {
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="bulb-outline" size={18} color={colors.primary} />
               <Text style={[styles.summaryValue, { color: colors.foreground }]}>{sortedRecs.length}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>إجمالي التوصيات</Text>
+              <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>إجمالي التوصيات</ArabicText>
             </View>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="construct-outline" size={18} color="#f59e0b" />
               <Text style={[styles.summaryValue, { color: colors.foreground }]}>{maintenanceCount}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>صيانة قادمة</Text>
+              <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>صيانة قادمة</ArabicText>
             </View>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="warning-outline" size={18} color="#ef4444" />
               <Text style={[styles.summaryValue, { color: colors.foreground }]}>{criticalCount + warningCount}</Text>
-              <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>تحتاج انتباه</Text>
+              <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>تحتاج انتباه</ArabicText>
             </View>
           </View>
 
@@ -242,17 +256,17 @@ export default function RecommendationsScreen() {
             onPress={() => router.push("/maintenance")}
             style={({ pressed }) => [
               styles.maintenanceLink,
-              { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1 },
+              { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.78 : 1, flexDirection: rowDir },
             ]}
           >
             <View style={[styles.maintenanceIcon, { backgroundColor: colors.primary + "18" }]}>
               <Ionicons name="calendar-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.maintenanceText}>
-              <Text style={[styles.maintenanceTitle, { color: colors.foreground }]}>سجل وجدول الصيانة</Text>
-              <Text style={[styles.maintenanceDesc, { color: colors.mutedForeground }]}>
+              <ArabicText style={[styles.maintenanceTitle, { color: colors.foreground }]}>سجل وجدول الصيانة</ArabicText>
+              <ArabicText style={[styles.maintenanceDesc, { color: colors.mutedForeground }]}>
                 أضف الصيانة المنجزة عشان تصير التوصيات أدق.
-              </Text>
+              </ArabicText>
             </View>
             <Ionicons name="chevron-back" size={18} color={colors.mutedForeground} />
           </Pressable>
@@ -262,7 +276,7 @@ export default function RecommendationsScreen() {
               <Ionicons name="bulb-outline" size={52} color={colors.primary} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>لا توجد توصيات حالياً</Text>
               <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-                مركبتك تعمل بأداء مثالي. سنخبرك إذا وجدنا ما يحتاج انتباهك.
+                لا توجد توصيات مفتوحة من جدول الصيانة أو القراءات المحفوظة. هذا لا يعني أن المركبة سليمة؛ أعد الفحص التشخيصي عند الحاجة.
               </Text>
             </View>
           ) : (
@@ -271,32 +285,41 @@ export default function RecommendationsScreen() {
               const recDetails = rec as any;
               return (
                 <Animated.View key={rec.id} entering={FadeInDown.delay(i * 60).springify()}>
-                  <View style={[styles.card, { borderColor: sev.border, backgroundColor: sev.bg }]}>
+                  <Pressable
+                    onPress={() =>
+                      router.push({ pathname: "/recommendation-detail", params: { id: rec.id } })
+                    }
+                    style={[styles.card, { borderColor: sev.border, backgroundColor: sev.bg }]}
+                  >
                     {/* Top Row */}
-                    <View style={styles.cardTop}>
+                    <View style={[styles.cardTop, { flexDirection: rowDir }]}>
                       <Ionicons name={sev.iconName as any} size={22} color={sev.icon} />
-                      <View style={[styles.kindBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={[styles.kindBadge, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
                         <Ionicons name={KIND_ICON[rec.kind] as any ?? "bulb-outline"} size={12} color={colors.mutedForeground} />
                         <Text style={[styles.kindText, { color: colors.mutedForeground }]}>
-                          {KIND_LABEL[rec.kind] ?? "توصية"}
+                          {(rec as any).category === "diagnostic" ? "فحص تشخيصي" : KIND_LABEL[rec.kind] ?? "توصية"}
                         </Text>
                       </View>
                     </View>
+                    <View style={[styles.kindBadge, { alignSelf: "flex-end", backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={[styles.kindText, { color: sev.icon }]}>
+                        {STATUS_LABEL[(rec as any).status] || STATUS_LABEL.active}
+                      </Text>
+                    </View>
 
                     {/* Title */}
-                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>{rec.titleAr}</Text>
+                    <ArabicText style={[styles.cardTitle, { color: colors.foreground }]}>{rec.titleAr}</ArabicText>
 
-                    {/* Description */}
                     {rec.descriptionAr && (
-                      <Text style={[styles.cardDesc, { color: colors.mutedForeground }]}>{rec.descriptionAr}</Text>
+                      <ArabicText style={[styles.cardDesc, { color: colors.mutedForeground }]}>{rec.descriptionAr}</ArabicText>
                     )}
 
                     {/* Confidence Bar */}
                     {hasRealConfidence(rec) && (
                       <View style={styles.confWrap}>
-                        <View style={styles.confHeader}>
+                        <View style={[styles.confHeader, { flexDirection: rowDir }]}>
                           <Text style={[styles.confPct, { color: sev.icon }]}>{rec.confidencePct}%</Text>
-                          <Text style={[styles.confLabel, { color: colors.mutedForeground }]}>نسبة الثقة</Text>
+                          <ArabicText style={[styles.confLabel, { color: colors.mutedForeground }]}>نسبة الثقة</ArabicText>
                         </View>
                         <View style={[styles.confBar, { backgroundColor: colors.border }]}>
                           <View style={[styles.confFill, { width: `${rec.confidencePct}%` as any, backgroundColor: sev.icon }]} />
@@ -308,18 +331,18 @@ export default function RecommendationsScreen() {
                       <View style={[styles.maintenanceBox, { backgroundColor: colors.card + "cc", borderColor: colors.border + "80" }]}>
                         <View style={styles.maintenanceStatsRow}>
                           <View style={styles.maintenanceStat}>
-                            <Text style={[styles.maintenanceStatLabel, { color: colors.mutedForeground }]}>آخر صيانة</Text>
-                            <Text style={[styles.maintenanceStatValue, { color: colors.foreground }]}>
+                            <ArabicText style={[styles.maintenanceStatLabel, { color: colors.mutedForeground }]}>آخر صيانة</ArabicText>
+                            <ArabicText style={[styles.maintenanceStatValue, { color: colors.foreground }]}>
                               {recDetails.lastDoneKm !== undefined && recDetails.lastDoneKm !== null ? formatKm(recDetails.lastDoneKm) : safeDate(recDetails.lastDoneAt)}
-                            </Text>
+                            </ArabicText>
                           </View>
                           <View style={styles.maintenanceStat}>
-                            <Text style={[styles.maintenanceStatLabel, { color: colors.mutedForeground }]}>المتبقي</Text>
-                            <Text style={[styles.maintenanceStatValue, { color: sev.icon }]}>{getRemainingText(recDetails)}</Text>
+                            <ArabicText style={[styles.maintenanceStatLabel, { color: colors.mutedForeground }]}>المتبقي</ArabicText>
+                            <ArabicText style={[styles.maintenanceStatValue, { color: sev.icon }]}>{getRemainingText(recDetails)}</ArabicText>
                           </View>
                         </View>
                         {buildEquation(recDetails) ? (
-                          <View style={[styles.equationRow, { borderTopColor: colors.border + "50" }]}>
+                          <View style={[styles.equationRow, { borderTopColor: colors.border + "50", flexDirection: rowDir }]}>
                             <Ionicons name="information-circle-outline" size={14} color={colors.mutedForeground} />
                             <Text style={[styles.equationText, { color: colors.mutedForeground }]}>{buildEquation(recDetails)}</Text>
                           </View>
@@ -331,20 +354,20 @@ export default function RecommendationsScreen() {
                     {(rec.suggestedAction || rec.suggestedCostSar !== undefined) && (
                       <View style={[styles.actionBox, { backgroundColor: colors.card + "cc", borderColor: colors.border + "80" }]}>
                         {rec.suggestedAction && (
-                          <View style={styles.actionRow}>
-                            <Text style={[styles.actionText, { color: colors.foreground }]}>{rec.suggestedAction}</Text>
+                          <View style={[styles.actionRow, { flexDirection: rowDir }]}>
+                            <ArabicText style={[styles.actionText, { color: colors.foreground }]}>{rec.suggestedAction}</ArabicText>
                             <Ionicons name="construct-outline" size={16} color={colors.mutedForeground} />
                           </View>
                         )}
                         {rec.suggestedCostSar !== undefined && (
-                          <View style={[styles.costRow, { borderTopColor: colors.border + "50" }]}>
+                          <View style={[styles.costRow, { borderTopColor: colors.border + "50", flexDirection: rowDir }]}>
                             <Text style={[styles.costVal, { color: colors.primary }]}>{rec.suggestedCostSar} ر.س</Text>
-                            <Text style={[styles.costLabel, { color: colors.mutedForeground }]}>التكلفة التقديرية</Text>
+                            <ArabicText style={[styles.costLabel, { color: colors.mutedForeground }]}>التكلفة التقديرية</ArabicText>
                           </View>
                         )}
                       </View>
                     )}
-                  </View>
+                  </Pressable>
                 </Animated.View>
               );
             })
@@ -358,14 +381,15 @@ export default function RecommendationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitleWrap: { flex: 1, direction: "ltr" },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
   backBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
   exportBtn: {
     alignItems: "center",
@@ -379,7 +403,7 @@ const styles = StyleSheet.create({
   tabChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   tabChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   loadCenter: { flex: 1, alignItems: "center", justifyContent: "center" },
-  summaryGrid: { flexDirection: "row-reverse", gap: 8 },
+  summaryGrid: { flexDirection: "row", gap: 8 },
   summaryCard: {
     flex: 1,
     alignItems: "center",
@@ -395,12 +419,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row-reverse",
     gap: 12,
     padding: 14,
   },
   maintenanceIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  maintenanceText: { flex: 1, alignItems: "flex-end", gap: 3 },
+  maintenanceText: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 3 },
   maintenanceTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right" },
   maintenanceDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 18 },
   emptyWrap: {
@@ -414,9 +437,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
   emptyDesc: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   card: { padding: 16, borderRadius: 16, borderWidth: 1.5, gap: 10 },
-  cardTop: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
+  cardTop: { alignItems: "center", justifyContent: "space-between" },
   kindBadge: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
@@ -428,29 +450,27 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
   cardDesc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 20 },
   confWrap: { gap: 6 },
-  confHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
+  confHeader: { alignItems: "center", justifyContent: "space-between" },
   confLabel: { fontSize: 12, fontFamily: "Inter_400Regular" },
   confPct: { fontSize: 12, fontFamily: "Inter_700Bold" },
   confBar: { height: 6, borderRadius: 3, overflow: "hidden" },
   confFill: { height: "100%", borderRadius: 3 },
   maintenanceBox: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 8 },
-  maintenanceStatsRow: { flexDirection: "row-reverse", gap: 10 },
-  maintenanceStat: { flex: 1, alignItems: "flex-end", gap: 3 },
+  maintenanceStatsRow: { flexDirection: "row", gap: 10 },
+  maintenanceStat: { flex: 1, alignItems: "stretch", gap: 3 },
   maintenanceStatLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
   maintenanceStatValue: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
   equationRow: {
     alignItems: "center",
     borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row-reverse",
     gap: 6,
     paddingTop: 8,
   },
   equationText: { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 17, textAlign: "right" },
   actionBox: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 8 },
-  actionRow: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 8 },
+  actionRow: { alignItems: "flex-start", gap: 8 },
   actionText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "right" },
   costRow: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingTop: 8,

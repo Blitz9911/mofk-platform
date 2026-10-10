@@ -172,12 +172,74 @@ export const recommendationsTable = pgTable(
     titleAr: varchar("title_ar", { length: 200 }).notNull(),
     descriptionAr: text("description_ar").notNull(),
     confidencePct: smallint("confidence_pct").notNull().default(80),
-    suggestedAction: varchar("suggested_action", { length: 50 }),
+    suggestedAction: varchar("suggested_action", { length: 200 }),
     suggestedCostSar: integer("suggested_cost_sar"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    status: varchar("status", { length: 20 }).notNull().default("active"),
+    source: varchar("source", { length: 40 }),
+    sourceKey: varchar("source_key", { length: 80 }),
+    category: varchar("category", { length: 20 }),
+    serviceType: varchar("service_type", { length: 50 }),
+    linkedMaintenanceItemId: uuid("linked_maintenance_item_id"),
+    linkedMaintenanceLogId: uuid("linked_maintenance_log_id"),
+    deferredUntil: timestamp("deferred_until", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   },
   (t) => ({
     vehicleIdx: index("idx_recs_vehicle").on(t.vehicleId, t.createdAt),
+    sourceIdx: index("idx_recs_source_key").on(t.vehicleId, t.sourceKey),
+  }),
+);
+
+export const maintenanceLogsTable = pgTable(
+  "maintenance_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    serviceType: varchar("service_type", { length: 50 }).notNull(),
+    serviceTypeAr: varchar("service_type_ar", { length: 100 }),
+    customServiceName: varchar("custom_service_name", { length: 120 }),
+    doneAt: timestamp("done_at", { withTimezone: true }).notNull(),
+    doneAtKm: integer("done_at_km"),
+    costSar: integer("cost_sar"),
+    notes: text("notes"),
+    source: varchar("source", { length: 30 }).notNull().default("manual"),
+    recommendationId: uuid("recommendation_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleIdx: index("idx_maint_logs_vehicle").on(t.vehicleId, t.doneAt),
+    userIdx: index("idx_maint_logs_user").on(t.userId, t.doneAt),
+  }),
+);
+
+export const recommendationEventsTable = pgTable(
+  "recommendation_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    recommendationId: uuid("recommendation_id")
+      .notNull()
+      .references(() => recommendationsTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 40 }).notNull(),
+    fromStatus: varchar("from_status", { length: 20 }),
+    toStatus: varchar("to_status", { length: 20 }),
+    note: text("note"),
+    maintenanceLogId: uuid("maintenance_log_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    recIdx: index("idx_rec_events_rec").on(t.recommendationId, t.createdAt),
   }),
 );
 

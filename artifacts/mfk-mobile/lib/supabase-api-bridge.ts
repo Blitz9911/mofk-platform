@@ -2,6 +2,20 @@ import {
   getValidSupabaseSession,
   supabaseRequest,
 } from "@/lib/supabase";
+import {
+  buildDtcRecommendation,
+  buildMaintenanceRecommendation,
+  buildTelemetryRecommendations as engineTelemetryRecommendations,
+  sourceKeyForMaintenance,
+  visibleRecommendations,
+} from "@/lib/maintenance-engine.mjs";
+import {
+  applyMaintenanceLogToLifecycle,
+  applyOverlay,
+  getLifecycleOverlay,
+  recStorageKey,
+  recordRecommendationAction,
+} from "@/lib/recommendation-lifecycle";
 
 type VehicleRow = {
   id: string;
@@ -88,6 +102,20 @@ type DiagnosticCodeRow = {
   } | null;
 };
 
+type TelemetryRow = {
+  time: string;
+  vehicle_id: string;
+  session_id?: string | null;
+  rpm?: number | null;
+  speed_kmh?: number | null;
+  coolant_temp?: number | null;
+  intake_temp?: number | null;
+  battery_v?: number | string | null;
+  fuel_level_pct?: number | null;
+  engine_load?: number | null;
+  throttle_pos?: number | null;
+};
+
 type SubscriptionPlanRow = {
   id: string;
   name: string;
@@ -102,6 +130,65 @@ type SubscriptionPlanRow = {
   is_popular?: boolean | null;
   sort_order?: number | null;
 };
+
+const FALLBACK_SUBSCRIPTION_PLANS: SubscriptionPlanRow[] = [
+  {
+    id: "free",
+    name: "Free",
+    name_ar: "باقة مجانية",
+    description_ar: "إدارة مركبة واحدة بدون جهاز وبدون دفع",
+    price_monthly_sar: 0,
+    price_yearly_sar: 0,
+    max_vehicles: 1,
+    tier: "free",
+    features: ["One vehicle", "Maintenance log", "Fuel log"],
+    features_ar: ["مركبة واحدة", "سجل الصيانة", "سجل البنزين والصرفية"],
+    is_popular: false,
+    sort_order: 1,
+  },
+  {
+    id: "mofk",
+    name: "Mofk",
+    name_ar: "باقة مفك",
+    description_ar: "اشتراك مدفوع لمركبة واحدة مع جهاز مفك OBD",
+    price_monthly_sar: 29,
+    price_yearly_sar: 290,
+    max_vehicles: 1,
+    tier: "mofk",
+    features: ["OBD diagnostics", "Unlimited AI assistant", "PDF export"],
+    features_ar: ["تشخيص OBD", "رسائل المساعد الذكي غير محدودة", "تصدير PDF"],
+    is_popular: true,
+    sort_order: 2,
+  },
+  {
+    id: "family",
+    name: "Family",
+    name_ar: "باقة العائلة",
+    description_ar: "لعدة مركبات مع تقارير أعمق وتصدير PDF",
+    price_monthly_sar: 59,
+    price_yearly_sar: 590,
+    max_vehicles: 3,
+    tier: "family",
+    features: ["Up to 3 vehicles", "Advanced health reports", "Priority support"],
+    features_ar: ["حتى 3 مركبات", "تقارير صحة متقدمة", "دعم أولوية"],
+    is_popular: false,
+    sort_order: 3,
+  },
+  {
+    id: "fleet",
+    name: "Fleet",
+    name_ar: "باقة الاسطول",
+    description_ar: "للشركات: التفاصيل والتسعير في الموقع",
+    price_monthly_sar: 0,
+    price_yearly_sar: null,
+    max_vehicles: null,
+    tier: "fleet",
+    features: [],
+    features_ar: [],
+    is_popular: false,
+    sort_order: 4,
+  },
+];
 
 type BookingRow = {
   id: string;
@@ -708,6 +795,10 @@ function completedMaintenanceItem(
     createdAt: row.created_at,
     updatedAt:
       row.updated_at ?? row.created_at,
+    vehicleMake: row.vehicles?.make ?? null,
+    vehicleModel: row.vehicles?.model ?? null,
+    vehicleNickname: row.vehicles?.nickname ?? null,
+    vehicleOdometerKm: row.vehicles?.odometer_km ?? null,
   };
 }
 
@@ -731,7 +822,119 @@ function healthTrend(score: number) {
   );
 }
 
-function liveTelemetry(vehicleId: string) {
+function telemetryPointFromRow(row: TelemetryRow) {
+  return {
+    time: row.time,
+    rpm: row.rpm ?? null,
+    speedKmh: row.speed_kmh ?? null,
+    coolantTemp: row.coolant_temp ?? null,
+    intakeTemp: row.intake_temp ?? null,
+    batteryV:
+      row.battery_v === null ||
+      row.battery_v === undefined
+        ? null
+        : Number(row.battery_v),
+    fuelLevelPct: row.fuel_level_pct ?? null,
+    engineLoad: row.engine_load ?? null,
+    throttlePos: row.throttle_pos ?? null,
+  };
+}
+
+async function latestTelemetryPoint(
+  vehicleId: string,
+  accessToken: string,
+) {
+  try {
+    const rows =
+      await supabaseRequest<TelemetryRow[]>(
+        `/rest/v1/telemetry?select=time,vehicle_id,session_id,rpm,speed_kmh,coolant_temp,intake_temp,battery_v,fuel_level_pct,engine_load,throttle_pos&vehicle_id=eq.${encodeURIComponent(
+          vehicleId,
+        )}&order=time.desc&limit=1`,
+        {
+          method: "GET",
+        },
+        accessToken,
+      );
+
+    return rows[0]
+      ? telemetryPointFromRow(rows[0])
+      : null;
+  } catch (error) {
+    if (isMissingTelemetryTableError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function buildTelemetryRecommendations(
+  vehicleId: string,
+  latest: ReturnType<typeof telemetryPointFromRow> | null,
+) {
+  if (!latest) return [];
+
+  const recs: ReturnType<typeof toRecommendation>[] = [];
+
+  if (
+    latest.coolantTemp != null &&
+    latest.coolantTemp >= 105
+  ) {
+    recs.push({
+      id: `telemetry-coolant-${vehicleId}`,
+      vehicleId,
+      kind: "telemetry_anomaly",
+      severity: "critical",
+      titleAr: "حرارة المحرك مرتفعة",
+      descriptionAr: `آخر قراءة محفوظة لحرارة سائل التبريد ${Math.round(latest.coolantTemp)}°م. راجع التبريد قبل الصيانة الدورية.`,
+      confidencePct: 90,
+      suggestedAction: "أوقف القيادة إذا استمر الارتفاع وراجع نظام التبريد.",
+      suggestedCostSar: null,
+      createdAt: latest.time,
+    });
+  }
+
+  if (
+    latest.fuelLevelPct != null &&
+    latest.fuelLevelPct <= 15
+  ) {
+    recs.push({
+      id: `telemetry-fuel-${vehicleId}`,
+      vehicleId,
+      kind: "telemetry_anomaly",
+      severity: "warning",
+      titleAr: "الخزان يحتاج تعبئة",
+      descriptionAr: `آخر قراءة محفوظة لمستوى البنزين ${Math.round(latest.fuelLevelPct)}%. سجّل التعبئة بعد المحطة.`,
+      confidencePct: 86,
+      suggestedAction: "افتح صفحة البنزين وسجّل التعبئة.",
+      suggestedCostSar: null,
+      createdAt: latest.time,
+    });
+  }
+
+  if (
+    latest.batteryV != null &&
+    latest.batteryV > 0 &&
+    latest.batteryV < 12.2
+  ) {
+    recs.push({
+      id: `telemetry-battery-${vehicleId}`,
+      vehicleId,
+      kind: "telemetry_anomaly",
+      severity: "warning",
+      titleAr: "جهد البطارية منخفض",
+      descriptionAr: `آخر قراءة محفوظة لجهد البطارية ${latest.batteryV.toFixed(1)} فولت. راقب البطارية مع الصيانة الدورية.`,
+      confidencePct: 80,
+      suggestedAction: "افحص البطارية والشحن عند أقرب صيانة.",
+      suggestedCostSar: null,
+      createdAt: latest.time,
+    });
+  }
+
+  return recs;
+}
+
+function emptyLiveTelemetry(vehicleId: string) {
   return {
     vehicleId,
     isConnected: false,
@@ -748,6 +951,187 @@ function liveTelemetry(vehicleId: string) {
     },
     recent: [],
   };
+}
+
+function isMissingTelemetryTableError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return (
+    message.includes("telemetry") &&
+    (message.includes("Could not find") ||
+      message.includes("does not exist") ||
+      message.includes("schema cache"))
+  );
+}
+
+async function liveTelemetry(
+  vehicleId: string,
+  accessToken: string,
+  userId: string,
+) {
+  const vehicle = await getVehicleRow(
+    vehicleId,
+    accessToken,
+    userId,
+  );
+
+  if (!vehicle) {
+    throw new ApiBridgeError(
+      "المركبة غير موجودة.",
+      404,
+    );
+  }
+
+  const since = new Date(
+    Date.now() - 30 * 60 * 1000,
+  ).toISOString();
+
+  let rows: TelemetryRow[] = [];
+
+  try {
+    rows =
+      await supabaseRequest<TelemetryRow[]>(
+        `/rest/v1/telemetry?select=time,vehicle_id,session_id,rpm,speed_kmh,coolant_temp,intake_temp,battery_v,fuel_level_pct,engine_load,throttle_pos&vehicle_id=eq.${encodeURIComponent(
+          vehicleId,
+        )}&time=gte.${encodeURIComponent(
+          since,
+        )}&order=time.desc&limit=60`,
+        {
+          method: "GET",
+        },
+        accessToken,
+      );
+  } catch (error) {
+    if (!isMissingTelemetryTableError(error)) {
+      throw error;
+    }
+  }
+
+  if (!rows.length) {
+    return {
+      ...emptyLiveTelemetry(vehicleId),
+      isConnected: Boolean(
+        vehicle.adapter_mac,
+      ),
+    };
+  }
+
+  const recent = rows
+    .slice()
+    .reverse()
+    .map(telemetryPointFromRow);
+
+  return {
+    vehicleId,
+    isConnected: true,
+    latest: telemetryPointFromRow(rows[0]),
+    recent,
+  };
+}
+
+function optionalNumber(
+  value: unknown,
+): number | null {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : null;
+}
+
+async function saveTelemetryPoint(
+  vehicleId: string,
+  body: Record<string, unknown>,
+  accessToken: string,
+  userId: string,
+) {
+  const vehicle = await getVehicleRow(
+    vehicleId,
+    accessToken,
+    userId,
+  );
+
+  if (!vehicle) {
+    throw new ApiBridgeError(
+      "المركبة غير موجودة.",
+      404,
+    );
+  }
+
+  const sessionId =
+    typeof body.sessionId === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      body.sessionId,
+    )
+      ? body.sessionId
+      : null;
+
+  const payload: Record<string, unknown> = {
+    vehicle_id: vehicleId,
+    time:
+      typeof body.time === "string"
+        ? body.time
+        : new Date().toISOString(),
+    rpm: optionalNumber(body.rpm),
+    speed_kmh: optionalNumber(
+      body.speedKmh,
+    ),
+    coolant_temp: optionalNumber(
+      body.coolantTemp,
+    ),
+    intake_temp: optionalNumber(
+      body.intakeTemp,
+    ),
+    battery_v: optionalNumber(
+      body.batteryV,
+    ),
+    fuel_level_pct: optionalNumber(
+      body.fuelLevelPct,
+    ),
+    engine_load: optionalNumber(
+      body.engineLoad,
+    ),
+    throttle_pos: optionalNumber(
+      body.throttlePos,
+    ),
+  };
+
+  if (sessionId) {
+    payload.session_id = sessionId;
+  }
+
+  try {
+    const rows =
+      await supabaseRequest<TelemetryRow[]>(
+        "/rest/v1/telemetry?select=time,vehicle_id,session_id,rpm,speed_kmh,coolant_temp,intake_temp,battery_v,fuel_level_pct,engine_load,throttle_pos",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer:
+              "return=representation",
+          },
+          body: JSON.stringify(payload),
+        },
+        accessToken,
+      );
+
+    return telemetryPointFromRow(rows[0]);
+  } catch (error) {
+    if (!isMissingTelemetryTableError(error)) {
+      throw error;
+    }
+
+    return telemetryPointFromRow(payload as TelemetryRow);
+  }
 }
 
 function toSubscriptionPlan(row: SubscriptionPlanRow) {
@@ -829,6 +1213,7 @@ function toDtcCode(row: DiagnosticCodeRow) {
 }
 
 function toRecommendation(row: RecommendationRow) {
+  const metadata = (row as { metadata?: Record<string, unknown> }).metadata ?? {};
   return {
     id: row.id,
     vehicleId: row.vehicle_id,
@@ -836,10 +1221,14 @@ function toRecommendation(row: RecommendationRow) {
     severity: row.severity ?? "info",
     titleAr: row.title_ar,
     descriptionAr: row.description_ar ?? "",
-    confidencePct: row.confidence_pct ?? undefined,
+    confidencePct: metadata.confidenceSource === "measured" ? row.confidence_pct ?? undefined : undefined,
     suggestedAction: row.suggested_action ?? null,
     suggestedCostSar: row.suggested_cost_sar ?? null,
     createdAt: row.created_at ?? undefined,
+    status: (row as { status?: string }).status ?? "active",
+    source: (row as { source?: string }).source ?? null,
+    sourceKey: (row as { source_key?: string }).source_key ?? `legacy:${row.title_ar}`,
+    category: (row as { category?: string }).category ?? null,
   };
 }
 
@@ -1527,6 +1916,16 @@ async function handleMaintenance(
       );
     }
 
+    await applyMaintenanceLogToLifecycle({
+      vehicleId,
+      serviceType,
+      logId: rows[0].id,
+      recommendationId:
+        typeof body.recommendationId === "string"
+          ? body.recommendationId
+          : null,
+    });
+
     return {
       handled: true,
       data: completedMaintenanceItem(
@@ -1537,6 +1936,18 @@ async function handleMaintenance(
   }
 
   const updateLogMatch = path.match(/^\/api\/maintenance\/logs\/([^/]+)$/);
+  if (updateLogMatch && method === "GET") {
+    const id = decodeURIComponent(updateLogMatch[1]);
+    const rows = await supabaseRequest<MaintenanceLogRow[]>(
+      `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      { method: "GET" },
+      session.access_token,
+    );
+    if (!rows[0]) {
+      throw new ApiBridgeError("سجل الصيانة غير موجود.", 404);
+    }
+    return { handled: true, data: completedMaintenanceItem(rows[0]) };
+  }
   if (updateLogMatch && (method === "PATCH" || method === "DELETE")) {
     const id = decodeURIComponent(updateLogMatch[1]);
 
@@ -1637,7 +2048,7 @@ async function handleSubscriptions(
 
     return {
       handled: true,
-      data: rows.map(toSubscriptionPlan),
+      data: (rows.length ? rows : FALLBACK_SUBSCRIPTION_PLANS).map(toSubscriptionPlan),
     };
   }
 
@@ -2061,60 +2472,100 @@ async function handleAi(
   if (match && method === "GET") {
     const session = await requireSession();
     const vehicleId = decodeURIComponent(match[1]);
-
-    const rows = await supabaseRequest<RecommendationRow[]>(
-      `/rest/v1/recommendations?select=*&user_id=eq.${encodeURIComponent(
-        session.user.id,
-      )}&vehicle_id=eq.${encodeURIComponent(vehicleId)}&order=created_at.desc`,
-      {
-        method: "GET",
-      },
+    const vehicle = await getVehicleRow(
+      vehicleId,
       session.access_token,
+      session.user.id,
     );
-
-    if (!rows.length) {
-      const maintenanceRows = await listMaintenanceLogs(
-        session.access_token,
-        session.user.id,
-        vehicleId,
-      );
-
-      const recommendations = buildMaintenanceRecommendations(
-        maintenanceRows,
-      )
-        .slice(0, 5)
-        .map((item) => ({
-          id: `maintenance-${item.id}`,
-          vehicleId,
-          kind: "maintenance_due",
-          severity:
-            item.status === "overdue"
-              ? "critical"
-              : item.status === "upcoming"
-                ? "warning"
-                : "info",
-          titleAr: item.serviceTypeAr
-            ? `${item.serviceTypeAr} تحتاج متابعة`
-            : "صيانة تحتاج متابعة",
-          descriptionAr:
-            item.status === "overdue"
-              ? "يوجد بند صيانة متأخر حسب آخر سجل محفوظ للمركبة."
-              : "هذه توصية مبنية على سجل الصيانة المحفوظ للمركبة.",
-          confidencePct: item.status === "scheduled" ? 72 : 88,
-          suggestedAction: "راجع جدول الصيانة وسجل آخر قراءة للعداد.",
-          suggestedCostSar: item.estimatedCost ?? null,
-          createdAt: new Date().toISOString(),
-        }));
-
-      return {
-        handled: true,
-        data: recommendations,
-      };
+    if (!vehicle) {
+      throw new ApiBridgeError("المركبة غير موجودة.", 404);
     }
 
+    const overlay = await getLifecycleOverlay();
+    const latest = await latestTelemetryPoint(
+      vehicleId,
+      session.access_token,
+    );
+    const telemetryRecs = engineTelemetryRecommendations(vehicleId, latest);
+
+    const maintenanceRows = await listMaintenanceLogs(
+      session.access_token,
+      session.user.id,
+      vehicleId,
+    );
+    const maintenanceRecs = latestMaintenanceRows(maintenanceRows)
+      .map((row) =>
+        buildMaintenanceRecommendation({
+          vehicleId,
+          serviceType: row.service_type,
+          lastDoneKm: row.done_at_km,
+          lastDoneAt: row.done_at,
+          odometerKm: vehicle.odometer_km ?? row.done_at_km,
+          estimatedCost: row.actual_cost_sar ?? row.cost_sar,
+        }),
+      )
+      .filter(Boolean)
+      .map((item: any) => ({
+        ...item,
+        id: `maintenance-${vehicleId}-${item.serviceType}`,
+        createdAt: item.lastDoneAt || new Date().toISOString(),
+      }));
+
+    let dtcRecs: ReturnType<typeof buildDtcRecommendation>[] = [];
+    try {
+      const dtcRows = await supabaseRequest<DiagnosticCodeRow[]>(
+        `/rest/v1/diagnostic_codes?select=*&user_id=eq.${encodeURIComponent(
+          session.user.id,
+        )}&vehicle_id=eq.${encodeURIComponent(vehicleId)}&status=in.(open,active,pending)`,
+        { method: "GET" },
+        session.access_token,
+      );
+      dtcRecs = dtcRows
+        .map((row) =>
+          buildDtcRecommendation({
+            vehicleId,
+            code: row.code,
+            descriptionAr: row.title ?? row.explanation ?? undefined,
+            severity: row.severity,
+          }),
+        )
+        .filter(Boolean)
+        .map((item: any) => ({
+          ...item,
+          id: `dtc-${vehicleId}-${item.sourceKey}`,
+          createdAt: new Date().toISOString(),
+        }));
+    } catch {
+      dtcRecs = [];
+    }
+
+    const stored = await supabaseRequest<RecommendationRow[]>(
+      `/rest/v1/recommendations?select=*&vehicle_id=eq.${encodeURIComponent(
+        vehicleId,
+      )}&order=created_at.desc`,
+      { method: "GET" },
+      session.access_token,
+    ).catch(() => [] as RecommendationRow[]);
+
+    const combined = [
+      ...telemetryRecs.map((item) => ({
+        ...item,
+        id: `${item.sourceKey}-${vehicleId}`,
+        createdAt: latest?.time || new Date().toISOString(),
+      })),
+      ...maintenanceRecs,
+      ...dtcRecs,
+      ...stored.map(toRecommendation),
+    ];
+    const unique = new Map<string, (typeof combined)[number]>();
+    for (const rec of combined) {
+      const key = recStorageKey(rec as any) || rec.id;
+      if (!unique.has(key)) unique.set(key, rec);
+    }
+    const withLifecycle = [...unique.values()].map((rec) => applyOverlay(rec as any, overlay));
     return {
       handled: true,
-      data: rows.map(toRecommendation),
+      data: visibleRecommendations(withLifecycle),
     };
   }
 
@@ -2652,18 +3103,38 @@ async function handleRequest(
     /^\/api\/diagnostics\/live\/([^/]+)$/,
   );
 
-  if (
-    liveMatch &&
-    method === "GET"
-  ) {
-    await requireSession();
+  if (liveMatch && method === "GET") {
+    const session = await requireSession();
 
     return {
       handled: true,
-      data: liveTelemetry(
+      data: await liveTelemetry(
         decodeURIComponent(
           liveMatch[1],
         ),
+        session.access_token,
+        session.user.id,
+      ),
+    };
+  }
+
+  if (liveMatch && method === "POST") {
+    const session = await requireSession();
+    const body = await readJsonBody(
+      input,
+      init,
+    );
+
+    return {
+      handled: true,
+      status: 201,
+      data: await saveTelemetryPoint(
+        decodeURIComponent(
+          liveMatch[1],
+        ),
+        body,
+        session.access_token,
+        session.user.id,
       ),
     };
   }
@@ -2692,6 +3163,31 @@ async function handleRequest(
       handled: true,
       data: [],
     };
+  }
+
+  const recAction = path.match(/^\/api\/recommendations\/([^/]+)(?:\/(events))?$/);
+  if (recAction) {
+    await requireSession();
+    const recId = decodeURIComponent(recAction[1]);
+    const overlay = await getLifecycleOverlay();
+    const row = overlay[recId] ?? {};
+    if (recAction[2] === "events" && method === "GET") {
+      return { handled: true, data: row.events ?? [] };
+    }
+    if (method === "PATCH") {
+      const body = await readJsonBody(input, init);
+      const saved = await recordRecommendationAction(
+        { id: recId, vehicleId: String(body.vehicleId ?? ""), kind: String(body.kind ?? "maintenance_due"), sourceKey: body.sourceKey ? String(body.sourceKey) : recId, status: row.status },
+        String(body.action ?? "in_progress"),
+        {
+          status: undefined,
+          deferredUntil: body.deferredUntil ? String(body.deferredUntil) : null,
+          linkedMaintenanceLogId: body.maintenanceLogId ? String(body.maintenanceLogId) : null,
+          note: body.note ? String(body.note) : null,
+        },
+      );
+      return { handled: true, data: { id: recId, ...saved } };
+    }
   }
 
   if (

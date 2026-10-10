@@ -19,4 +19,20 @@ export interface Recommendation {
   suggestedAction?: string | null;
   suggestedCostSar?: number | null;
   createdAt?: Date;
+  status?: "active" | "in_progress" | "resolved" | "deferred" | "dismissed";
+  source?: string | null;
+  sourceKey?: string | null;
+  category?: "preventive" | "diagnostic";
+  serviceType?: string | null;
+  linkedMaintenanceLogId?: string | null;
+  linkedMaintenanceItemId?: string | null;
+  lastDoneKm?: number | null;
+  lastDoneAt?: Date | string | null;
+  intervalKm?: number | null;
+  intervalDays?: number | null;
+  nextDueKm?: number | null;
+  nextDueAt?: Date | string | null;
+  remainingKm?: number | null;
+  daysUntilDue?: number | null;
+  metadata?: Record<string, unknown>;
 }

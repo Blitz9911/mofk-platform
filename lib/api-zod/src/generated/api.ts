@@ -492,6 +492,7 @@ export const LogMaintenanceBody = zod.object({
   doneAtKm: zod.number(),
   cost: zod.number().optional(),
   notes: zod.string().optional(),
+  recommendationId: zod.string().optional(),
 });
 
 /**
@@ -571,6 +572,24 @@ export const GetAiRecommendationsResponseItem = zod.object({
   suggestedAction: zod.string().nullish(),
   suggestedCostSar: zod.number().nullish(),
   createdAt: zod.coerce.date().optional(),
+  status: zod
+    .enum(["active", "in_progress", "resolved", "deferred", "dismissed"])
+    .optional(),
+  source: zod.string().nullish(),
+  sourceKey: zod.string().nullish(),
+  category: zod.enum(["preventive", "diagnostic"]).optional(),
+  serviceType: zod.string().nullish(),
+  linkedMaintenanceLogId: zod.string().nullish(),
+  linkedMaintenanceItemId: zod.string().nullish(),
+  lastDoneKm: zod.number().nullish(),
+  lastDoneAt: zod.coerce.date().nullish(),
+  intervalKm: zod.number().nullish(),
+  intervalDays: zod.number().nullish(),
+  nextDueKm: zod.number().nullish(),
+  nextDueAt: zod.coerce.date().nullish(),
+  remainingKm: zod.number().nullish(),
+  daysUntilDue: zod.number().nullish(),
+  metadata: zod.record(zod.any()).optional(),
 });
 export const GetAiRecommendationsResponse = zod.array(
   GetAiRecommendationsResponseItem,

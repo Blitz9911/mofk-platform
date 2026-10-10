@@ -124,6 +124,7 @@ function RootLayoutNav() {
       <Stack.Screen name="fuel" options={cardScreenOptions} />
       <Stack.Screen name="bookings" options={cardScreenOptions} />
       <Stack.Screen name="recommendations" options={cardScreenOptions} />
+      <Stack.Screen name="recommendation-detail" options={cardScreenOptions} />
       <Stack.Screen name="subscription" options={cardScreenOptions} />
       <Stack.Screen name="profile-edit" options={cardScreenOptions} />
       <Stack.Screen name="my-orders" options={cardScreenOptions} />

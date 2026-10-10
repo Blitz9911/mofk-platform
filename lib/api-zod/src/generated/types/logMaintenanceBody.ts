@@ -12,4 +12,5 @@ export interface LogMaintenanceBody {
   doneAtKm: number;
   cost?: number;
   notes?: string;
+  recommendationId?: string;
 }
