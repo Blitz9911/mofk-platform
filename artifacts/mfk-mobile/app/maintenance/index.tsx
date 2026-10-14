@@ -58,35 +58,6 @@ import {
 
 const todayIso = () => new Date().toISOString().split("T")[0];
 
-function SummaryCard({
-  title,
-  value,
-  icon,
-  color,
-  suffix,
-}: {
-  title: string;
-  value: string | number;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  suffix?: string;
-}) {
-  const colors = useColors();
-
-  return (
-    <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.summaryIcon, { backgroundColor: `${color}18` }]}>
-        <Ionicons name={icon} size={20} color={color} />
-      </View>
-      <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{title}</ArabicText>
-      <Text style={[styles.summaryValue, { color }]}>
-        {value}
-        {suffix ? <Text style={[styles.summarySuffix, { color: colors.mutedForeground }]}> {suffix}</Text> : null}
-      </Text>
-    </View>
-  );
-}
-
 function SelectSheet({
   visible,
   title,
@@ -379,7 +350,14 @@ function ManualMaintenanceModal({
       {
         onSuccess: async (item) => {
           if (invoice && item?.id) {
-            await saveMaintenanceInvoice(item.id, invoice);
+            try {
+              await saveMaintenanceInvoice(item.id, invoice);
+            } catch (error) {
+              Alert.alert(
+                "الصيانة حُفظت بدون فاتورة",
+                error instanceof Error ? error.message : "تعذر حفظ ملف الفاتورة.",
+              );
+            }
           }
           queryClient.invalidateQueries({ queryKey: MAINTENANCE_LOGS_QUERY_KEY });
           queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] || "").includes("recommendations") });
@@ -703,38 +681,24 @@ export default function MaintenanceScreen() {
         </Pressable>
         <View style={styles.headerText}>
           <ArabicText style={[styles.headerTitle, { color: colors.foreground }]}>الصيانة</ArabicText>
-          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>السجل والتفاصيل لكل عملية</ArabicText>
+          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>سجل العمليات المنفذة</ArabicText>
         </View>
-        {!isLoading && sortedLogs.length > 0 ? (
-          <Pressable onPress={exportMaintenancePdf} style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+        <View style={[styles.headerActions, { flexDirection: rowDir }]}>
+          {!isLoading && sortedLogs.length > 0 ? (
+            <Pressable onPress={exportMaintenancePdf} style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => setManualOpen(true)} style={[styles.headerAdd, { backgroundColor: colors.primary }]}>
+            <Ionicons name="add" size={18} color="#fff" />
           </Pressable>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        </View>
       </View>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === "web" ? 96 : 126, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.hero, { flexDirection: rowDir }]}>
-          <View style={styles.heroText}>
-            <ArabicText style={[styles.eyebrow, { color: colors.primary }]}>الصيانة</ArabicText>
-            <ArabicText style={[styles.title, { color: colors.foreground }]}>سجل الصيانة</ArabicText>
-            <ArabicText style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              اضغط أي عملية لفتح تفاصيلها كاملة: التاريخ، العداد، التكلفة، والملاحظات والفاتورة.
-            </ArabicText>
-          </View>
-          <Pressable
-            onPress={() => setManualOpen(true)}
-            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addBtnText}>إضافة</Text>
-          </Pressable>
-        </View>
-
         {isLoading ? (
           <View style={styles.loadCenter}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -758,17 +722,23 @@ export default function MaintenanceScreen() {
               </View>
             ) : null}
 
-            <View style={styles.summaryGrid}>
-              <SummaryCard title="إجمالي الصيانات" value={sortedLogs.length} icon="clipboard-outline" color={colors.primary} />
-              <SummaryCard title="هذا الشهر" value={logsThisMonth.length} icon="calendar-outline" color="#3b82f6" />
-              <SummaryCard title="المركبات" value={uniqueVehiclesCount} icon="car-outline" color="#f59e0b" />
-              <SummaryCard
-                title="إجمالي التكاليف"
-                value={Number(totalCost.toFixed(0)).toLocaleString("ar-SA")}
-                icon="receipt-outline"
-                color="#F59E0B"
-                suffix="ر.س"
-              />
+            <View style={[styles.insightBar, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.foreground }]}>{sortedLogs.length}</ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>عمليات</ArabicText>
+              </View>
+              <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.foreground }]}>{logsThisMonth.length}</ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>هذا الشهر</ArabicText>
+              </View>
+              <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.primary }]}>
+                  {Number(totalCost.toFixed(0)).toLocaleString("ar-SA")}
+                </ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>ر.س إجمالي</ArabicText>
+              </View>
             </View>
 
             <View style={[styles.noteCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}34`, flexDirection: rowDir }]}>
@@ -843,16 +813,17 @@ export default function MaintenanceScreen() {
               </View>
             ) : (
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <ArabicText style={[styles.sectionHint, { color: colors.mutedForeground }]}>اضغط الكرت لفتح التفاصيل</ArabicText>
-                  <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>
-                    السجل ({visibleLogs.length})
-                  </ArabicText>
+                <View style={[styles.sectionHeader, { flexDirection: rowDir }]}>
+                  <ArabicText style={[styles.sectionHint, { color: colors.mutedForeground }]}>اضغط لفتح التفاصيل</ArabicText>
+                  <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>السجل</ArabicText>
                 </View>
 
                 {groupedLogs.map((group) => (
                   <View key={group.title} style={styles.monthGroup}>
-                    <ArabicText style={[styles.monthTitle, { color: colors.mutedForeground }]}>{group.title}</ArabicText>
+                    <View style={[styles.monthRow, { flexDirection: rowDir }]}>
+                      <View style={[styles.monthDot, { backgroundColor: colors.primary }]} />
+                      <ArabicText style={[styles.monthTitle, { color: colors.mutedForeground }]}>{group.title}</ArabicText>
+                    </View>
                     {group.items.map((item: any) => {
                       const invoice = invoices[item.id];
                       return (
@@ -864,43 +835,54 @@ export default function MaintenanceScreen() {
                             {
                               backgroundColor: colors.card,
                               borderColor: colors.border,
-                              opacity: pressed ? 0.86 : 1,
+                              opacity: pressed ? 0.88 : 1,
                             },
                           ]}
                           accessibilityRole="button"
                           accessibilityLabel={`تفاصيل ${logTitle(item)}`}
                         >
-                          <View style={[styles.logTop, { flexDirection: rowDir }]}>
-                            <Ionicons name="chevron-back" size={18} color={colors.mutedForeground} />
-                            <View style={[styles.logIcon, { backgroundColor: `${colors.primary}18` }]}>
-                              <Ionicons name={serviceIcon(item.serviceType)} size={20} color={colors.primary} />
-                            </View>
-                            <View style={styles.logTitleWrap}>
-                              <ArabicText style={[styles.logTitle, { color: colors.foreground }]}>{logTitle(item)}</ArabicText>
-                              <ArabicText style={[styles.logVehicle, { color: colors.mutedForeground }]}>
-                                {vehicleName(item, vehicles)}
-                              </ArabicText>
-                            </View>
-                          </View>
-                          <View style={[styles.logMeta, { flexDirection: rowDir }]}>
-                            <View style={[styles.metaPill, { backgroundColor: colors.background, borderColor: colors.border, flexDirection: rowDir }]}>
-                              <ArabicText style={[styles.metaText, { color: colors.foreground }]}>{formatDate(doneAtOf(item))}</ArabicText>
-                              <Ionicons name="calendar-outline" size={13} color={colors.mutedForeground} />
-                            </View>
-                            <View style={[styles.metaPill, { backgroundColor: colors.background, borderColor: colors.border, flexDirection: rowDir }]}>
-                              <ArabicText style={[styles.metaText, { color: colors.foreground }]}>{formatKm(doneKmOf(item))}</ArabicText>
-                              <Ionicons name="speedometer-outline" size={13} color={colors.mutedForeground} />
-                            </View>
-                            <View style={[styles.metaPill, { backgroundColor: colors.background, borderColor: colors.border, flexDirection: rowDir }]}>
-                              <ArabicText style={[styles.metaText, { color: colors.foreground }]}>{formatSar(costOf(item))}</ArabicText>
-                              <Ionicons name="cash-outline" size={13} color={colors.mutedForeground} />
-                            </View>
-                            {invoice ? (
-                              <View style={[styles.metaPill, { backgroundColor: `${colors.primary}14`, borderColor: `${colors.primary}40`, flexDirection: rowDir }]}>
-                                <ArabicText style={[styles.metaText, { color: colors.primary }]}>فاتورة</ArabicText>
-                                <Ionicons name="attach-outline" size={13} color={colors.primary} />
+                          <View style={[styles.logAccent, { backgroundColor: colors.primary }]} />
+                          <View style={styles.logBody}>
+                            <View style={[styles.logTop, { flexDirection: rowDir }]}>
+                              <Ionicons name="chevron-back" size={16} color={colors.mutedForeground} />
+                              {invoice ? (
+                                <View style={[styles.invoiceBadge, { backgroundColor: `${colors.primary}18` }]}>
+                                  <Ionicons name="document-attach-outline" size={12} color={colors.primary} />
+                                  <ArabicText style={[styles.invoiceBadgeText, { color: colors.primary }]}>فاتورة</ArabicText>
+                                </View>
+                              ) : null}
+                              <View style={[styles.logIcon, { backgroundColor: `${colors.primary}16` }]}>
+                                <Ionicons name={serviceIcon(item.serviceType)} size={20} color={colors.primary} />
                               </View>
-                            ) : null}
+                              <View style={styles.logTitleWrap}>
+                                <ArabicText style={[styles.logTitle, { color: colors.foreground }]}>{logTitle(item)}</ArabicText>
+                                <ArabicText style={[styles.logVehicle, { color: colors.mutedForeground }]}>
+                                  {vehicleName(item, vehicles)}
+                                </ArabicText>
+                              </View>
+                            </View>
+                            <View style={[styles.metrics, { backgroundColor: colors.background, flexDirection: rowDir }]}>
+                              <View style={styles.metric}>
+                                <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>التاريخ</ArabicText>
+                                <ArabicText style={[styles.metricValue, { color: colors.foreground }]} numberOfLines={1}>
+                                  {formatDate(doneAtOf(item))}
+                                </ArabicText>
+                              </View>
+                              <View style={[styles.metricSplit, { backgroundColor: colors.border }]} />
+                              <View style={styles.metric}>
+                                <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>العداد</ArabicText>
+                                <ArabicText style={[styles.metricValue, { color: colors.foreground }]} numberOfLines={1}>
+                                  {formatKm(doneKmOf(item))}
+                                </ArabicText>
+                              </View>
+                              <View style={[styles.metricSplit, { backgroundColor: colors.border }]} />
+                              <View style={styles.metric}>
+                                <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>التكلفة</ArabicText>
+                                <ArabicText style={[styles.metricValue, { color: colors.primary }]} numberOfLines={1}>
+                                  {formatSar(costOf(item))}
+                                </ArabicText>
+                              </View>
+                            </View>
                           </View>
                         </Pressable>
                       );
@@ -946,7 +928,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, direction: "ltr", alignItems: "stretch", gap: 3 },
   headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
   headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
-  headerSpacer: { width: 42 },
+  headerActions: { alignItems: "center", gap: 8 },
   exportBtn: {
     width: 42,
     height: 42,
@@ -955,36 +937,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
   },
-  hero: { alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  heroText: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 4 },
-  eyebrow: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right" },
-  title: { fontSize: 28, fontFamily: "Inter_700Bold", textAlign: "right" },
-  subtitle: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right" },
-  addBtn: {
-    minHeight: 42,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    flexDirection: "row",
+  headerAdd: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
   },
-  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   loadCenter: { paddingVertical: 60, alignItems: "center", justifyContent: "center" },
-  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  summaryCard: {
-    width: "48%",
-    minHeight: 116,
-    padding: 14,
-    borderRadius: 16,
+  insightBar: {
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "flex-end",
-    justifyContent: "space-between",
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: "center",
   },
-  summaryIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  summaryLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "right" },
-  summaryValue: { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "right" },
-  summarySuffix: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  insightCell: { flex: 1, alignItems: "center", gap: 4 },
+  insightValue: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "center" },
+  insightLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  insightDivider: { width: StyleSheet.hairlineWidth, height: 36 },
   noteCard: { gap: 12, padding: 14, borderRadius: 16, borderWidth: 1 },
   noteIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   noteText: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 4 },
@@ -1012,9 +983,9 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   section: { gap: 12 },
-  sectionHeader: { alignItems: "stretch", gap: 2 },
+  sectionHeader: { alignItems: "baseline", justifyContent: "space-between", gap: 8 },
   sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
-  sectionHint: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  sectionHint: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "left" },
   filterRow: { gap: 8, paddingVertical: 2 },
   filterChip: {
     minHeight: 36,
@@ -1026,28 +997,41 @@ const styles = StyleSheet.create({
   },
   filterChipText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   monthGroup: { gap: 8 },
-  monthTitle: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right", paddingHorizontal: 4 },
+  monthRow: { alignItems: "center", gap: 8, paddingHorizontal: 4 },
+  monthDot: { width: 7, height: 7, borderRadius: 4 },
+  monthTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
   logCard: {
-    padding: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    overflow: "hidden",
+    flexDirection: "row",
   },
+  logAccent: { width: 4 },
+  logBody: { flex: 1, padding: 14, gap: 12 },
   logTop: { justifyContent: "space-between", alignItems: "center", gap: 10 },
   logIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   logTitleWrap: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 3 },
   logTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
   logVehicle: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "right" },
-  logMeta: { flexWrap: "wrap", gap: 6, justifyContent: "flex-end" },
-  metaPill: {
-    minHeight: 30,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+  invoiceBadge: {
+    flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  metaText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  invoiceBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  metrics: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: "stretch",
+  },
+  metric: { flex: 1, alignItems: "center", gap: 3, minWidth: 0 },
+  metricLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textAlign: "center" },
+  metricValue: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  metricSplit: { width: StyleSheet.hairlineWidth, marginVertical: 2 },
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.62)", justifyContent: "flex-end" },
   sheet: {
     maxHeight: "82%",

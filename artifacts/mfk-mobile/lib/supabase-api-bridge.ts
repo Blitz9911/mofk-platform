@@ -13,6 +13,7 @@ import {
   describeVehicleLink,
   evaluateVehicleHealth,
   isFreshTimestamp,
+  maintenanceIdempotencyKey,
 } from "@/lib/vehicle-health-engine.mjs";
 import {
   isAnomalyDetectionEnabled,
@@ -27,6 +28,15 @@ import {
   recStorageKey,
   recordRecommendationAction,
 } from "@/lib/recommendation-lifecycle";
+import {
+  assertOdometerWrite,
+  buildMaintenanceLogInsert,
+  committedOdometerResponse,
+  isMissingTableError,
+  isUnknownColumnError,
+  maintenanceInsertFallbacks,
+} from "@/lib/qa-write-guards.mjs";
+import { computeNextDue, computeScheduleStatus, serviceLabelAr } from "@/lib/maintenance-engine.mjs";
 
 type VehicleRow = {
   id: string;
@@ -561,16 +571,174 @@ async function listMaintenanceLogs(
   const vehicleFilter = vehicleId
     ? `&vehicle_id=eq.${encodeURIComponent(vehicleId)}`
     : "";
+  const query = `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&user_id=eq.${encodeURIComponent(
+    userId,
+  )}${vehicleFilter}&order=done_at.desc`;
+  try {
+    return await supabaseRequest<MaintenanceLogRow[]>(query, { method: "GET" }, accessToken);
+  } catch (error) {
+    if (!isUnknownColumnError(error) && !/embed|relationship/i.test(String(error))) {
+      throw error;
+    }
+    return supabaseRequest<MaintenanceLogRow[]>(
+      `/rest/v1/maintenance_logs?select=*&user_id=eq.${encodeURIComponent(
+        userId,
+      )}${vehicleFilter}&order=done_at.desc`,
+      { method: "GET" },
+      accessToken,
+    );
+  }
+}
 
-  return supabaseRequest<MaintenanceLogRow[]>(
-    `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&user_id=eq.${encodeURIComponent(
-      userId,
-    )}${vehicleFilter}&order=done_at.desc`,
+async function insertWithColumnFallback<T extends { id?: string }>(
+  path: string,
+  bodies: Record<string, unknown>[],
+  accessToken: string,
+): Promise<T> {
+  let lastError: unknown;
+  for (const body of bodies) {
+    try {
+      const rows = await supabaseRequest<T[]>(
+        path,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(body),
+        },
+        accessToken,
+      );
+      if (rows?.[0]) return rows[0];
+      lastError = new ApiBridgeError("تعذر حفظ السجل.", 500);
+    } catch (error) {
+      lastError = error;
+      const message = String(error instanceof Error ? error.message : error);
+      if (/duplicate|unique|23505/i.test(message) && body.idempotency_key) {
+        const existing = await supabaseRequest<T[]>(
+          `${path.split("?")[0]}?idempotency_key=eq.${encodeURIComponent(String(body.idempotency_key))}&user_id=eq.${encodeURIComponent(String(body.user_id))}&select=*&limit=1`,
+          { method: "GET" },
+          accessToken,
+        );
+        if (existing?.[0]) return existing[0];
+      }
+      if (!isUnknownColumnError(error)) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new ApiBridgeError("تعذر حفظ السجل.", 500);
+}
+
+async function persistVehicleOdometer(
+  vehicleId: string,
+  userId: string,
+  km: number,
+  accessToken: string,
+) {
+  const rows = await supabaseRequest<VehicleRow[]>(
+    `/rest/v1/vehicles?id=eq.${encodeURIComponent(vehicleId)}&user_id=eq.${encodeURIComponent(userId)}&select=*`,
     {
-      method: "GET",
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ odometer_km: km }),
     },
     accessToken,
   );
+  if (!rows[0]) {
+    throw new ApiBridgeError("تعذر تحديث عداد المركبة.", 500);
+  }
+  return rows[0];
+}
+
+async function upsertMaintenanceSchedule(
+  vehicle: VehicleRow,
+  input: { serviceType: string; doneAt: string; doneAtKm: number | null; costSar: number | null },
+  accessToken: string,
+) {
+  const rule = MAINTENANCE_RULES[input.serviceType];
+  if (!rule) return;
+  const due = computeNextDue({
+    lastDoneKm: input.doneAtKm,
+    lastDoneAt: input.doneAt,
+    intervalKm: rule.intervalKm,
+    intervalDays: rule.intervalDays,
+  });
+  const statusInfo = computeScheduleStatus({
+    ...due,
+    odometerKm: Math.max(Number(vehicle.odometer_km ?? 0), Number(input.doneAtKm ?? 0)),
+    soonKm: rule.soonKm,
+    soonDays: rule.soonDays,
+  });
+  const payload = {
+    vehicle_id: vehicle.id,
+    service_type: input.serviceType,
+    service_type_ar: serviceLabelAr(input.serviceType),
+    interval_km: rule.intervalKm ?? null,
+    interval_days: rule.intervalDays ?? null,
+    last_done_km: input.doneAtKm,
+    last_done_at: input.doneAt,
+    next_due_km: due.nextDueKm,
+    next_due_at: due.nextDueAt,
+    status: statusInfo.status,
+    estimated_cost: input.costSar ?? rule.estimatedCost ?? null,
+  };
+  try {
+    const existing = await supabaseRequest<{ id: string }[]>(
+      `/rest/v1/maintenance_schedule?vehicle_id=eq.${encodeURIComponent(vehicle.id)}&service_type=eq.${encodeURIComponent(input.serviceType)}&select=id`,
+      { method: "GET" },
+      accessToken,
+    );
+    if (existing[0]) {
+      await supabaseRequest(
+        `/rest/v1/maintenance_schedule?id=eq.${encodeURIComponent(existing[0].id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        accessToken,
+      );
+      return;
+    }
+    await supabaseRequest("/rest/v1/maintenance_schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }, accessToken);
+  } catch (error) {
+    if (isMissingTableError(error) || isUnknownColumnError(error)) return;
+    throw error;
+  }
+}
+
+async function persistRecommendationResolution(
+  vehicleId: string,
+  serviceType: string,
+  logId: string,
+  accessToken: string,
+) {
+  try {
+    await supabaseRequest(
+      `/rest/v1/recommendations?vehicle_id=eq.${encodeURIComponent(vehicleId)}&source_key=eq.${encodeURIComponent(`maintenance:${serviceType}`)}&status=in.(active,upcoming,in_progress)`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "resolved",
+          linked_maintenance_log_id: logId,
+          resolved_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
+      },
+      accessToken,
+    );
+  } catch (error) {
+    if (isMissingTableError(error) || isUnknownColumnError(error)) return;
+    throw error;
+  }
 }
 
 function todayStart() {
@@ -1485,9 +1653,16 @@ async function handleVehicles(
     if (
       body.odometerKm !== undefined
     ) {
-      payload.odometer_km = Number(
-        body.odometerKm,
-      );
+      const valid = assertOdometerWrite({
+        km: Number(body.odometerKm),
+        previousKm: Number(
+          (await getVehicleRow(vehicleId, session.access_token, session.user.id))
+            ?.odometer_km ?? 0,
+        ),
+        estimated: false,
+      });
+      if (!valid.ok) throw new ApiBridgeError(valid.error, 400);
+      payload.odometer_km = valid.km;
     }
 
     const rows =
@@ -1515,6 +1690,26 @@ async function handleVehicles(
         "المركبة غير موجودة.",
         404,
       );
+    }
+
+    if (payload.odometer_km !== undefined) {
+      const logs = await listMaintenanceLogs(
+        session.access_token,
+        session.user.id,
+        vehicleId,
+      );
+      for (const row of latestMaintenanceRows(logs)) {
+        await upsertMaintenanceSchedule(
+          rows[0],
+          {
+            serviceType: row.service_type,
+            doneAt: row.done_at,
+            doneAtKm: row.done_at_km ?? null,
+            costSar: Number(row.actual_cost_sar ?? row.cost_sar ?? 0) || null,
+          },
+          session.access_token,
+        );
+      }
     }
 
     return {
@@ -1885,55 +2080,53 @@ async function handleMaintenance(
       );
     }
 
-    const rows =
-      await supabaseRequest<
-        MaintenanceLogRow[]
-      >(
-        "/rest/v1/maintenance_logs?select=*",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-            Prefer:
-              "return=representation",
-          },
-          body: JSON.stringify({
-            vehicle_id: vehicleId,
-            user_id: session.user.id,
-            service_type: serviceType,
-            custom_service_name:
-              customServiceName,
-            done_at: doneAt,
-            done_at_km: doneAtKm,
-            actual_cost_sar:
-              actualCostSar,
-            cost_sar:
-              actualCostSar,
-            notes:
-              typeof body.notes === "string" &&
-              body.notes.trim()
-                ? body.notes.trim()
-                : null,
-            source: String(
-              body.source ?? "manual",
-            ),
-          }),
-        },
-        session.access_token,
-      );
+    const insertRow = buildMaintenanceLogInsert({
+      vehicleId,
+      userId: session.user.id,
+      serviceType,
+      customServiceName,
+      doneAt,
+      doneAtKm,
+      costSar: actualCostSar,
+      notes:
+        typeof body.notes === "string" && body.notes.trim()
+          ? body.notes.trim()
+          : null,
+      source: String(body.source ?? "manual"),
+      recommendationId:
+        typeof body.recommendationId === "string" ? body.recommendationId : null,
+      idempotencyKey: maintenanceIdempotencyKey({
+        userId: session.user.id,
+        vehicleId,
+        serviceType,
+        doneAt,
+        doneAtKm,
+      }),
+      serviceTypeAr:
+        serviceType === "other" && customServiceName
+          ? customServiceName
+          : MAINTENANCE_LABELS[serviceType] || serviceType,
+    });
 
-    if (!rows[0]) {
-      throw new ApiBridgeError(
-        "تعذر تسجيل الصيانة.",
-        500,
-      );
+    const saved = await insertWithColumnFallback<MaintenanceLogRow>(
+      "/rest/v1/maintenance_logs?select=*",
+      maintenanceInsertFallbacks(insertRow),
+      session.access_token,
+    );
+
+    if (doneAtKm != null && doneAtKm > Number(vehicle.odometer_km ?? 0)) {
+      await persistVehicleOdometer(vehicleId, session.user.id, doneAtKm, session.access_token);
     }
-
+    await upsertMaintenanceSchedule(
+      vehicle,
+      { serviceType, doneAt, doneAtKm, costSar: actualCostSar },
+      session.access_token,
+    );
+    await persistRecommendationResolution(vehicleId, serviceType, saved.id, session.access_token);
     await applyMaintenanceLogToLifecycle({
       vehicleId,
       serviceType,
-      logId: rows[0].id,
+      logId: saved.id,
       recommendationId:
         typeof body.recommendationId === "string"
           ? body.recommendationId
@@ -1942,9 +2135,7 @@ async function handleMaintenance(
 
     return {
       handled: true,
-      data: completedMaintenanceItem(
-        rows[0],
-      ),
+      data: completedMaintenanceItem(saved),
       status: 201,
     };
   }
@@ -1952,11 +2143,23 @@ async function handleMaintenance(
   const updateLogMatch = path.match(/^\/api\/maintenance\/logs\/([^/]+)$/);
   if (updateLogMatch && method === "GET") {
     const id = decodeURIComponent(updateLogMatch[1]);
-    const rows = await supabaseRequest<MaintenanceLogRow[]>(
-      `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
-      { method: "GET" },
-      session.access_token,
-    );
+    let rows: MaintenanceLogRow[] = [];
+    try {
+      rows = await supabaseRequest<MaintenanceLogRow[]>(
+        `/rest/v1/maintenance_logs?select=*,vehicles(make,model,nickname,odometer_km)&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+        { method: "GET" },
+        session.access_token,
+      );
+    } catch (error) {
+      if (!isUnknownColumnError(error) && !/embed|relationship/i.test(String(error))) {
+        throw error;
+      }
+      rows = await supabaseRequest<MaintenanceLogRow[]>(
+        `/rest/v1/maintenance_logs?select=*&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+        { method: "GET" },
+        session.access_token,
+      );
+    }
     if (!rows[0]) {
       throw new ApiBridgeError("سجل الصيانة غير موجود.", 404);
     }
@@ -2008,7 +2211,6 @@ async function handleMaintenance(
       ) {
         throw new ApiBridgeError("التكلفة غير صحيحة.", 400);
       }
-      patch.actual_cost_sar = actualCostSar;
       patch.cost_sar = actualCostSar;
     }
     if (typeof body.notes === "string" || body.notes === null) {
@@ -2039,6 +2241,69 @@ async function handleMaintenance(
       handled: true,
       data: completedMaintenanceItem(rows[0]),
     };
+  }
+
+  const invoiceMatch = path.match(/^\/api\/maintenance\/logs\/([^/]+)\/invoice$/);
+  if (invoiceMatch && (method === "GET" || method === "POST")) {
+    const logId = decodeURIComponent(invoiceMatch[1]);
+    const logs = await supabaseRequest<MaintenanceLogRow[]>(
+      `/rest/v1/maintenance_logs?select=*&id=eq.${encodeURIComponent(logId)}&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      { method: "GET" },
+      session.access_token,
+    );
+    const log = logs[0];
+    if (!log) throw new ApiBridgeError("سجل الصيانة غير موجود.", 404);
+    if (method === "GET") {
+      try {
+        const rows = await supabaseRequest<
+          { id: string; storage_path: string; mime_type?: string; kind?: string }[]
+        >(
+          `/rest/v1/maintenance_attachments?select=*&log_id=eq.${encodeURIComponent(logId)}&user_id=eq.${encodeURIComponent(session.user.id)}&order=created_at.desc&limit=1`,
+          { method: "GET" },
+          session.access_token,
+        );
+        return { handled: true, data: rows[0] ?? null };
+      } catch (error) {
+        if (isMissingTableError(error) || isUnknownColumnError(error)) {
+          return { handled: true, data: null };
+        }
+        throw error;
+      }
+    }
+    const body = await readJsonBody(input, init);
+    const storagePath = String(body.storagePath || body.uri || "").trim();
+    if (!storagePath) throw new ApiBridgeError("مسار الفاتورة مطلوب.", 400);
+    try {
+      const rows = await supabaseRequest<{ id: string }[]>(
+        "/rest/v1/maintenance_attachments?select=*",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify({
+            log_id: logId,
+            user_id: session.user.id,
+            vehicle_id: log.vehicle_id,
+            storage_path: storagePath,
+            mime_type: body.mime || body.mimeType || null,
+            kind: body.kind || "invoice",
+          }),
+        },
+        session.access_token,
+      );
+      if (!rows[0]) throw new ApiBridgeError("تعذر ربط الفاتورة بالسجل.", 500);
+      return { handled: true, status: 201, data: rows[0] };
+    } catch (error) {
+      if (isMissingTableError(error) || isUnknownColumnError(error)) {
+        throw new ApiBridgeError(
+          "جدول مرفقات الفواتير غير متاح في بيئة QA. لم يُعتبر الرفع سحابيًا ناجحًا.",
+          503,
+        );
+      }
+      throw error;
+    }
   }
 
   return { handled: false };
@@ -3089,38 +3354,98 @@ async function handleHealthIntelligence(
     };
   }
 
-  if (odoMatch && method === "POST") {
-    if (!isOdometerTrackingEnabled()) {
-      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+  if (odoMatch && method === "GET") {
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(odoMatch[1]);
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+    if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    let history: { km: number; estimated: boolean; recorded_at?: string }[] = [];
+    try {
+      history = await supabaseRequest(
+        `/rest/v1/odometer_readings?vehicle_id=eq.${encodeURIComponent(vehicleId)}&user_id=eq.${encodeURIComponent(session.user.id)}&select=km,estimated,recorded_at,source&order=recorded_at.desc&limit=20`,
+        { method: "GET" },
+        session.access_token,
+      );
+    } catch (error) {
+      if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
     }
+    const latest = history[0];
+    return {
+      handled: true,
+      data: {
+        vehicleId,
+        confirmedKm: latest && latest.estimated ? null : Number(vehicle.odometer_km ?? 0),
+        estimatedKm: latest?.estimated ? latest.km : null,
+        odometerKm: Number(vehicle.odometer_km ?? 0),
+        readings: history,
+      },
+    };
+  }
+
+  if (odoMatch && method === "POST") {
     const session = await requireSession();
     const vehicleId = decodeURIComponent(odoMatch[1]);
     const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
     if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
     const body = await readJsonBody(input, init);
-    const km = Number(body.km);
-    if (!Number.isFinite(km) || km < 0) throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
-    try {
-      const rows = await supabaseRequest<unknown[]>(
-        "/rest/v1/odometer_readings?select=*",
+    const estimated = Boolean(body.estimated);
+    const valid = assertOdometerWrite({
+      km: Number(body.km),
+      previousKm: Number(vehicle.odometer_km ?? 0),
+      estimated,
+    });
+    if (!valid.ok) throw new ApiBridgeError(valid.error, 400);
+    const updated = await persistVehicleOdometer(
+      vehicleId,
+      session.user.id,
+      valid.km,
+      session.access_token,
+    );
+    let historyStored = false;
+    if (isOdometerTrackingEnabled()) {
+      try {
+        const rows = await supabaseRequest<unknown[]>(
+          "/rest/v1/odometer_readings?select=*",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+            body: JSON.stringify({
+              vehicle_id: vehicleId,
+              user_id: session.user.id,
+              km: valid.km,
+              source: body.source || "manual",
+              estimated,
+              recorded_at: body.recordedAt || new Date().toISOString(),
+            }),
+          },
+          session.access_token,
+        );
+        historyStored = Boolean(rows?.[0]);
+      } catch (error) {
+        if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
+      }
+    }
+    const committed = committedOdometerResponse({
+      km: valid.km,
+      estimated,
+      vehicleUpdated: Boolean(updated),
+      historyStored,
+    });
+    if (!committed.ok) throw new ApiBridgeError(committed.error, 500);
+    const logs = await listMaintenanceLogs(session.access_token, session.user.id, vehicleId);
+    for (const row of latestMaintenanceRows(logs)) {
+      await upsertMaintenanceSchedule(
+        updated,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-          body: JSON.stringify({
-            vehicle_id: vehicleId,
-            user_id: session.user.id,
-            km,
-            source: body.source || "manual",
-            estimated: Boolean(body.estimated),
-            recorded_at: body.recordedAt || new Date().toISOString(),
-          }),
+          serviceType: row.service_type,
+          doneAt: row.done_at,
+          doneAtKm: row.done_at_km ?? null,
+          costSar: Number(row.actual_cost_sar ?? row.cost_sar ?? 0) || null,
         },
         session.access_token,
       );
-      return { handled: true, status: 201, data: rows[0] };
-    } catch {
-      return { handled: true, status: 201, data: { km, source: body.source || "manual", stored: "local_pending" } };
     }
+    return { handled: true, status: 201, data: { ...committed, odometerKm: updated.odometer_km } };
   }
 
   if (approvalsMatch && method === "GET") {
@@ -3131,27 +3456,39 @@ async function handleHealthIntelligence(
     const vehicleId = decodeURIComponent(approvalsMatch[1]);
     const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
     if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
-    try {
-      const rows = await supabaseRequest<unknown[]>(
-        `/rest/v1/maintenance_approval_requests?select=*&vehicle_id=eq.${encodeURIComponent(vehicleId)}&user_id=eq.${encodeURIComponent(session.user.id)}&order=created_at.desc`,
-        { method: "GET" },
-        session.access_token,
-      );
-      return { handled: true, data: rows };
-    } catch {
-      return { handled: true, data: [] };
-    }
+    const rows = await supabaseRequest<unknown[]>(
+      `/rest/v1/maintenance_approval_requests?select=*&vehicle_id=eq.${encodeURIComponent(vehicleId)}&user_id=eq.${encodeURIComponent(session.user.id)}&order=created_at.desc`,
+      { method: "GET" },
+      session.access_token,
+    );
+    return { handled: true, data: rows };
   }
 
   if (approvalPatch && method === "PATCH") {
     if (!isApprovalLoggingEnabled()) {
       return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
     }
+    const session = await requireSession();
+    const approvalId = decodeURIComponent(approvalPatch[1]);
     const body = await readJsonBody(input, init);
     if (body.decision === "yes" && !body.serviceType) {
       return { handled: true, status: 400, data: { error: "أكمل نموذج الصيانة بعد الموافقة." } };
     }
-    return { handled: true, data: { ok: true, decision: body.decision || "later" } };
+    const status =
+      body.decision === "yes" ? "confirmed" : body.decision === "no" ? "declined" : "later";
+    const rows = await supabaseRequest<{ id: string; status: string }[]>(
+      `/rest/v1/maintenance_approval_requests?id=eq.${encodeURIComponent(approvalId)}&user_id=eq.${encodeURIComponent(session.user.id)}&select=*`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+      },
+      session.access_token,
+    );
+    if (!rows[0]) {
+      throw new ApiBridgeError("تعذر حفظ قرار الموافقة.", 500);
+    }
+    return { handled: true, data: { ok: true, id: rows[0].id, status: rows[0].status } };
   }
 
   return { handled: false };
@@ -3513,18 +3850,6 @@ async function handleRequest(
     };
   }
 
-  if (
-    path.startsWith("/api/dtc") &&
-    method === "GET"
-  ) {
-    await requireSession();
-
-    return {
-      handled: true,
-      data: [],
-    };
-  }
-
   const recAction = path.match(/^\/api\/recommendations\/([^/]+)(?:\/(events))?$/);
   if (recAction) {
     await requireSession();
@@ -3554,11 +3879,37 @@ async function handleRequest(
     path === "/api/recommendations" &&
     method === "GET"
   ) {
-    await requireSession();
-
+    const session = await requireSession();
+    const vehicles = await supabaseRequest<VehicleRow[]>(
+      `/rest/v1/vehicles?select=*&user_id=eq.${encodeURIComponent(session.user.id)}`,
+      { method: "GET" },
+      session.access_token,
+    );
+    const overlay = await getLifecycleOverlay();
+    const logs = await listMaintenanceLogs(session.access_token, session.user.id);
+    const recs = vehicles.flatMap((vehicle) => {
+      const vehicleLogs = logs.filter((row) => row.vehicle_id === vehicle.id);
+      return latestMaintenanceRows(vehicleLogs)
+        .map((row) =>
+          engineBuildMaintenanceRecommendation({
+            vehicleId: vehicle.id,
+            serviceType: row.service_type,
+            lastDoneKm: row.done_at_km,
+            lastDoneAt: row.done_at,
+            odometerKm: vehicle.odometer_km ?? row.done_at_km,
+            estimatedCost: row.actual_cost_sar ?? row.cost_sar,
+          }),
+        )
+        .filter(Boolean)
+        .map((item: any) => ({
+          ...item,
+          id: `maintenance-${vehicle.id}-${item.serviceType}`,
+          createdAt: item.lastDoneAt || new Date().toISOString(),
+        }));
+    });
     return {
       handled: true,
-      data: [],
+      data: visibleRecommendations(recs.map((rec) => applyOverlay(rec, overlay))),
     };
   }
 

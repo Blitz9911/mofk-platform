@@ -56,7 +56,9 @@ function loadFileSystem(): {
 async function persistInvoiceFile(logId: string, draft: InvoiceDraft): Promise<InvoiceDraft> {
   const fs = loadFileSystem();
   const root = fs?.documentDirectory;
-  if (!fs?.copyAsync || !root || !draft.uri) return draft;
+  if (!fs?.copyAsync || !root || !draft.uri) {
+    throw new Error("نظام الملفات غير متاح لحفظ الفاتورة. لم يُعتبر الرفع ناجحًا.");
+  }
   const ext = draft.kind === "pdf" ? "pdf" : draft.mime.includes("png") ? "png" : "jpg";
   const dir = `${root}mfk-invoices/`;
   const dest = `${dir}${logId}.${ext}`;
@@ -64,8 +66,12 @@ async function persistInvoiceFile(logId: string, draft: InvoiceDraft): Promise<I
     await fs.makeDirectoryAsync?.(dir, { intermediates: true });
     await fs.copyAsync({ from: draft.uri, to: dest });
     return { ...draft, uri: dest };
-  } catch {
-    return draft;
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? "تعذر حفظ ملف الفاتورة على الجهاز. لم يُربط بالسجل."
+        : "تعذر حفظ ملف الفاتورة.",
+    );
   }
 }
 
@@ -78,6 +84,31 @@ export async function saveMaintenanceInvoice(logId: string, draft: InvoiceDraft)
     createdAt: new Date().toISOString(),
   };
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  try {
+    const response = await fetch(`/api/maintenance/logs/${encodeURIComponent(logId)}/invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        storagePath: persisted.uri,
+        uri: persisted.uri,
+        mime: persisted.mime,
+        kind: persisted.kind || "invoice",
+        name: persisted.name,
+      }),
+    });
+    if (!response.ok && response.status !== 503) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(
+        typeof payload?.error === "string"
+          ? payload.error
+          : "حُفظت الفاتورة محليًا وتعذر ربطها بسجل قاعدة البيانات.",
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("حُفظت الفاتورة محليًا")) {
+      throw error;
+    }
+  }
 }
 
 async function fromImageResult(result: ImagePicker.ImagePickerResult): Promise<InvoiceDraft | null> {

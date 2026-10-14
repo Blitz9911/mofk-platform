@@ -1,19 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  getGetVehicleQueryKey,
+  getListVehiclesQueryKey,
   useGetVehicle,
-  useGetVehicleHealthHistory,
-  useListDtcCodes,
   useGetUpcomingMaintenance,
+  useListDtcCodes,
+  useUpdateVehicle,
 } from "@workspace/api-client-react";
-import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +50,10 @@ export default function VehicleDetailScreen() {
   const { data: vehicle, isLoading } = useGetVehicle(id);
   const { data: dtcs } = useListDtcCodes({ vehicleId: id, status: "active" });
   const { data: maintenance } = useGetUpcomingMaintenance();
+  const queryClient = useQueryClient();
+  const updateVehicle = useUpdateVehicle();
+  const [odometerOpen, setOdometerOpen] = useState(false);
+  const [odometerDraft, setOdometerDraft] = useState("");
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const healthScore = vehicle?.healthScore ?? 0;
@@ -83,11 +93,17 @@ export default function VehicleDetailScreen() {
           </View>
 
           <View style={styles.infoGrid}>
-            <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable
+              onPress={() => {
+                setOdometerDraft(String(vehicle.odometerKm ?? ""));
+                setOdometerOpen(true);
+              }}
+              style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>العداد</Text>
               <Text style={[styles.infoValue, { color: colors.foreground }]}>{(vehicle.odometerKm ?? 0).toLocaleString("ar-SA")}</Text>
-              <Text style={[styles.infoUnit, { color: colors.mutedForeground }]}>كم</Text>
-            </View>
+              <Text style={[styles.infoUnit, { color: colors.mutedForeground }]}>كم — اضغط للتحديث</Text>
+            </Pressable>
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>الوقود</Text>
               <Text style={[styles.infoValue, { color: colors.foreground }]}>{vehicle.fuelType ? (FUEL_LABELS[vehicle.fuelType] ?? vehicle.fuelType) : "—"}</Text>
@@ -154,6 +170,53 @@ export default function VehicleDetailScreen() {
           <Text style={[styles.errorText, { color: colors.mutedForeground }]}>المركبة غير موجودة</Text>
         </View>
       )}
+      <Modal visible={odometerOpen} transparent animationType="fade" onRequestClose={() => setOdometerOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setOdometerOpen(false)}>
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>تحديث قراءة العداد</Text>
+            <TextInput
+              value={odometerDraft}
+              onChangeText={setOdometerDraft}
+              keyboardType="number-pad"
+              placeholder="45000"
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.odometerInput, { color: colors.foreground, borderColor: colors.border }]}
+            />
+            <Pressable
+              disabled={updateVehicle.isPending}
+              onPress={() => {
+                const km = Number(odometerDraft);
+                if (!id || !Number.isFinite(km) || km < 0) {
+                  Alert.alert("قراءة غير صحيحة", "أدخل رقم عداد صالح.");
+                  return;
+                }
+                updateVehicle.mutate(
+                  { vehicleId: id, data: { odometerKm: km } },
+                  {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries({ queryKey: getGetVehicleQueryKey(id) });
+                      queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
+                      setOdometerOpen(false);
+                    },
+                    onError: (error) => {
+                      Alert.alert(
+                        "تعذر حفظ العداد",
+                        error instanceof Error ? error.message : "لم تُحفظ القراءة.",
+                      );
+                    },
+                  },
+                );
+              }}
+              style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: updateVehicle.isPending ? 0.7 : 1 }]}
+            >
+              <Text style={styles.submitText}>{updateVehicle.isPending ? "جاري الحفظ..." : "حفظ"}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -230,4 +293,27 @@ const styles = StyleSheet.create({
   maintStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   maintStatusText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   errorText: { fontSize: 15, fontFamily: "Inter_400Regular" },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    gap: 12,
+  },
+  odometerInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    textAlign: "left",
+  },
+  submitBtn: { borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  submitText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
 });

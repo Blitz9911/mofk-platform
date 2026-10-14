@@ -196,6 +196,18 @@ test("logging uses vehicle lock, idempotency, and rules", () => {
   assert.match(storeSource, /approvalId/);
 });
 
+test("mobile bridge does not fake odometer or approval success", () => {
+  const bridge = readFileSync(
+    join(root, "artifacts/mfk-mobile/lib/supabase-api-bridge.ts"),
+    "utf8",
+  );
+  assert.equal(bridge.includes("local_pending"), false);
+  assert.equal(/return \{ handled: true, data: \[\] \}/.test(bridge.split("path === \"/api/recommendations\"")[1] || ""), false);
+  assert.match(bridge, /persistVehicleOdometer/);
+  assert.match(bridge, /insertWithColumnFallback/);
+  assert.equal(/return \{ handled: true, data: \{ ok: true, decision/.test(bridge), false);
+});
+
 test("BLE modules stay out of health intelligence routes", () => {
   assert.equal(/\b(react-native-ble-plx|elm327-command-queue|FFE1)\b/.test(routeSource), false);
   assert.equal(/\b(react-native-ble-plx|elm327-command-queue|FFE1)\b/.test(storeSource), false);
