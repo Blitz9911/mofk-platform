@@ -1,0 +1,24 @@
+export const TELEMETRY_MAX_AGE_MS: number;
+export const COOLANT_REPEAT_THRESHOLD_C: number;
+export const BATTERY_LOW_VOLTS: number;
+export const MIN_ANOMALY_SAMPLES: number;
+export const DEFAULT_RULE_SOURCE: string;
+
+export function resolveMaintenanceRule(serviceType: string, overrides?: any[]): any | null;
+export function isSupportedPidValue(value: unknown): boolean;
+export function isFreshTimestamp(time: Date | string | null | undefined, now?: Date, maxAgeMs?: number): boolean;
+export function assessTelemetryQuality(samples: any[], now?: Date): any;
+export function validateOdometerReading(input: Record<string, unknown>): { ok: boolean; error?: string; km?: number };
+export function estimateDailyKm(readings: any[]): { status: string; kmPerDay: number | null; estimated: boolean };
+export function estimateNextDueDate(input: Record<string, unknown>): any;
+export function computeHealthScore(input: Record<string, unknown>): number;
+export function attachExplanation(rec: any): any;
+export function buildRepeatedCoolantAnomaly(vehicleId: string, samples: any[], now?: Date): any | null;
+export function buildRecurringDtcRecommendation(vehicleId: string, history?: any[]): any[];
+export function maybeCreateMaintenanceApproval(input: Record<string, unknown>): any | null;
+export function explainForAssistant(rec: any): any;
+export function evaluateVehicleHealth(input: Record<string, unknown>): any;
+export function notificationDedupeKey(input: Record<string, unknown>): string;
+export function computeNextDue(input: Record<string, unknown>): any;
+export function computeScheduleStatus(input: Record<string, unknown>): any;
+export function serviceLabelAr(serviceType: string): string;

@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:recommendations": "node --test ./test/recommendation-engine.test.mjs",
+    "test:recommendations": "node --test ./test/recommendation-engine.test.mjs ./test/vehicle-health-engine.test.mjs",
     "test:ai": "node --test ./test/mofk-ai-service.test.mjs"
   },
   "dependencies": {

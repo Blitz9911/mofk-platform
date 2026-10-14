@@ -331,6 +331,19 @@ router.get(
       res.status(400).json({ error: params.error.message });
       return;
     }
+    const [owned] = await db
+      .select({ id: vehiclesTable.id })
+      .from(vehiclesTable)
+      .where(
+        and(
+          eq(vehiclesTable.id, params.data.vehicleId),
+          eq(vehiclesTable.userId, req.userId),
+        ),
+      );
+    if (!owned) {
+      res.status(404).json({ error: "Vehicle not found" });
+      return;
+    }
     const rows = await db
       .select()
       .from(healthHistoryTable)

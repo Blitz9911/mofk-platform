@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
 import { rowDir } from "@/lib/layout";
+import { isHealthIntelligenceEnabled } from "@/lib/health-intelligence-flags";
 import { cacheRecommendations } from "@/lib/recommendation-lifecycle";
 import { smoothBack } from "@/lib/navigation";
 import { exportPdf } from "@/lib/pdf-export";
@@ -234,6 +235,17 @@ export default function RecommendationsScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
           showsVerticalScrollIndicator={false}
         >
+          {isHealthIntelligenceEnabled() ? (
+            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 0, padding: 14 }]}>
+              <ArabicText style={[styles.emptyTitle, { color: colors.foreground, fontSize: 15 }]}>
+                ملخص صحة المركبة
+              </ArabicText>
+              <ArabicText style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+                التوصيات مبنية على سجل الصيانة والقراءات المحفوظة فقط. إذا لم تتوفر قراءة حديثة تظهر حالة بيانات غير كافية بدل الادعاء أن السيارة سليمة.
+              </ArabicText>
+            </View>
+          ) : null}
+
           <View style={styles.summaryGrid}>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="bulb-outline" size={18} color={colors.primary} />

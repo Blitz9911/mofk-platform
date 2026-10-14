@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
 import { rowDir } from "@/lib/layout";
+import { isHealthIntelligenceEnabled } from "@/lib/health-intelligence-flags";
 import { smoothBack } from "@/lib/navigation";
 import {
   getCachedRecommendation,
@@ -127,6 +128,11 @@ export default function RecommendationDetailScreen() {
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ArabicText style={[styles.title, { color: colors.foreground }]}>{rec.titleAr}</ArabicText>
           <ArabicText style={[styles.body, { color: colors.mutedForeground }]}>{rec.descriptionAr}</ArabicText>
+          {isHealthIntelligenceEnabled() && (rec.explanationAr || rec.metadata?.explanationAr) ? (
+            <ArabicText style={[styles.body, { color: colors.mutedForeground }]}>
+              {rec.explanationAr || rec.metadata?.explanationAr}
+            </ArabicText>
+          ) : null}
           <View style={styles.metaRow}>
             <View style={[styles.chip, { borderColor: colors.border }]}>
               <Text style={[styles.chipText, { color: colors.foreground }]}>{STATUS_LABEL[rec.status] || "نشطة"}</Text>

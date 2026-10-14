@@ -4,11 +4,21 @@ import {
 } from "@/lib/supabase";
 import {
   buildDtcRecommendation,
-  buildMaintenanceRecommendation,
+  buildMaintenanceRecommendation as engineBuildMaintenanceRecommendation,
   buildTelemetryRecommendations as engineTelemetryRecommendations,
-  sourceKeyForMaintenance,
   visibleRecommendations,
 } from "@/lib/maintenance-engine.mjs";
+import {
+  buildRepeatedCoolantAnomaly,
+  evaluateVehicleHealth,
+  isFreshTimestamp,
+} from "@/lib/vehicle-health-engine.mjs";
+import {
+  isAnomalyDetectionEnabled,
+  isApprovalLoggingEnabled,
+  isHealthIntelligenceEnabled,
+  isOdometerTrackingEnabled,
+} from "@/lib/health-intelligence-flags";
 import {
   applyMaintenanceLogToLifecycle,
   applyOverlay,
@@ -2030,10 +2040,158 @@ async function handleMaintenance(
   return { handled: false };
 }
 
+function entitlementTier(raw?: string | null) {
+  const value = String(raw || "free").toLowerCase();
+  if (value === "plus" || value === "mofk" || value === "individual-basic") return "mofk";
+  if (
+    value === "premium" ||
+    value === "pro" ||
+    value === "family" ||
+    value === "individual-advanced"
+  ) {
+    return "family";
+  }
+  if (value === "fleet") return "fleet";
+  return value || "free";
+}
+
+function periodEnd(cycle: string) {
+  const ends = new Date();
+  if (cycle === "yearly" || cycle === "annual") {
+    ends.setFullYear(ends.getFullYear() + 1);
+  } else {
+    ends.setMonth(ends.getMonth() + 1);
+  }
+  return ends.toISOString();
+}
+
+async function latestAccountSubscription(accessToken: string, userId: string) {
+  try {
+    const rows = await supabaseRequest<
+      Array<{
+        plan?: string | null;
+        plan_id?: string | null;
+        status?: string | null;
+        started_at?: string | null;
+        created_at?: string | null;
+        ends_at?: string | null;
+        current_period_end?: string | null;
+      }>
+    >(
+      `/rest/v1/subscriptions?select=*&user_id=eq.${encodeURIComponent(
+        userId,
+      )}&order=created_at.desc&limit=5`,
+      { method: "GET" },
+      accessToken,
+    );
+    return (
+      rows.find((row) => String(row.status || "").toLowerCase() !== "cancelled") ??
+      rows[0] ??
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function handleSubscriptions(
   path: string,
   method: string,
+  input?: RequestInfo | URL,
+  init?: RequestInit,
 ): Promise<ApiBridgeResult> {
+  if (path === "/api/subscriptions/activate" && method === "POST") {
+    const session = await requireSession();
+    const body = await readJsonBody(input as RequestInfo | URL, init);
+    const planId = entitlementTier(String(body.planId ?? body.tier ?? ""));
+    const billingCycle = String(body.billingCycle ?? "monthly");
+    if (!planId || planId === "free") {
+      throw new ApiBridgeError("اختر باقة مفك أو العائلة لتفعيلها على حسابك.", 400);
+    }
+    const startedAt = new Date().toISOString();
+    const endsAt = periodEnd(billingCycle);
+
+    await supabaseRequest(
+      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          subscription_tier: planId,
+          subscription_started_at: startedAt,
+          subscription_ends_at: endsAt,
+          subscription_auto_renew: true,
+        }),
+      },
+      session.access_token,
+    );
+
+    const rows = await supabaseRequest<SubscriptionUserRow[]>(
+      `/rest/v1/users?select=subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(
+        session.user.id,
+      )}&limit=1`,
+      { method: "GET" },
+      session.access_token,
+    );
+
+    if (entitlementTier(rows[0]?.subscription_tier) !== planId) {
+      throw new ApiBridgeError(
+        "تعذر حفظ الباقة على الحساب. حدّث صلاحيات users.subscription_tier أو أعد تسجيل الدخول بعد تطبيق المنح.",
+        403,
+      );
+    }
+
+    const subscriptionPayloads = [
+      {
+        user_id: session.user.id,
+        plan_id: planId,
+        billing_cycle: billingCycle === "yearly" ? "annual" : "monthly",
+        status: "active",
+        current_period_end: endsAt,
+      },
+      {
+        user_id: session.user.id,
+        plan: planId,
+        status: "active",
+        started_at: startedAt,
+        ends_at: endsAt,
+      },
+    ];
+    for (const payload of subscriptionPayloads) {
+      try {
+        await supabaseRequest(
+          "/rest/v1/subscriptions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify(payload),
+          },
+          session.access_token,
+        );
+        break;
+      } catch {
+        /* Try the next subscriptions table shape. */
+      }
+    }
+
+    return {
+      handled: true,
+      data: {
+        tier: entitlementTier(rows[0].subscription_tier),
+        status: "active",
+        startedAt: rows[0].subscription_started_at ?? startedAt,
+        endsAt: rows[0].subscription_ends_at ?? endsAt,
+        autoRenew: rows[0].subscription_auto_renew ?? true,
+      },
+    };
+  }
+
   if (method !== "GET") {
     return { handled: false };
   }
@@ -2083,20 +2241,35 @@ async function handleSubscriptions(
     );
 
     const row = rows[0];
-    const endsAt = row?.subscription_ends_at ?? null;
+    const latest = await latestAccountSubscription(
+      session.access_token,
+      session.user.id,
+    );
+    const fromUser = entitlementTier(row?.subscription_tier);
+    const fromSubscription = entitlementTier(latest?.plan_id ?? latest?.plan);
+    const tier = fromUser !== "free" ? fromUser : fromSubscription || "free";
+    const endsAt =
+      row?.subscription_ends_at ??
+      latest?.current_period_end ??
+      latest?.ends_at ??
+      null;
     const isExpired = endsAt ? new Date(endsAt) < new Date() : false;
 
     return {
       handled: true,
       data: {
-        tier: row?.subscription_tier ?? "free",
+        tier,
         status:
           row?.is_active === false
             ? "cancelled"
-            : isExpired
+            : isExpired && tier !== "free"
               ? "expired"
               : "active",
-        startedAt: row?.subscription_started_at ?? null,
+        startedAt:
+          row?.subscription_started_at ??
+          latest?.started_at ??
+          latest?.created_at ??
+          null,
         endsAt,
         autoRenew: row?.subscription_auto_renew ?? true,
       },
@@ -2486,7 +2659,12 @@ async function handleAi(
       vehicleId,
       session.access_token,
     );
-    const telemetryRecs = engineTelemetryRecommendations(vehicleId, latest);
+    const telemetryRecs =
+      latest && isFreshTimestamp(latest.time)
+        ? isAnomalyDetectionEnabled()
+          ? [buildRepeatedCoolantAnomaly(vehicleId, [latest])].filter(Boolean)
+          : engineTelemetryRecommendations(vehicleId, latest)
+        : [];
 
     const maintenanceRows = await listMaintenanceLogs(
       session.access_token,
@@ -2495,7 +2673,7 @@ async function handleAi(
     );
     const maintenanceRecs = latestMaintenanceRows(maintenanceRows)
       .map((row) =>
-        buildMaintenanceRecommendation({
+        engineBuildMaintenanceRecommendation({
           vehicleId,
           serviceType: row.service_type,
           lastDoneKm: row.done_at_km,
@@ -2802,6 +2980,130 @@ async function generateMaintenanceNotifications(
   return generatedRows;
 }
 
+async function handleHealthIntelligence(
+  path: string,
+  method: string,
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<ApiBridgeResult> {
+  const summaryMatch = path.match(/^\/api\/vehicles\/([^/]+)\/health-summary$/);
+  const odoMatch = path.match(/^\/api\/vehicles\/([^/]+)\/odometer$/);
+  const approvalsMatch = path.match(/^\/api\/vehicles\/([^/]+)\/maintenance\/approvals$/);
+  const approvalPatch = path.match(/^\/api\/maintenance\/approvals\/([^/]+)$/);
+  const ocrMatch = path === "/api/maintenance/invoice-ocr";
+
+  if (!summaryMatch && !odoMatch && !approvalsMatch && !approvalPatch && !ocrMatch) {
+    return { handled: false };
+  }
+
+  if (ocrMatch && method === "POST") {
+    return { handled: true, data: { available: false, fields: null, reason: "ocr_disabled" } };
+  }
+
+  if (summaryMatch && method === "GET") {
+    if (!isHealthIntelligenceEnabled()) {
+      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+    }
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(summaryMatch[1]);
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+    if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    const latest = await latestTelemetryPoint(vehicleId, session.access_token);
+    const logs = await listMaintenanceLogs(session.access_token, session.user.id, vehicleId);
+    const evaluation = evaluateVehicleHealth({
+      vehicleId,
+      odometerKm: vehicle.odometer_km,
+      logs: logs.map((row) => ({
+        serviceType: row.service_type,
+        doneAtKm: row.done_at_km,
+        doneAt: row.done_at,
+      })),
+      telemetrySamples: latest ? [{ ...latest, synthetic: false }] : [],
+      anomalyEnabled: isAnomalyDetectionEnabled(),
+    });
+    return {
+      handled: true,
+      data: {
+        vehicleId,
+        healthScore: evaluation.healthScore,
+        dataQuality: evaluation.dataQuality,
+        lastReadingAt: evaluation.lastReadingAt,
+        insufficientData: evaluation.insufficientData,
+        odometerKm: vehicle.odometer_km,
+        openRecommendations: evaluation.candidates.length,
+        connected: Boolean(vehicle.adapter_mac),
+      },
+    };
+  }
+
+  if (odoMatch && method === "POST") {
+    if (!isOdometerTrackingEnabled()) {
+      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+    }
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(odoMatch[1]);
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+    if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    const body = await readJsonBody(input, init);
+    const km = Number(body.km);
+    if (!Number.isFinite(km) || km < 0) throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
+    try {
+      const rows = await supabaseRequest<unknown[]>(
+        "/rest/v1/odometer_readings?select=*",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+          body: JSON.stringify({
+            vehicle_id: vehicleId,
+            user_id: session.user.id,
+            km,
+            source: body.source || "manual",
+            estimated: Boolean(body.estimated),
+            recorded_at: body.recordedAt || new Date().toISOString(),
+          }),
+        },
+        session.access_token,
+      );
+      return { handled: true, status: 201, data: rows[0] };
+    } catch {
+      return { handled: true, status: 201, data: { km, source: body.source || "manual", stored: "local_pending" } };
+    }
+  }
+
+  if (approvalsMatch && method === "GET") {
+    if (!isApprovalLoggingEnabled()) {
+      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+    }
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(approvalsMatch[1]);
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+    if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    try {
+      const rows = await supabaseRequest<unknown[]>(
+        `/rest/v1/maintenance_approval_requests?select=*&vehicle_id=eq.${encodeURIComponent(vehicleId)}&user_id=eq.${encodeURIComponent(session.user.id)}&order=created_at.desc`,
+        { method: "GET" },
+        session.access_token,
+      );
+      return { handled: true, data: rows };
+    } catch {
+      return { handled: true, data: [] };
+    }
+  }
+
+  if (approvalPatch && method === "PATCH") {
+    if (!isApprovalLoggingEnabled()) {
+      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+    }
+    const body = await readJsonBody(input, init);
+    if (body.decision === "yes" && !body.serviceType) {
+      return { handled: true, status: 400, data: { error: "أكمل نموذج الصيانة بعد الموافقة." } };
+    }
+    return { handled: true, data: { ok: true, decision: body.decision || "later" } };
+  }
+
+  return { handled: false };
+}
+
 async function handleNotifications(
   path: string,
   method: string,
@@ -3005,7 +3307,7 @@ async function handleRequest(
   }
 
   const subscriptionsResult =
-    await handleSubscriptions(path, method);
+    await handleSubscriptions(path, method, input, init);
 
   if (subscriptionsResult.handled) {
     return subscriptionsResult;
@@ -3027,6 +3329,11 @@ async function handleRequest(
 
   if (deviceOrdersResult.handled) {
     return deviceOrdersResult;
+  }
+
+  const healthIntelResult = await handleHealthIntelligence(path, method, input, init);
+  if (healthIntelResult.handled) {
+    return healthIntelResult;
   }
 
   const notificationsResult = await handleNotifications(

@@ -9,6 +9,7 @@ import {
   telemetryTable,
   vehiclesTable,
 } from "@workspace/db";
+import { isAnomalyDetectionEnabled, isHealthIntelligenceEnabled } from "../lib/health-intelligence-flags";
 import {
   applyMaintenanceToRecommendations,
   buildDtcRecommendation,
@@ -23,6 +24,7 @@ import {
   validateMaintenanceInput,
   visibleRecommendations,
 } from "./maintenance-recommendations.mjs";
+import { evaluateVehicleHealth, isFreshTimestamp } from "./vehicle-health-engine.mjs";
 
 function toIso(value: Date | string | null | undefined) {
   if (!value) return null;
@@ -72,13 +74,17 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
     db
       .select()
       .from(dtcCodesTable)
-      .where(and(eq(dtcCodesTable.vehicleId, vehicleId), eq(dtcCodesTable.status, "active"))),
+      .where(
+        isHealthIntelligenceEnabled()
+          ? eq(dtcCodesTable.vehicleId, vehicleId)
+          : and(eq(dtcCodesTable.vehicleId, vehicleId), eq(dtcCodesTable.status, "active")),
+      ),
     db
       .select()
       .from(telemetryTable)
       .where(eq(telemetryTable.vehicleId, vehicleId))
       .orderBy(desc(telemetryTable.time))
-      .limit(1),
+      .limit(20),
     db
       .select()
       .from(maintenanceLogsTable)
@@ -92,48 +98,67 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
   }
 
   const candidates = [];
-  const seenServices = new Set<string>();
-  for (const item of schedule) {
-    seenServices.add(item.serviceType);
-    const rec = buildMaintenanceRecommendation({
+  if (isHealthIntelligenceEnabled()) {
+    const evaluation = evaluateVehicleHealth({
       vehicleId,
-      serviceType: item.serviceType,
-      lastDoneKm: item.lastDoneKm,
-      lastDoneAt: item.lastDoneAt,
       odometerKm: vehicle.odometerKm,
-      estimatedCost: item.estimatedCost,
+      logs,
+      schedule,
+      dtcs,
+      telemetrySamples: telemetryRows.map((row) => ({
+        time: row.time,
+        coolantTemp: row.coolantTemp,
+        batteryV: row.batteryV != null ? Number(row.batteryV) : null,
+        synthetic: false,
+      })),
+      anomalyEnabled: isAnomalyDetectionEnabled(),
     });
-    if (rec) candidates.push(rec);
-  }
-  for (const [serviceType, log] of latestByService) {
-    if (seenServices.has(serviceType)) continue;
-    const rec = buildMaintenanceRecommendation({
-      vehicleId,
-      serviceType,
-      lastDoneKm: log.doneAtKm,
-      lastDoneAt: log.doneAt,
-      odometerKm: vehicle.odometerKm,
-    });
-    if (rec) candidates.push(rec);
-  }
+    candidates.push(...evaluation.candidates);
+  } else {
+    const seenServices = new Set<string>();
+    for (const item of schedule) {
+      seenServices.add(item.serviceType);
+      const rec = buildMaintenanceRecommendation({
+        vehicleId,
+        serviceType: item.serviceType,
+        lastDoneKm: item.lastDoneKm,
+        lastDoneAt: item.lastDoneAt,
+        odometerKm: vehicle.odometerKm,
+        estimatedCost: item.estimatedCost,
+      });
+      if (rec) candidates.push(rec);
+    }
+    for (const [serviceType, log] of latestByService) {
+      if (seenServices.has(serviceType)) continue;
+      const rec = buildMaintenanceRecommendation({
+        vehicleId,
+        serviceType,
+        lastDoneKm: log.doneAtKm,
+        lastDoneAt: log.doneAt,
+        odometerKm: vehicle.odometerKm,
+      });
+      if (rec) candidates.push(rec);
+    }
 
-  for (const dtc of dtcs) {
-    const rec = buildDtcRecommendation({
-      vehicleId,
-      code: dtc.code,
-      descriptionAr: dtc.descriptionAr ?? undefined,
-      severity: dtc.severity,
-    });
-    if (rec) candidates.push(rec);
-  }
+    for (const dtc of dtcs) {
+      const rec = buildDtcRecommendation({
+        vehicleId,
+        code: dtc.code,
+        descriptionAr: dtc.descriptionAr ?? undefined,
+        severity: dtc.severity,
+      });
+      if (rec) candidates.push(rec);
+    }
 
-  const latestTelemetry = telemetryRows[0]
-    ? {
-        coolantTemp: telemetryRows[0].coolantTemp,
-        batteryV: telemetryRows[0].batteryV != null ? Number(telemetryRows[0].batteryV) : null,
-      }
-    : null;
-  candidates.push(...buildTelemetryRecommendations(vehicleId, latestTelemetry));
+    const latestFresh = telemetryRows.find((row) => isFreshTimestamp(row.time));
+    const latestTelemetry = latestFresh
+      ? {
+          coolantTemp: latestFresh.coolantTemp,
+          batteryV: latestFresh.batteryV != null ? Number(latestFresh.batteryV) : null,
+        }
+      : null;
+    candidates.push(...buildTelemetryRecommendations(vehicleId, latestTelemetry));
+  }
 
   const existingMapped = existing.map((row) => ({
     ...row,
@@ -240,6 +265,29 @@ export async function logCompletedMaintenance(input: {
     .where(and(eq(vehiclesTable.id, input.vehicleId), eq(vehiclesTable.userId, input.userId)));
   if (!vehicle) {
     return { ok: false as const, status: 404 as const, error: "Vehicle not found" };
+  }
+
+  const doneAtPreview = new Date(input.doneAt);
+  const doneAtKmPreview = input.doneAtKm == null ? vehicle.odometerKm : Number(input.doneAtKm);
+  const [duplicate] = await db
+    .select()
+    .from(maintenanceLogsTable)
+    .where(
+      and(
+        eq(maintenanceLogsTable.vehicleId, input.vehicleId),
+        eq(maintenanceLogsTable.userId, input.userId),
+        eq(maintenanceLogsTable.serviceType, input.serviceType),
+      ),
+    )
+    .orderBy(desc(maintenanceLogsTable.createdAt))
+    .limit(1);
+  if (
+    duplicate &&
+    duplicate.doneAtKm === doneAtKmPreview &&
+    Math.abs(new Date(duplicate.doneAt).getTime() - doneAtPreview.getTime()) < 120_000 &&
+    Date.now() - new Date(duplicate.createdAt).getTime() < 120_000
+  ) {
+    return { ok: true as const, log: duplicate, schedule: null, duplicate: true };
   }
 
   const rule = MAINTENANCE_RULES[input.serviceType];

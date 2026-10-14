@@ -258,6 +258,143 @@ export const healthHistoryTable = pgTable(
   }),
 );
 
+/** History remains `maintenance_logs`. These tables extend it without replacing it. */
+export const maintenanceLogItemsTable = pgTable(
+  "maintenance_log_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    logId: uuid("log_id")
+      .notNull()
+      .references(() => maintenanceLogsTable.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 20 }).notNull().default("part"),
+    nameAr: varchar("name_ar", { length: 120 }).notNull(),
+    brand: varchar("brand", { length: 80 }),
+    quantity: integer("quantity").notNull().default(1),
+    unitCostSar: integer("unit_cost_sar"),
+    oilType: varchar("oil_type", { length: 40 }),
+    oilViscosity: varchar("oil_viscosity", { length: 20 }),
+  },
+  (t) => ({
+    logIdx: index("idx_maint_log_items_log").on(t.logId),
+  }),
+);
+
+export const maintenanceAttachmentsTable = pgTable(
+  "maintenance_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    logId: uuid("log_id")
+      .notNull()
+      .references(() => maintenanceLogsTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull(),
+    mimeType: varchar("mime_type", { length: 80 }),
+    kind: varchar("kind", { length: 20 }).notNull().default("invoice"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    logIdx: index("idx_maint_attachments_log").on(t.logId),
+    userIdx: index("idx_maint_attachments_user").on(t.userId),
+  }),
+);
+
+export const maintenanceRulesTable = pgTable(
+  "maintenance_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vehicleId: uuid("vehicle_id").references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    make: varchar("make", { length: 50 }),
+    model: varchar("model", { length: 80 }),
+    year: integer("year"),
+    engine: varchar("engine", { length: 40 }),
+    serviceType: varchar("service_type", { length: 50 }).notNull(),
+    intervalKm: integer("interval_km"),
+    intervalDays: integer("interval_days"),
+    soonKm: integer("soon_km"),
+    soonDays: integer("soon_days"),
+    estimatedCost: integer("estimated_cost"),
+    ruleSource: varchar("rule_source", { length: 30 }).notNull().default("user_configured"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleIdx: index("idx_maint_rules_vehicle").on(t.vehicleId, t.serviceType),
+  }),
+);
+
+export const maintenanceApprovalRequestsTable = pgTable(
+  "maintenance_approval_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 30 }).notNull().default("dtc_cleared"),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    titleAr: varchar("title_ar", { length: 200 }).notNull(),
+    bodyAr: text("body_ar").notNull(),
+    dtcCode: varchar("dtc_code", { length: 8 }),
+    reminderAt: timestamp("reminder_at", { withTimezone: true }),
+    resolvedLogId: uuid("resolved_log_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleIdx: index("idx_maint_approvals_vehicle").on(t.vehicleId, t.status),
+  }),
+);
+
+export const odometerReadingsTable = pgTable(
+  "odometer_readings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    km: integer("km").notNull(),
+    source: varchar("source", { length: 30 }).notNull().default("manual"),
+    estimated: boolean("estimated").notNull().default(false),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleIdx: index("idx_odometer_vehicle").on(t.vehicleId, t.recordedAt),
+  }),
+);
+
+export const notificationsTable = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id").references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 40 }).notNull(),
+    severity: varchar("severity", { length: 10 }).notNull().default("info"),
+    titleAr: varchar("title_ar", { length: 200 }).notNull(),
+    bodyAr: text("body_ar"),
+    actionUrl: varchar("action_url", { length: 200 }),
+    dedupeKey: varchar("dedupe_key", { length: 160 }),
+    isRead: boolean("is_read").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("idx_notifications_user").on(t.userId, t.createdAt),
+    dedupeIdx: index("idx_notifications_dedupe").on(t.userId, t.dedupeKey),
+  }),
+);
+
 export const subscriptionPlansTable = pgTable("subscription_plans", {
   id: varchar("id", { length: 30 }).primaryKey(),
   name: varchar("name", { length: 50 }).notNull(),

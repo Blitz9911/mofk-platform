@@ -36,6 +36,7 @@ import {
   type InvoiceDraft,
   type MaintenanceInvoice,
 } from "@/lib/maintenance-invoices";
+import { isApprovalLoggingEnabled, isHealthIntelligenceEnabled } from "@/lib/health-intelligence-flags";
 import {
   MAINTENANCE_LOGS_QUERY_KEY,
   SERVICE_TYPES,
@@ -740,6 +741,23 @@ export default function MaintenanceScreen() {
           </View>
         ) : (
           <>
+            {isHealthIntelligenceEnabled() ? (
+              <View style={[styles.noteCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
+                <View style={[styles.noteIcon, { backgroundColor: `${colors.primary}18` }]}>
+                  <Ionicons name="pulse-outline" size={20} color={colors.primary} />
+                </View>
+                <View style={styles.noteText}>
+                  <ArabicText style={[styles.noteTitle, { color: colors.foreground }]}>سجل مستقل عن الجدول</ArabicText>
+                  <ArabicText style={[styles.noteBody, { color: colors.mutedForeground }]}>
+                    كل عملية تُحفظ في السجل ولا تُمسح عند تسجيل صيانة جديدة. الفواتير تبقى مربوطة بالمالك.
+                    {isApprovalLoggingEnabled()
+                      ? " إذا اختفى كود عطل، مفك يسألك قبل توثيق صيانة."
+                      : ""}
+                  </ArabicText>
+                </View>
+              </View>
+            ) : null}
+
             <View style={styles.summaryGrid}>
               <SummaryCard title="إجمالي الصيانات" value={sortedLogs.length} icon="clipboard-outline" color={colors.primary} />
               <SummaryCard title="هذا الشهر" value={logsThisMonth.length} icon="calendar-outline" color="#3b82f6" />
