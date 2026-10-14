@@ -3,12 +3,21 @@ export const COOLANT_REPEAT_THRESHOLD_C: number;
 export const BATTERY_LOW_VOLTS: number;
 export const MIN_ANOMALY_SAMPLES: number;
 export const DEFAULT_RULE_SOURCE: string;
+export const LIVE_WINDOW_MS: number;
+export function isRecommendationId(value: unknown): value is string;
+export function maintenanceIdempotencyKey(input: Record<string, unknown>): string;
+export function describeVehicleLink(input: Record<string, unknown>): {
+  paired: boolean;
+  connected: boolean;
+  lastSeenAt: string | null;
+  live: boolean;
+};
 
-export function resolveMaintenanceRule(serviceType: string, overrides?: any[]): any | null;
+export function resolveMaintenanceRule(serviceType: string, overrides?: any[], vehicle?: any): any | null;
 export function isSupportedPidValue(value: unknown): boolean;
 export function isFreshTimestamp(time: Date | string | null | undefined, now?: Date, maxAgeMs?: number): boolean;
 export function assessTelemetryQuality(samples: any[], now?: Date): any;
-export function validateOdometerReading(input: Record<string, unknown>): { ok: boolean; error?: string; km?: number };
+export function validateOdometerReading(input: Record<string, unknown>): { ok: true; km: number } | { ok: false; error: string };
 export function estimateDailyKm(readings: any[]): { status: string; kmPerDay: number | null; estimated: boolean };
 export function estimateNextDueDate(input: Record<string, unknown>): any;
 export function computeHealthScore(input: Record<string, unknown>): number;

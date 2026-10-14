@@ -19,22 +19,83 @@ export const BATTERY_LOW_VOLTS = 12.2;
 export const MIN_ANOMALY_SAMPLES = 3;
 
 export const DEFAULT_RULE_SOURCE = "platform_default";
+export const LIVE_WINDOW_MS = 2 * 60 * 1000;
 
-export function resolveMaintenanceRule(serviceType, overrides = []) {
-  const match = (overrides || []).find((row) => row.serviceType === serviceType);
-  if (match && (match.intervalKm || match.intervalDays)) {
-    return {
-      intervalKm: match.intervalKm ?? null,
-      intervalDays: match.intervalDays ?? null,
-      soonKm: match.soonKm ?? 1500,
-      soonDays: match.soonDays ?? 30,
-      estimatedCost: match.estimatedCost ?? null,
-      ruleSource: match.ruleSource || "user_configured",
-    };
-  }
+function usableRule(row) {
+  return Boolean(row && (row.intervalKm || row.intervalDays));
+}
+
+function normalizeRule(row, fallbackSource) {
+  return {
+    intervalKm: row.intervalKm ?? null,
+    intervalDays: row.intervalDays ?? null,
+    soonKm: row.soonKm ?? 1500,
+    soonDays: row.soonDays ?? 30,
+    estimatedCost: row.estimatedCost ?? null,
+    ruleSource: row.ruleSource || fallbackSource,
+  };
+}
+
+export function resolveMaintenanceRule(serviceType, overrides = [], vehicle = {}) {
+  const rows = overrides || [];
+  const vehicleRule = rows.find(
+    (row) => row.serviceType === serviceType && row.vehicleId && row.vehicleId === vehicle.id,
+  );
+  if (usableRule(vehicleRule)) return normalizeRule(vehicleRule, "vehicle_rule");
+
+  const catalogRule = rows.find(
+    (row) =>
+      row.serviceType === serviceType &&
+      !row.vehicleId &&
+      row.make &&
+      String(row.make).toLowerCase() === String(vehicle.make || "").toLowerCase() &&
+      (!row.model || String(row.model).toLowerCase() === String(vehicle.model || "").toLowerCase()) &&
+      (!row.year || Number(row.year) === Number(vehicle.year)),
+  );
+  if (usableRule(catalogRule)) return normalizeRule(catalogRule, "catalog_rule");
+
+  const generic = rows.find(
+    (row) => row.serviceType === serviceType && !row.vehicleId && !row.make && usableRule(row),
+  );
+  if (usableRule(generic)) return normalizeRule(generic, "user_configured");
+
   const fallback = MAINTENANCE_RULES[serviceType];
   if (!fallback) return null;
   return { ...fallback, ruleSource: DEFAULT_RULE_SOURCE };
+}
+
+export function isRecommendationId(value) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
+export function maintenanceIdempotencyKey({ userId, vehicleId, serviceType, doneAt, doneAtKm } = {}) {
+  return [
+    userId || "na",
+    vehicleId || "na",
+    serviceType || "na",
+    doneAt ? new Date(doneAt).toISOString() : "na",
+    doneAtKm == null || doneAtKm === "" ? "na" : String(doneAtKm),
+  ].join("|");
+}
+
+export function describeVehicleLink({ adapterMac, lastTelemetryAt, now = new Date() } = {}) {
+  const paired = Boolean(adapterMac);
+  const lastSeenAt = lastTelemetryAt
+    ? lastTelemetryAt instanceof Date
+      ? lastTelemetryAt
+      : new Date(lastTelemetryAt)
+    : null;
+  const lastSeenMs = lastSeenAt && !Number.isNaN(lastSeenAt.getTime()) ? lastSeenAt.getTime() : null;
+  const connected = Boolean(paired && lastSeenMs && now.getTime() - lastSeenMs <= LIVE_WINDOW_MS);
+  return {
+    paired,
+    connected,
+    lastSeenAt: lastSeenMs ? new Date(lastSeenMs).toISOString() : null,
+    live: connected,
+  };
 }
 
 export function isSupportedPidValue(value) {
@@ -278,6 +339,7 @@ export function explainForAssistant(rec) {
 
 export function evaluateVehicleHealth({
   vehicleId,
+  vehicle = {},
   odometerKm,
   logs = [],
   schedule = [],
@@ -288,6 +350,7 @@ export function evaluateVehicleHealth({
   anomalyEnabled = false,
 } = {}) {
   const quality = assessTelemetryQuality(telemetrySamples, now);
+  const vehicleContext = { id: vehicleId, ...vehicle };
   const latestByService = new Map();
   for (const log of logs) {
     if (!latestByService.has(log.serviceType)) latestByService.set(log.serviceType, log);
@@ -297,7 +360,7 @@ export function evaluateVehicleHealth({
   const seen = new Set();
   for (const item of schedule) {
     seen.add(item.serviceType);
-    const rule = resolveMaintenanceRule(item.serviceType, ruleOverrides);
+    const rule = resolveMaintenanceRule(item.serviceType, ruleOverrides, vehicleContext);
     const rec = buildMaintenanceRecommendation({
       vehicleId,
       serviceType: item.serviceType,
@@ -305,6 +368,7 @@ export function evaluateVehicleHealth({
       lastDoneAt: item.lastDoneAt,
       odometerKm,
       estimatedCost: item.estimatedCost ?? rule?.estimatedCost,
+      rule,
       now,
     });
     if (rec) {
@@ -318,16 +382,17 @@ export function evaluateVehicleHealth({
   }
   for (const [serviceType, log] of latestByService) {
     if (seen.has(serviceType)) continue;
+    const rule = resolveMaintenanceRule(serviceType, ruleOverrides, vehicleContext);
     const rec = buildMaintenanceRecommendation({
       vehicleId,
       serviceType,
       lastDoneKm: log.doneAtKm ?? log.lastDoneKm,
       lastDoneAt: log.doneAt ?? log.lastDoneAt,
       odometerKm,
+      rule,
       now,
     });
     if (rec) {
-      const rule = resolveMaintenanceRule(serviceType, ruleOverrides);
       candidates.push(
         attachExplanation({
           ...rec,

@@ -12,15 +12,18 @@ import {
   vehiclesTable,
 } from "@workspace/db";
 import {
+  isAnomalyDetectionEnabled,
   isApprovalLoggingEnabled,
   isHealthIntelligenceEnabled,
+  isOcrEnabled,
   isOdometerTrackingEnabled,
 } from "../lib/health-intelligence-flags";
 import { extractInvoiceFromImage } from "../services/ocr-adapter";
-import { maybeLlmExplain } from "../services/ai-explanation-adapter";
 import { enqueueNotification } from "../services/notification-orchestrator";
+import { explainOwnedRecommendation } from "../services/explain-owned-recommendation";
 import { logCompletedMaintenance } from "../services/recommendation-store";
 import {
+  describeVehicleLink,
   estimateDailyKm,
   evaluateVehicleHealth,
   validateOdometerReading,
@@ -83,11 +86,16 @@ router.get("/vehicles/:vehicleId/health-summary", async (req, res): Promise<void
       synthetic: false,
     })),
     ruleOverrides: rules,
-    anomalyEnabled: true,
+    anomalyEnabled: isAnomalyDetectionEnabled(),
+    vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, year: vehicle.year },
   });
   const mileage = estimateDailyKm(
     odo.map((row) => ({ km: row.km, recordedAt: row.recordedAt })),
   );
+  const link = describeVehicleLink({
+    adapterMac: vehicle.adapterMac,
+    lastTelemetryAt: evaluation.lastReadingAt,
+  });
 
   res.json({
     vehicleId: vehicle.id,
@@ -101,7 +109,10 @@ router.get("/vehicles/:vehicleId/health-summary", async (req, res): Promise<void
       ? "تقديري من قراءات العداد المسجلة، وليس بديلاً عن العداد المؤكد."
       : null,
     openRecommendations: evaluation.candidates.length,
-    connected: Boolean(vehicle.adapterMac),
+    paired: link.paired,
+    connected: link.connected,
+    lastSeenAt: link.lastSeenAt,
+    live: link.live,
   });
 });
 
@@ -283,20 +294,17 @@ router.patch("/maintenance/approvals/:id", async (req, res): Promise<void> => {
     doneAtKm: body.doneAtKm,
     cost: body.cost,
     notes: body.notes,
+    approvalId: row.id,
+    idempotencyKey: `approval:${row.id}`,
   });
   if (!logged.ok) {
     res.status(logged.status).json({ error: logged.error });
     return;
   }
   const [updated] = await db
-    .update(maintenanceApprovalRequestsTable)
-    .set({
-      status: "confirmed",
-      resolvedLogId: logged.log.id,
-      updatedAt: new Date(),
-    })
-    .where(eq(maintenanceApprovalRequestsTable.id, row.id))
-    .returning();
+    .select()
+    .from(maintenanceApprovalRequestsTable)
+    .where(eq(maintenanceApprovalRequestsTable.id, row.id));
   await enqueueNotification({
     userId: req.userId,
     vehicleId: row.vehicleId,
@@ -319,15 +327,24 @@ router.post("/ai/recommendations/:vehicleId/explain", async (req, res): Promise<
     res.status(404).json({ error: "Vehicle not found" });
     return;
   }
-  const rec = req.body as Record<string, unknown>;
-  if (!rec || (rec.vehicleId && rec.vehicleId !== vehicle.id)) {
-    res.status(400).json({ error: "Invalid recommendation" });
+  const body = req.body as { recommendationId?: unknown };
+  const result = await explainOwnedRecommendation({
+    vehicleId: vehicle.id,
+    userId: req.userId,
+    recommendationId: body?.recommendationId,
+  });
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
-  res.json(await maybeLlmExplain(rec));
+  res.json(result.explanation);
 });
 
 router.post("/maintenance/invoice-ocr", async (req, res): Promise<void> => {
+  if (!isOcrEnabled()) {
+    featureDisabled(res, "MFK_OCR_ENABLED");
+    return;
+  }
   res.json(await extractInvoiceFromImage());
 });
 

@@ -1,8 +1,10 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 import {
   db,
   dtcCodesTable,
+  maintenanceApprovalRequestsTable,
   maintenanceLogsTable,
+  maintenanceRulesTable,
   maintenanceTable,
   recommendationEventsTable,
   recommendationsTable,
@@ -24,7 +26,12 @@ import {
   validateMaintenanceInput,
   visibleRecommendations,
 } from "./maintenance-recommendations.mjs";
-import { evaluateVehicleHealth, isFreshTimestamp } from "./vehicle-health-engine.mjs";
+import {
+  evaluateVehicleHealth,
+  isFreshTimestamp,
+  maintenanceIdempotencyKey,
+  resolveMaintenanceRule,
+} from "./vehicle-health-engine.mjs";
 
 function toIso(value: Date | string | null | undefined) {
   if (!value) return null;
@@ -99,8 +106,23 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
 
   const candidates = [];
   if (isHealthIntelligenceEnabled()) {
+    let ruleOverrides: Array<typeof maintenanceRulesTable.$inferSelect> = [];
+    try {
+      ruleOverrides = await db
+        .select()
+        .from(maintenanceRulesTable)
+        .where(
+          or(
+            eq(maintenanceRulesTable.vehicleId, vehicleId),
+            and(eq(maintenanceRulesTable.make, vehicle.make), isNull(maintenanceRulesTable.vehicleId)),
+          ),
+        );
+    } catch {
+      ruleOverrides = [];
+    }
     const evaluation = evaluateVehicleHealth({
       vehicleId,
+      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, year: vehicle.year },
       odometerKm: vehicle.odometerKm,
       logs,
       schedule,
@@ -111,6 +133,7 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
         batteryV: row.batteryV != null ? Number(row.batteryV) : null,
         synthetic: false,
       })),
+      ruleOverrides,
       anomalyEnabled: isAnomalyDetectionEnabled(),
     });
     candidates.push(...evaluation.candidates);
@@ -169,7 +192,7 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
 
   if (inserts.length > 0) {
     await db.insert(recommendationsTable).values(
-      inserts.map((item) => ({
+      inserts.map((item: any) => ({
         vehicleId: item.vehicleId,
         kind: item.kind,
         severity: item.severity,
@@ -212,7 +235,7 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
     .orderBy(desc(recommendationsTable.createdAt));
 
   const extrasByService = new Map(
-    schedule.map((item) => [
+    schedule.map((item: typeof maintenanceTable.$inferSelect) => [
       item.serviceType,
       {
         lastDoneKm: item.lastDoneKm,
@@ -233,7 +256,7 @@ export async function persistEvaluation(vehicleId: string, userId: string) {
     ]),
   );
 
-  return visibleRecommendations(rows).map((row) =>
+  return visibleRecommendations(rows).map((row: any) =>
     serializeRecommendation(row, extrasByService.get(row.serviceType || "") ?? {}),
   );
 }
@@ -248,6 +271,8 @@ export async function logCompletedMaintenance(input: {
   notes?: string | null;
   recommendationId?: string | null;
   customServiceName?: string | null;
+  idempotencyKey?: string | null;
+  approvalId?: string | null;
 }) {
   const valid = validateMaintenanceInput({
     serviceType: input.serviceType,
@@ -267,32 +292,37 @@ export async function logCompletedMaintenance(input: {
     return { ok: false as const, status: 404 as const, error: "Vehicle not found" };
   }
 
-  const doneAtPreview = new Date(input.doneAt);
-  const doneAtKmPreview = input.doneAtKm == null ? vehicle.odometerKm : Number(input.doneAtKm);
-  const [duplicate] = await db
-    .select()
-    .from(maintenanceLogsTable)
-    .where(
-      and(
-        eq(maintenanceLogsTable.vehicleId, input.vehicleId),
-        eq(maintenanceLogsTable.userId, input.userId),
-        eq(maintenanceLogsTable.serviceType, input.serviceType),
-      ),
-    )
-    .orderBy(desc(maintenanceLogsTable.createdAt))
-    .limit(1);
-  if (
-    duplicate &&
-    duplicate.doneAtKm === doneAtKmPreview &&
-    Math.abs(new Date(duplicate.doneAt).getTime() - doneAtPreview.getTime()) < 120_000 &&
-    Date.now() - new Date(duplicate.createdAt).getTime() < 120_000
-  ) {
-    return { ok: true as const, log: duplicate, schedule: null, duplicate: true };
-  }
-
-  const rule = MAINTENANCE_RULES[input.serviceType];
   const doneAt = new Date(input.doneAt);
   const doneAtKm = input.doneAtKm == null ? vehicle.odometerKm : Number(input.doneAtKm);
+  const idempotencyKey =
+    input.idempotencyKey ||
+    maintenanceIdempotencyKey({
+      userId: input.userId,
+      vehicleId: input.vehicleId,
+      serviceType: input.serviceType,
+      doneAt,
+      doneAtKm,
+    });
+
+  let ruleOverrides: Array<typeof maintenanceRulesTable.$inferSelect> = [];
+  try {
+    ruleOverrides = await db
+      .select()
+      .from(maintenanceRulesTable)
+      .where(
+        or(
+          eq(maintenanceRulesTable.vehicleId, vehicle.id),
+          and(eq(maintenanceRulesTable.make, vehicle.make), isNull(maintenanceRulesTable.vehicleId)),
+        ),
+      );
+  } catch {
+    ruleOverrides = [];
+  }
+  const rule =
+    resolveMaintenanceRule(input.serviceType, ruleOverrides, vehicle) ||
+    (MAINTENANCE_RULES as Record<string, (typeof MAINTENANCE_RULES)["oil_change"] | undefined>)[
+      input.serviceType
+    ];
   const due = computeNextDue({
     lastDoneKm: doneAtKm,
     lastDoneAt: doneAt,
@@ -308,6 +338,38 @@ export async function logCompletedMaintenance(input: {
 
   try {
     const result = await db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select()
+        .from(vehiclesTable)
+        .where(and(eq(vehiclesTable.id, input.vehicleId), eq(vehiclesTable.userId, input.userId)))
+        .for("update");
+      if (!locked) {
+        throw Object.assign(new Error("Vehicle not found"), { status: 404 });
+      }
+
+      const [existingByKey] = await tx
+        .select()
+        .from(maintenanceLogsTable)
+        .where(
+          and(
+            eq(maintenanceLogsTable.userId, input.userId),
+            eq(maintenanceLogsTable.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existingByKey) {
+        const [schedule] = await tx
+          .select()
+          .from(maintenanceTable)
+          .where(
+            and(
+              eq(maintenanceTable.vehicleId, input.vehicleId),
+              eq(maintenanceTable.serviceType, input.serviceType),
+            ),
+          );
+        return { log: existingByKey, schedule: schedule ?? null, duplicate: true };
+      }
+
       const [log] = await tx
         .insert(maintenanceLogsTable)
         .values({
@@ -322,6 +384,7 @@ export async function logCompletedMaintenance(input: {
           notes: input.notes ?? null,
           source: "manual",
           recommendationId: input.recommendationId ?? null,
+          idempotencyKey,
         })
         .returning();
 
@@ -431,11 +494,44 @@ export async function logCompletedMaintenance(input: {
         }
       }
 
-      return { log, schedule };
+      if (input.approvalId) {
+        await tx
+          .update(maintenanceApprovalRequestsTable)
+          .set({
+            status: "confirmed",
+            resolvedLogId: log.id,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(maintenanceApprovalRequestsTable.id, input.approvalId),
+              eq(maintenanceApprovalRequestsTable.userId, input.userId),
+              eq(maintenanceApprovalRequestsTable.vehicleId, input.vehicleId),
+            ),
+          );
+      }
+
+      return { log, schedule, duplicate: false };
     });
 
     return { ok: true as const, ...result };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("idx_maint_logs_idempotency") || message.includes("idempotency_key")) {
+      const [existing] = await db
+        .select()
+        .from(maintenanceLogsTable)
+        .where(
+          and(
+            eq(maintenanceLogsTable.userId, input.userId),
+            eq(maintenanceLogsTable.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        return { ok: true as const, log: existing, schedule: null, duplicate: true };
+      }
+    }
     return {
       ok: false as const,
       status: 500 as const,

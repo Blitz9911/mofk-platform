@@ -10,6 +10,7 @@ import {
 } from "@/lib/maintenance-engine.mjs";
 import {
   buildRepeatedCoolantAnomaly,
+  describeVehicleLink,
   evaluateVehicleHealth,
   isFreshTimestamp,
 } from "@/lib/vehicle-health-engine.mjs";
@@ -1020,9 +1021,7 @@ async function liveTelemetry(
   if (!rows.length) {
     return {
       ...emptyLiveTelemetry(vehicleId),
-      isConnected: Boolean(
-        vehicle.adapter_mac,
-      ),
+      isConnected: false,
     };
   }
 
@@ -1030,11 +1029,16 @@ async function liveTelemetry(
     .slice()
     .reverse()
     .map(telemetryPointFromRow);
+  const latest = telemetryPointFromRow(rows[0]);
+  const link = describeVehicleLink({
+    adapterMac: vehicle.adapter_mac,
+    lastTelemetryAt: latest.time,
+  });
 
   return {
     vehicleId,
-    isConnected: true,
-    latest: telemetryPointFromRow(rows[0]),
+    isConnected: link.connected,
+    latest,
     recent,
   };
 }
@@ -2991,13 +2995,53 @@ async function handleHealthIntelligence(
   const approvalsMatch = path.match(/^\/api\/vehicles\/([^/]+)\/maintenance\/approvals$/);
   const approvalPatch = path.match(/^\/api\/maintenance\/approvals\/([^/]+)$/);
   const ocrMatch = path === "/api/maintenance/invoice-ocr";
+  const explainMatch = path.match(/^\/api\/ai\/recommendations\/([^/]+)\/explain$/);
 
-  if (!summaryMatch && !odoMatch && !approvalsMatch && !approvalPatch && !ocrMatch) {
+  if (!summaryMatch && !odoMatch && !approvalsMatch && !approvalPatch && !ocrMatch && !explainMatch) {
     return { handled: false };
   }
 
   if (ocrMatch && method === "POST") {
-    return { handled: true, data: { available: false, fields: null, reason: "ocr_disabled" } };
+    return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+  }
+
+  if (explainMatch && method === "POST") {
+    if (!isHealthIntelligenceEnabled()) {
+      return { handled: true, status: 404, data: { error: "Feature disabled", featureDisabled: true } };
+    }
+    const session = await requireSession();
+    const vehicleId = decodeURIComponent(explainMatch[1]);
+    const vehicle = await getVehicleRow(vehicleId, session.access_token, session.user.id);
+    if (!vehicle) throw new ApiBridgeError("المركبة غير موجودة.", 404);
+    const body = await readJsonBody(input, init);
+    const recommendationId = body.recommendationId;
+    if (typeof recommendationId !== "string" || !recommendationId) {
+      return { handled: true, status: 400, data: { error: "recommendationId required" } };
+    }
+    try {
+      const rows = await supabaseRequest<{ id: string; vehicle_id: string; title_ar: string; description_ar: string; suggested_action?: string | null; severity?: string | null; metadata?: Record<string, unknown> }[]>(
+        `/rest/v1/recommendations?select=*&id=eq.${encodeURIComponent(recommendationId)}&vehicle_id=eq.${encodeURIComponent(vehicleId)}`,
+        { method: "GET" },
+        session.access_token,
+      );
+      const rec = rows[0];
+      if (!rec) {
+        return { handled: true, status: 404, data: { error: "Recommendation not found" } };
+      }
+      return {
+        handled: true,
+        data: {
+          observedAr: rec.title_ar,
+          whyAr: rec.description_ar,
+          nextAr: rec.suggested_action,
+          severity: rec.severity,
+          workshop: rec.severity === "critical",
+          provider: "rules",
+        },
+      };
+    } catch {
+      return { handled: true, status: 404, data: { error: "Recommendation not found" } };
+    }
   }
 
   if (summaryMatch && method === "GET") {
@@ -3012,6 +3056,12 @@ async function handleHealthIntelligence(
     const logs = await listMaintenanceLogs(session.access_token, session.user.id, vehicleId);
     const evaluation = evaluateVehicleHealth({
       vehicleId,
+      vehicle: {
+        id: vehicleId,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+      },
       odometerKm: vehicle.odometer_km,
       logs: logs.map((row) => ({
         serviceType: row.service_type,
@@ -3031,7 +3081,10 @@ async function handleHealthIntelligence(
         insufficientData: evaluation.insufficientData,
         odometerKm: vehicle.odometer_km,
         openRecommendations: evaluation.candidates.length,
-        connected: Boolean(vehicle.adapter_mac),
+        ...describeVehicleLink({
+          adapterMac: vehicle.adapter_mac,
+          lastTelemetryAt: evaluation.lastReadingAt,
+        }),
       },
     };
   }

@@ -102,7 +102,7 @@ export default function VehicleDetailScreen() {
             <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.infoLabel, { color: colors.mutedForeground }]}>الجهاز</Text>
               <Text style={[styles.infoValue, { color: vehicle.adapterMac ? colors.success : colors.mutedForeground }]}>
-                {vehicle.adapterMac ? "متصل" : "غير متصل"}
+                {vehicle.adapterMac ? "مقترن" : "غير مقترن"}
               </Text>
             </View>
           </View>

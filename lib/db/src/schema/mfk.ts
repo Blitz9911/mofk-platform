@@ -212,6 +212,7 @@ export const maintenanceLogsTable = pgTable(
     notes: text("notes"),
     source: varchar("source", { length: 30 }).notNull().default("manual"),
     recommendationId: uuid("recommendation_id"),
+    idempotencyKey: varchar("idempotency_key", { length: 200 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -387,6 +388,9 @@ export const notificationsTable = pgTable(
     actionUrl: varchar("action_url", { length: 200 }),
     dedupeKey: varchar("dedupe_key", { length: 160 }),
     isRead: boolean("is_read").notNull().default(false),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

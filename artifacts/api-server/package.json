@@ -8,7 +8,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:recommendations": "node --test ./test/recommendation-engine.test.mjs ./test/vehicle-health-engine.test.mjs",
+    "test:recommendations": "node --test ./test/recommendation-engine.test.mjs ./test/vehicle-health-engine.test.mjs ./test/health-intelligence-security.test.mjs ./test/health-intelligence-db.integration.test.mjs",
     "test:ai": "node --test ./test/mofk-ai-service.test.mjs"
   },
   "dependencies": {
@@ -16,7 +16,7 @@
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "catalog:",
     "express": "^5",
     "openai": "^6.49.0",
     "pino": "^9",

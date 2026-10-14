@@ -157,6 +157,36 @@ test("13 BLE/ELM modules are not imported by the health engine", () => {
   assert.equal(/\b(react-native-ble-plx|elm327-command-queue|FFE1|obd-service)\b/.test(source), false);
 });
 
+test("anomaly detection stays off unless the flag is passed in", () => {
+  const hot = Array.from({ length: MIN_ANOMALY_SAMPLES }, (_, i) => ({
+    time: new Date(now.getTime() - i * 1000).toISOString(),
+    coolantTemp: 110,
+    synthetic: false,
+  }));
+  const off = evaluateVehicleHealth({
+    vehicleId: "veh-1",
+    odometerKm: 10000,
+    telemetrySamples: hot,
+    anomalyEnabled: false,
+    now,
+  });
+  assert.equal(
+    off.candidates.some((row) => row.kind === "telemetry_anomaly"),
+    false,
+  );
+  const on = evaluateVehicleHealth({
+    vehicleId: "veh-1",
+    odometerKm: 10000,
+    telemetrySamples: hot,
+    anomalyEnabled: true,
+    now,
+  });
+  assert.equal(
+    on.candidates.some((row) => row.kind === "telemetry_anomaly"),
+    true,
+  );
+});
+
 test("14 works offline with insufficient data instead of fake health copy", () => {
   const result = evaluateVehicleHealth({
     vehicleId: "veh-1",

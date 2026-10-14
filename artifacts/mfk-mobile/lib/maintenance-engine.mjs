@@ -204,9 +204,12 @@ export function buildMaintenanceRecommendation({
   lastDoneAt,
   odometerKm,
   estimatedCost,
+  rule: ruleInput,
   now = new Date(),
 } = {}) {
-  const rule = MAINTENANCE_RULES[serviceType];
+  const rule = ruleInput && (ruleInput.intervalKm || ruleInput.intervalDays)
+    ? ruleInput
+    : MAINTENANCE_RULES[serviceType];
   if (!rule) return null;
   const due = computeNextDue({
     lastDoneKm,
@@ -249,7 +252,12 @@ export function buildMaintenanceRecommendation({
     scheduleStatus: statusInfo.status,
     serviceType,
     serviceTypeAr: label,
-    metadata: { confidenceSource: "none", ruleBased: true },
+    metadata: {
+      confidenceSource: "none",
+      ruleBased: true,
+      ruleSource: rule.ruleSource || "platform_default",
+      oemSchedule: rule.ruleSource === "oem",
+    },
     confidencePct: undefined,
   };
 }

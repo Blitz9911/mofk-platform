@@ -1,7 +1,7 @@
 import { isExternalLlmEnabled } from "../lib/health-intelligence-flags";
 import { explainForAssistant } from "./vehicle-health-engine.mjs";
 
-/** LLM is optional. Facts always come from the rule engine. */
+/** LLM is optional. Callers must pass a stored recommendation row, never client-authored copy. */
 export function explainRecommendation(rec: Record<string, unknown>) {
   return explainForAssistant(rec);
 }
