@@ -10,6 +10,8 @@ export const MAINTENANCE_RULES: Record<string, {
 }>;
 
 export function serviceLabelAr(serviceType: string): string;
+export function ruleSourceLabelAr(source?: string): string;
+export function mergeLifecycleOntoRecommendation(rec: any, overlay?: Record<string, unknown> | null): any;
 export function addDaysIso(dateInput: Date | string, days: number): string | null;
 export function daysUntilIso(dateInput: Date | string, now?: Date): number | null;
 export function validateMaintenanceInput(input: Record<string, unknown>): { ok: boolean; errors: string[] };

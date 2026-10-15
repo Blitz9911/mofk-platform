@@ -361,6 +361,8 @@ function ManualMaintenanceModal({
           }
           queryClient.invalidateQueries({ queryKey: MAINTENANCE_LOGS_QUERY_KEY });
           queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] || "").includes("recommendations") });
+          queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] || "").includes("vehicles") });
+          queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] || "").includes("maintenance") });
           const createdId = item?.id;
           close();
           if (createdId) onCreated?.(createdId);

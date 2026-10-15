@@ -43,6 +43,35 @@ export function serviceLabelAr(serviceType) {
   return MAINTENANCE_LABELS[serviceType] || serviceType || "صيانة";
 }
 
+export function ruleSourceLabelAr(source) {
+  if (source === "oem") return "جدول الوكيل";
+  if (source === "vehicle_rule") return "إعداد خاص بالمركبة";
+  if (source === "catalog_rule") return "كتالوج الصيانة";
+  if (source === "user_configured") return "إعداد عام معتمد";
+  return "فاصل منصة مفك — ليس جدول وكيل";
+}
+
+export function mergeLifecycleOntoRecommendation(rec, overlay) {
+  if (!rec) return rec;
+  if (!overlay) return rec;
+  if (overlay.status === "resolved" && rec.kind === "maintenance_due") {
+    return {
+      ...rec,
+      linkedMaintenanceLogId: overlay.linkedMaintenanceLogId ?? rec.linkedMaintenanceLogId,
+      events: overlay.events ?? rec.events,
+    };
+  }
+  return {
+    ...rec,
+    status: overlay.status ?? rec.status,
+    deferredUntil: overlay.deferredUntil ?? rec.deferredUntil,
+    linkedMaintenanceLogId: overlay.linkedMaintenanceLogId ?? rec.linkedMaintenanceLogId,
+    linkedMaintenanceItemId: overlay.linkedMaintenanceItemId ?? rec.linkedMaintenanceItemId,
+    events: overlay.events ?? rec.events,
+    updatedAt: overlay.updatedAt ?? rec.updatedAt,
+  };
+}
+
 export function addDaysIso(dateInput, days) {
   const date = dateInput instanceof Date ? new Date(dateInput.getTime()) : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return null;
@@ -224,9 +253,19 @@ export function buildMaintenanceRecommendation({
     soonDays: rule.soonDays,
     now,
   });
-  if (statusInfo.status === "scheduled") return null;
   const overdue = statusInfo.status === "overdue";
   const label = serviceLabelAr(serviceType);
+  const ruleSource = rule.ruleSource || "platform_default";
+  const titles = {
+    overdue: `صيانة متأخرة: ${label}`,
+    upcoming: `موعد صيانة قريب: ${label}`,
+    scheduled: `صيانة مجدولة: ${label}`,
+  };
+  const descriptions = {
+    overdue: `بند ${label} تجاوز الفاصل المعتمد حسب آخر صيانة مسجلة. هذا تنبيه جدولة وليس تشخيص عطل.`,
+    upcoming: `بند ${label} قريب حسب فاصل الصيانة المعتمد لهذه المركبة.`,
+    scheduled: `البند التالي لـ ${label} محسوب من آخر سجل مكتمل. هذا جدول وليست توصية تحذيرية.`,
+  };
   return {
     vehicleId,
     kind: "maintenance_due",
@@ -235,10 +274,9 @@ export function buildMaintenanceRecommendation({
     sourceKey: sourceKeyForMaintenance(serviceType),
     severity: overdue ? "warning" : "info",
     status: "active",
-    titleAr: overdue ? `صيانة متأخرة: ${label}` : `موعد صيانة: ${label}`,
-    descriptionAr: overdue
-      ? `بند ${label} تجاوز الفاصل المعتمد حسب آخر صيانة مسجلة. هذا تنبيه جدولة وليس تشخيص عطل.`
-      : `بند ${label} قريب حسب فاصل الصيانة المعتمد لهذه المركبة.`,
+    displayGroup: statusInfo.status,
+    titleAr: titles[statusInfo.status] || titles.scheduled,
+    descriptionAr: descriptions[statusInfo.status] || descriptions.scheduled,
     suggestedAction: `تسجيل ${label}`,
     suggestedCostSar: estimatedCost ?? rule.estimatedCost ?? null,
     lastDoneKm: lastDoneKm ?? null,
@@ -255,8 +293,9 @@ export function buildMaintenanceRecommendation({
     metadata: {
       confidenceSource: "none",
       ruleBased: true,
-      ruleSource: rule.ruleSource || "platform_default",
-      oemSchedule: rule.ruleSource === "oem",
+      ruleSource,
+      ruleSourceAr: ruleSourceLabelAr(ruleSource),
+      oemSchedule: ruleSource === "oem",
     },
     confidencePct: undefined,
   };

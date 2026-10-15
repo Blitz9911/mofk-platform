@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   applyMaintenanceToRecommendations,
   lifecycleEvent,
+  mergeLifecycleOntoRecommendation,
 } from "./maintenance-engine.mjs";
 
 const STORAGE_KEY = "mfk-recommendation-lifecycle";
@@ -59,15 +60,7 @@ export function applyOverlay<T extends Record<string, unknown>>(rec: T, overlay:
   const key = recStorageKey(rec as any);
   const row = overlay[key] || (rec.id ? overlay[String(rec.id)] : undefined);
   if (!row) return rec;
-  return {
-    ...rec,
-    status: row.status ?? rec.status,
-    deferredUntil: row.deferredUntil ?? rec.deferredUntil,
-    linkedMaintenanceLogId: row.linkedMaintenanceLogId ?? rec.linkedMaintenanceLogId,
-    linkedMaintenanceItemId: row.linkedMaintenanceItemId ?? rec.linkedMaintenanceItemId,
-    events: row.events ?? rec.events,
-    updatedAt: row.updatedAt ?? rec.updatedAt,
-  };
+  return mergeLifecycleOntoRecommendation(rec, row) as T;
 }
 
 export async function recordRecommendationAction(

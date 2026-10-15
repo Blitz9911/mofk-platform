@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  getGetAiRecommendationsQueryKey,
+  getGetUpcomingMaintenanceQueryKey,
   getGetVehicleQueryKey,
   getListVehiclesQueryKey,
   useGetVehicle,
@@ -199,6 +201,8 @@ export default function VehicleDetailScreen() {
                     onSuccess: () => {
                       queryClient.invalidateQueries({ queryKey: getGetVehicleQueryKey(id) });
                       queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
+                      queryClient.invalidateQueries({ queryKey: getGetUpcomingMaintenanceQueryKey() });
+                      queryClient.invalidateQueries({ queryKey: getGetAiRecommendationsQueryKey(id) });
                       setOdometerOpen(false);
                     },
                     onError: (error) => {

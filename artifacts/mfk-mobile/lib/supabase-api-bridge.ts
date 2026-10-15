@@ -5,7 +5,6 @@ import {
 import {
   buildDtcRecommendation,
   buildMaintenanceRecommendation as engineBuildMaintenanceRecommendation,
-  buildTelemetryRecommendations as engineTelemetryRecommendations,
   visibleRecommendations,
 } from "@/lib/maintenance-engine.mjs";
 import {
@@ -14,6 +13,7 @@ import {
   evaluateVehicleHealth,
   isFreshTimestamp,
   maintenanceIdempotencyKey,
+  resolveMaintenanceRule,
 } from "@/lib/vehicle-health-engine.mjs";
 import {
   isAnomalyDetectionEnabled,
@@ -804,6 +804,74 @@ function latestMaintenanceRows(rows: MaintenanceLogRow[]) {
   }
 
   return Array.from(latest.values());
+}
+
+function mapMaintenanceRuleRow(row: Record<string, unknown>) {
+  return {
+    serviceType: String(row.service_type || ""),
+    vehicleId: row.vehicle_id ? String(row.vehicle_id) : null,
+    make: row.make ? String(row.make) : null,
+    model: row.model ? String(row.model) : null,
+    year: row.year != null ? Number(row.year) : null,
+    intervalKm: row.interval_km != null ? Number(row.interval_km) : null,
+    intervalDays: row.interval_days != null ? Number(row.interval_days) : null,
+    soonKm: row.soon_km != null ? Number(row.soon_km) : null,
+    soonDays: row.soon_days != null ? Number(row.soon_days) : null,
+    estimatedCost: row.estimated_cost != null ? Number(row.estimated_cost) : null,
+    ruleSource: row.rule_source ? String(row.rule_source) : undefined,
+  };
+}
+
+async function listMaintenanceRuleOverrides(accessToken: string) {
+  try {
+    const rows = await supabaseRequest<Record<string, unknown>[]>(
+      "/rest/v1/maintenance_rules?select=*",
+      { method: "GET" },
+      accessToken,
+    );
+    return (rows || []).map(mapMaintenanceRuleRow);
+  } catch (error) {
+    if (isMissingTableError(error) || isUnknownColumnError(error)) return [];
+    throw error;
+  }
+}
+
+function evaluatedMaintenanceRecommendations(
+  vehicle: VehicleRow,
+  logs: MaintenanceLogRow[],
+  overrides: ReturnType<typeof mapMaintenanceRuleRow>[],
+  evaluatedAt: string,
+) {
+  return latestMaintenanceRows(logs)
+    .map((row) => {
+      const rule = resolveMaintenanceRule(row.service_type, overrides, {
+        id: vehicle.id,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+      });
+      if (!rule) return null;
+      return engineBuildMaintenanceRecommendation({
+        vehicleId: vehicle.id,
+        serviceType: row.service_type,
+        lastDoneKm: row.done_at_km,
+        lastDoneAt: row.done_at,
+        odometerKm: vehicle.odometer_km ?? row.done_at_km,
+        estimatedCost: row.actual_cost_sar ?? row.cost_sar,
+        rule,
+      });
+    })
+    .filter(Boolean)
+    .map((item: any) => ({
+      ...item,
+      id: `maintenance-${vehicle.id}-${item.serviceType}`,
+      createdAt: item.lastDoneAt || evaluatedAt,
+      metadata: {
+        ...(item.metadata || {}),
+        evaluatedAt,
+        dataSource: "maintenance_logs+vehicles.odometer_km",
+      },
+    }));
 }
 
 function buildMaintenanceRecommendation(
@@ -2924,15 +2992,14 @@ async function handleAi(
     }
 
     const overlay = await getLifecycleOverlay();
+    const evaluatedAt = new Date().toISOString();
     const latest = await latestTelemetryPoint(
       vehicleId,
       session.access_token,
     );
     const telemetryRecs =
-      latest && isFreshTimestamp(latest.time)
-        ? isAnomalyDetectionEnabled()
-          ? [buildRepeatedCoolantAnomaly(vehicleId, [latest])].filter(Boolean)
-          : engineTelemetryRecommendations(vehicleId, latest)
+      isAnomalyDetectionEnabled() && latest && isFreshTimestamp(latest.time)
+        ? [buildRepeatedCoolantAnomaly(vehicleId, [latest])].filter(Boolean)
         : [];
 
     const maintenanceRows = await listMaintenanceLogs(
@@ -2940,23 +3007,13 @@ async function handleAi(
       session.user.id,
       vehicleId,
     );
-    const maintenanceRecs = latestMaintenanceRows(maintenanceRows)
-      .map((row) =>
-        engineBuildMaintenanceRecommendation({
-          vehicleId,
-          serviceType: row.service_type,
-          lastDoneKm: row.done_at_km,
-          lastDoneAt: row.done_at,
-          odometerKm: vehicle.odometer_km ?? row.done_at_km,
-          estimatedCost: row.actual_cost_sar ?? row.cost_sar,
-        }),
-      )
-      .filter(Boolean)
-      .map((item: any) => ({
-        ...item,
-        id: `maintenance-${vehicleId}-${item.serviceType}`,
-        createdAt: item.lastDoneAt || new Date().toISOString(),
-      }));
+    const overrides = await listMaintenanceRuleOverrides(session.access_token);
+    const maintenanceRecs = evaluatedMaintenanceRecommendations(
+      vehicle,
+      maintenanceRows,
+      overrides,
+      evaluatedAt,
+    );
 
     let dtcRecs: ReturnType<typeof buildDtcRecommendation>[] = [];
     try {
@@ -2982,17 +3039,23 @@ async function handleAi(
           id: `dtc-${vehicleId}-${item.sourceKey}`,
           createdAt: new Date().toISOString(),
         }));
-    } catch {
+    } catch (error) {
+      if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
       dtcRecs = [];
     }
 
-    const stored = await supabaseRequest<RecommendationRow[]>(
-      `/rest/v1/recommendations?select=*&vehicle_id=eq.${encodeURIComponent(
-        vehicleId,
-      )}&order=created_at.desc`,
-      { method: "GET" },
-      session.access_token,
-    ).catch(() => [] as RecommendationRow[]);
+    let stored: RecommendationRow[] = [];
+    try {
+      stored = await supabaseRequest<RecommendationRow[]>(
+        `/rest/v1/recommendations?select=*&vehicle_id=eq.${encodeURIComponent(
+          vehicleId,
+        )}&order=created_at.desc`,
+        { method: "GET" },
+        session.access_token,
+      );
+    } catch (error) {
+      if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
+    }
 
     const combined = [
       ...telemetryRecs.map((item) => ({
@@ -3887,26 +3950,16 @@ async function handleRequest(
     );
     const overlay = await getLifecycleOverlay();
     const logs = await listMaintenanceLogs(session.access_token, session.user.id);
-    const recs = vehicles.flatMap((vehicle) => {
-      const vehicleLogs = logs.filter((row) => row.vehicle_id === vehicle.id);
-      return latestMaintenanceRows(vehicleLogs)
-        .map((row) =>
-          engineBuildMaintenanceRecommendation({
-            vehicleId: vehicle.id,
-            serviceType: row.service_type,
-            lastDoneKm: row.done_at_km,
-            lastDoneAt: row.done_at,
-            odometerKm: vehicle.odometer_km ?? row.done_at_km,
-            estimatedCost: row.actual_cost_sar ?? row.cost_sar,
-          }),
-        )
-        .filter(Boolean)
-        .map((item: any) => ({
-          ...item,
-          id: `maintenance-${vehicle.id}-${item.serviceType}`,
-          createdAt: item.lastDoneAt || new Date().toISOString(),
-        }));
-    });
+    const overrides = await listMaintenanceRuleOverrides(session.access_token);
+    const evaluatedAt = new Date().toISOString();
+    const recs = vehicles.flatMap((vehicle) =>
+      evaluatedMaintenanceRecommendations(
+        vehicle,
+        logs.filter((row) => row.vehicle_id === vehicle.id),
+        overrides,
+        evaluatedAt,
+      ),
+    );
     return {
       handled: true,
       data: visibleRecommendations(recs.map((rec) => applyOverlay(rec, overlay))),

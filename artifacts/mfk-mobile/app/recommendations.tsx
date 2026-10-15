@@ -86,6 +86,17 @@ function hasRealConfidence(rec: any) {
   return rec.metadata?.confidenceSource === "real" && rec.confidencePct !== undefined;
 }
 
+function displayGroup(rec: any): "overdue" | "upcoming" | "scheduled" | "diagnostic" | "predictive" | "other" {
+  if (rec.kind === "predictive_failure") return "predictive";
+  if (rec.category === "diagnostic" || rec.source === "dtc" || rec.kind === "telemetry_anomaly") {
+    return "diagnostic";
+  }
+  if (rec.scheduleStatus === "overdue") return "overdue";
+  if (rec.scheduleStatus === "upcoming") return "upcoming";
+  if (rec.kind === "maintenance_due") return "scheduled";
+  return "other";
+}
+
 const STATUS_LABEL: Record<string, string> = {
   active: "نشطة",
   in_progress: "قيد المعالجة",
@@ -112,21 +123,40 @@ export default function RecommendationsScreen() {
 
   const activeId = selectedId ?? vehicles?.[0]?.id ?? "";
 
-  const { data: recommendations, isLoading: recLoading } = useGetAiRecommendations(activeId, {
+  const {
+    data: recommendations,
+    isLoading: recLoading,
+    isError: recError,
+    error: recErrorDetail,
+    refetch: refetchRecs,
+  } = useGetAiRecommendations(activeId, {
     query: { enabled: !!activeId } as any,
   });
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
+  const grouped = {
+    overdue: recommendations?.filter((r) => displayGroup(r) === "overdue") ?? [],
+    upcoming: recommendations?.filter((r) => displayGroup(r) === "upcoming") ?? [],
+    scheduled: recommendations?.filter((r) => displayGroup(r) === "scheduled") ?? [],
+    diagnostic: recommendations?.filter((r) => displayGroup(r) === "diagnostic") ?? [],
+    predictive: recommendations?.filter((r) => displayGroup(r) === "predictive") ?? [],
+  };
   const sortedRecs = [
-    ...(recommendations?.filter((r) => r.severity === "critical") ?? []),
-    ...(recommendations?.filter((r) => r.severity === "warning") ?? []),
-    ...(recommendations?.filter((r) => r.severity === "info") ?? []),
+    ...grouped.overdue,
+    ...grouped.upcoming,
+    ...grouped.scheduled,
+    ...grouped.diagnostic,
+    ...grouped.predictive,
   ];
   cacheRecommendations(sortedRecs);
   const criticalCount = recommendations?.filter((r) => r.severity === "critical").length ?? 0;
   const warningCount = recommendations?.filter((r) => r.severity === "warning").length ?? 0;
-  const maintenanceCount = recommendations?.filter((r) => r.kind === "maintenance_due").length ?? 0;
+  const maintenanceCount = grouped.overdue.length + grouped.upcoming.length;
+  const evaluatedAt =
+    (recommendations?.[0] as any)?.metadata?.evaluatedAt ||
+    (recommendations?.[0] as any)?.createdAt ||
+    null;
 
   const exportRecommendationsPdf = () => {
     if (!sortedRecs.length) return;
@@ -230,6 +260,17 @@ export default function RecommendationsScreen() {
         <View style={styles.loadCenter}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : recError ? (
+        <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, margin: 16 }]}>
+          <Ionicons name="cloud-offline-outline" size={44} color="#ef4444" />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>تعذر تقييم التوصيات</Text>
+          <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+            {recErrorDetail instanceof Error ? recErrorDetail.message : "فشل الاتصال بمصدر بيانات الصيانة."}
+          </Text>
+          <Pressable onPress={() => void refetchRecs()} style={[styles.retryBtn, { backgroundColor: colors.primary }]}>
+            <Text style={styles.retryText}>إعادة المحاولة</Text>
+          </Pressable>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}
@@ -255,7 +296,7 @@ export default function RecommendationsScreen() {
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="construct-outline" size={18} color="#f59e0b" />
               <Text style={[styles.summaryValue, { color: colors.foreground }]}>{maintenanceCount}</Text>
-              <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>صيانة قادمة</ArabicText>
+              <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>قريبة أو متأخرة</ArabicText>
             </View>
             <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="warning-outline" size={18} color="#ef4444" />
@@ -283,20 +324,36 @@ export default function RecommendationsScreen() {
             <Ionicons name="chevron-back" size={18} color={colors.mutedForeground} />
           </Pressable>
 
+          {evaluatedAt ? (
+            <ArabicText style={[styles.evalMeta, { color: colors.mutedForeground }]}>
+              آخر تقييم {String(evaluatedAt).replace("T", " ").slice(0, 16)} — المصدر: سجل الصيانة وقراءة العداد
+            </ArabicText>
+          ) : null}
+
           {!sortedRecs.length ? (
             <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="bulb-outline" size={52} color={colors.primary} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>لا توجد توصيات حالياً</Text>
               <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-                لا توجد توصيات مفتوحة من جدول الصيانة أو القراءات المحفوظة. هذا لا يعني أن المركبة سليمة؛ أعد الفحص التشخيصي عند الحاجة.
+                لا يوجد سجل صيانة أو أعطال مفتوحة لهذه المركبة. هذا لا يعني أن المركبة سليمة؛ سجّل صيانة لتظهر الجدولة التالية.
               </Text>
             </View>
           ) : (
-            sortedRecs.map((rec, i) => {
-              const sev = getSeverityColors(rec.severity);
+            ([
+              { key: "overdue", title: "صيانة متأخرة", items: grouped.overdue },
+              { key: "upcoming", title: "صيانة قريبة", items: grouped.upcoming },
+              { key: "scheduled", title: "صيانة مجدولة", items: grouped.scheduled },
+              { key: "diagnostic", title: "توصيات تشخيصية", items: grouped.diagnostic },
+              { key: "predictive", title: "تنبيهات تنبؤية", items: grouped.predictive },
+            ] as const).flatMap((section) =>
+            section.items.map((rec, i) => {
+              const sev = section.key === "scheduled" ? getSeverityColors("info") : getSeverityColors(rec.severity);
               const recDetails = rec as any;
               return (
                 <Animated.View key={rec.id} entering={FadeInDown.delay(i * 60).springify()}>
+                  {i === 0 ? (
+                    <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>{section.title}</ArabicText>
+                  ) : null}
                   <Pressable
                     onPress={() =>
                       router.push({ pathname: "/recommendation-detail", params: { id: rec.id } })
@@ -315,7 +372,13 @@ export default function RecommendationsScreen() {
                     </View>
                     <View style={[styles.kindBadge, { alignSelf: "flex-end", backgroundColor: colors.card, borderColor: colors.border }]}>
                       <Text style={[styles.kindText, { color: sev.icon }]}>
-                        {STATUS_LABEL[(rec as any).status] || STATUS_LABEL.active}
+                        {(rec as any).scheduleStatus === "scheduled"
+                          ? "مجدولة"
+                          : (rec as any).scheduleStatus === "upcoming"
+                            ? "قريبة"
+                            : (rec as any).scheduleStatus === "overdue"
+                              ? "متأخرة"
+                              : STATUS_LABEL[(rec as any).status] || STATUS_LABEL.active}
                       </Text>
                     </View>
 
@@ -359,6 +422,11 @@ export default function RecommendationsScreen() {
                             <Text style={[styles.equationText, { color: colors.mutedForeground }]}>{buildEquation(recDetails)}</Text>
                           </View>
                         ) : null}
+                        {recDetails.metadata?.ruleSourceAr ? (
+                          <ArabicText style={[styles.equationText, { color: colors.mutedForeground }]}>
+                            مصدر الفاصل: {recDetails.metadata.ruleSourceAr}
+                          </ArabicText>
+                        ) : null}
                       </View>
                     )}
 
@@ -382,7 +450,8 @@ export default function RecommendationsScreen() {
                   </Pressable>
                 </Animated.View>
               );
-            })
+            }),
+            )
           )}
         </ScrollView>
       )}
@@ -447,6 +516,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  evalMeta: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 18 },
+  sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", marginBottom: 8, marginTop: 4 },
+  retryBtn: { marginTop: 8, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
+  retryText: { color: "#fff", fontFamily: "Inter_700Bold" },
   emptyDesc: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   card: { padding: 16, borderRadius: 16, borderWidth: 1.5, gap: 10 },
   cardTop: { alignItems: "center", justifyContent: "space-between" },
