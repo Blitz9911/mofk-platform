@@ -36,7 +36,12 @@ import {
   isUnknownColumnError,
   maintenanceInsertFallbacks,
 } from "@/lib/qa-write-guards.mjs";
-import { computeNextDue, computeScheduleStatus, serviceLabelAr } from "@/lib/maintenance-engine.mjs";
+import {
+  computeNextDue,
+  computeScheduleStatus,
+  serviceLabelAr,
+  sourceKeyForTelemetry,
+} from "@/lib/maintenance-engine.mjs";
 
 type VehicleRow = {
   id: string;
@@ -854,10 +859,10 @@ function evaluatedMaintenanceRecommendations(
       return engineBuildMaintenanceRecommendation({
         vehicleId: vehicle.id,
         serviceType: row.service_type,
-        lastDoneKm: row.done_at_km,
+        lastDoneKm: optionalNumber(row.done_at_km),
         lastDoneAt: row.done_at,
-        odometerKm: vehicle.odometer_km ?? row.done_at_km,
-        estimatedCost: row.actual_cost_sar ?? row.cost_sar,
+        odometerKm: optionalNumber(vehicle.odometer_km ?? row.done_at_km),
+        estimatedCost: optionalNumber(row.actual_cost_sar ?? row.cost_sar),
         rule,
       });
     })
@@ -1138,6 +1143,10 @@ function buildTelemetryRecommendations(
       suggestedAction: "أوقف القيادة إذا استمر الارتفاع وراجع نظام التبريد.",
       suggestedCostSar: null,
       createdAt: latest.time,
+      status: "active",
+      source: "telemetry",
+      sourceKey: sourceKeyForTelemetry("coolant"),
+      category: "diagnostic",
     });
   }
 
@@ -1156,6 +1165,10 @@ function buildTelemetryRecommendations(
       suggestedAction: "افتح صفحة البنزين وسجّل التعبئة.",
       suggestedCostSar: null,
       createdAt: latest.time,
+      status: "active",
+      source: "telemetry",
+      sourceKey: sourceKeyForTelemetry("fuel"),
+      category: "diagnostic",
     });
   }
 
@@ -1175,6 +1188,10 @@ function buildTelemetryRecommendations(
       suggestedAction: "افحص البطارية والشحن عند أقرب صيانة.",
       suggestedCostSar: null,
       createdAt: latest.time,
+      status: "active",
+      source: "telemetry",
+      sourceKey: sourceKeyForTelemetry("battery"),
+      category: "diagnostic",
     });
   }
 
@@ -2997,10 +3014,11 @@ async function handleAi(
       vehicleId,
       session.access_token,
     );
-    const telemetryRecs =
+    const coolantRec =
       isAnomalyDetectionEnabled() && latest && isFreshTimestamp(latest.time)
-        ? [buildRepeatedCoolantAnomaly(vehicleId, [latest])].filter(Boolean)
-        : [];
+        ? buildRepeatedCoolantAnomaly(vehicleId, [latest])
+        : null;
+    const telemetryRecs = coolantRec ? [coolantRec] : [];
 
     const maintenanceRows = await listMaintenanceLogs(
       session.access_token,
