@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { describeVehicleLink } from "../services/vehicle-health-engine.mjs";
 import {
   db,
   vehiclesTable,
@@ -287,19 +288,6 @@ router.get(
       .limit(60);
 
     const latestRow = recent[0];
-    // synthesize a live snapshot if the seed didn't include one
-    const now = new Date();
-    const synth = {
-      time: now,
-      rpm: 1850 + Math.floor(Math.sin(now.getMinutes() / 3) * 250),
-      speedKmh: 78,
-      coolantTemp: 92,
-      intakeTemp: 38,
-      batteryV: 14.1,
-      fuelLevelPct: 64,
-      engineLoad: 42,
-      throttlePos: 18,
-    };
     const latest = latestRow
       ? {
           time: latestRow.time,
@@ -313,11 +301,25 @@ router.get(
           engineLoad: latestRow.engineLoad,
           throttlePos: latestRow.throttlePos,
         }
-      : synth;
+      : {
+          time: new Date(0),
+          rpm: null,
+          speedKmh: null,
+          coolantTemp: null,
+          intakeTemp: null,
+          batteryV: null,
+          fuelLevelPct: null,
+          engineLoad: null,
+          throttlePos: null,
+        };
+    const link = describeVehicleLink({
+      adapterMac: v.adapterMac,
+      lastTelemetryAt: latestRow?.time ?? null,
+    });
     res.json(
       GetLiveTelemetryResponse.parse({
         vehicleId: v.id,
-        isConnected: !!v.adapterMac,
+        isConnected: link.connected,
         latest,
         recent: recent
           .slice()

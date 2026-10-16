@@ -16,6 +16,11 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   login: (user: AuthUser) => Promise<void>;
+  updateProfile: (input: {
+    name: string;
+    phone: string;
+    city?: string;
+  }) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -23,6 +28,9 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   isLoading: true,
   login: async () => {},
+  updateProfile: async () => {
+    throw new Error("AuthProvider is not ready.");
+  },
   logout: async () => {},
 });
 
@@ -77,12 +85,22 @@ export function AuthProvider({
     await authApi.logout();
   }, []);
 
+  const updateProfile = useCallback(
+    async (input: { name: string; phone: string; city?: string }) => {
+      const nextUser = await authApi.updateProfile(input);
+      setUser(nextUser);
+      return nextUser;
+    },
+    [],
+  );
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         login,
+        updateProfile,
         logout,
       }}
     >

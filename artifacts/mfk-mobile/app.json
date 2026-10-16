@@ -3,7 +3,7 @@
     "name": "MFK",
     "slug": "mfk-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "mfk-mobile",
     "userInterfaceStyle": "dark",
@@ -14,10 +14,22 @@
       "backgroundColor": "#060e1c"
     },
     "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.mfk.diagnostics"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mfk.diagnostics",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.mfk.diagnostics",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -29,11 +41,28 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "يستخدم تطبيق MFK البلوتوث للاتصال بجهاز V011 وقراءة بيانات مركبتك."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "640f7d9f-6d0b-4f5b-8dba-babc7c5b8d48"
+      }
     }
   }
 }

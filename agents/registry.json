@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "operational": false,
+  "policyFile": "policies/AGENT_POLICY.md",
+  "instructionBase": "agents/BASE.md",
+  "humanOwner": "founder",
+  "notes": [
+    "This registry is documentation plus CI-validated configuration. It does not grant credentials or start agents.",
+    "operational remains false until an orchestrator, scoped GitHub App, sandbox, and protected environments have been tested."
+  ],
+  "handoffContract": {
+    "requiredInputs": [
+      "taskId",
+      "acceptanceCriteria",
+      "riskTier",
+      "sensitiveChanges"
+    ],
+    "requiredOutputs": [
+      "taskId",
+      "findings",
+      "actions",
+      "evidence",
+      "risks",
+      "testsRun",
+      "approvalNeeded",
+      "nextAgentIds",
+      "nextSteps"
+    ],
+    "cannotSelfApprove": true,
+    "failClosedIfMissingEvidence": true
+  },
+  "globalForbiddenActions": [
+    "production_db_write",
+    "production_db_schema_apply",
+    "production_deploy",
+    "production_eas_update",
+    "merge_to_protected_branch",
+    "force_push",
+    "skip_hooks",
+    "live_obd_write",
+    "obd_mode_04",
+    "obd_safety_control",
+    "secret_exfiltration",
+    "customer_pii_export",
+    "raw_vin_export",
+    "payment_data_access",
+    "disable_ci",
+    "disable_branch_protection",
+    "change_environment_reviewers",
+    "credential_elevation",
+    "create_production_write_token",
+    "auto_merge"
+  ],
+  "sensitiveOperations": {
+    "database_migration": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true
+    },
+    "auth_policy": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true
+    },
+    "pricing_billing": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true
+    },
+    "customer_data_processing": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true
+    },
+    "device_binding": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true
+    },
+    "live_obd_or_vehicle_write": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": ["founder"],
+      "failClosed": true,
+      "default": "deny"
+    },
+    "production_release": {
+      "minLevel": "L4",
+      "requiredHumanApprovals": ["founder", "production-environment-reviewer"],
+      "failClosed": true,
+      "requiresApprovedPr": true,
+      "separateFromPrApprover": true
+    }
+  },
+  "agents": [
+    {
+      "id": "orchestrator",
+      "instructionFile": "agents/orchestrator.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Build a task graph with owners and dependencies",
+        "Collect evidence and escalate risk",
+        "Never execute repository changes"
+      ],
+      "allowedPaths": [
+        "agents/**",
+        "docs/**",
+        "policies/**",
+        "templates/**"
+      ],
+      "forbiddenActions": [
+        "execute_code",
+        "create_pr",
+        "deploy",
+        "grant_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": ["product-lead", "engineering-lead"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "product-lead",
+      "instructionFile": "agents/product-lead.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Translate founder intent into outcomes",
+        "Propose product priorities and value hypotheses"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**",
+        ".github/ISSUE_TEMPLATE/**"
+      ],
+      "forbiddenActions": [
+        "unilateral_pricing_change",
+        "unilateral_roadmap_change",
+        "implementation",
+        "merge"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-manager",
+          "business-analyst",
+          "ux-reviewer",
+          "product-analytics",
+          "uat"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "product-manager",
+      "instructionFile": "agents/product-manager.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Write user stories and acceptance criteria",
+        "Maintain a prioritized backlog and Definition of Done"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**",
+        ".github/ISSUE_TEMPLATE/**"
+      ],
+      "forbiddenActions": [
+        "implementation",
+        "merge_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": ["engineering-lead", "business-analyst"],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "business-analyst",
+      "instructionFile": "agents/business-analyst.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Specify business rules including maintenance and subscriptions",
+        "Produce decision tables, edge cases, and state transitions"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "artifacts/mfk-mobile/lib/maintenance-catalog.ts",
+        "artifacts/mfk-mobile/lib/maintenance-engine.mjs"
+      ],
+      "forbiddenActions": [
+        "assume_vehicle_compatibility",
+        "implementation"
+      ],
+      "handoff": {
+        "nextAgentIds": ["product-manager", "data-recommendations", "engineering-lead"],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "ux-reviewer",
+      "instructionFile": "agents/ux-reviewer.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Review usability and Arabic RTL localization",
+        "Produce annotated UX findings and accessibility checks"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "artifacts/mfk-mobile/app/**",
+        "artifacts/mfk-mobile/components/**"
+      ],
+      "forbiddenActions": [
+        "unsanctioned_customer_data_access",
+        "implementation"
+      ],
+      "handoff": {
+        "nextAgentIds": ["product-manager", "uat"],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "product-analytics",
+      "instructionFile": "agents/product-analytics.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Define feature-effectiveness metrics",
+        "Design privacy-safe aggregate queries"
+      ],
+      "allowedPaths": [
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "raw_user_export",
+        "fabricated_metrics",
+        "production_analytics_query_without_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": ["product-lead", "product-manager"],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "uat",
+      "instructionFile": "agents/uat.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Create user-acceptance scenarios",
+        "Report Pass / Fail / Not tested with reproducible evidence"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**"
+      ],
+      "forbiddenActions": [
+        "mark_unexecuted_pass",
+        "production_deploy"
+      ],
+      "handoff": {
+        "nextAgentIds": ["product-manager", "qa-automation"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "engineering-lead",
+      "instructionFile": "agents/engineering-lead.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Design a safe technical plan",
+        "Decompose implementation tasks and review risk"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "agents/**",
+        "policies/**"
+      ],
+      "forbiddenActions": [
+        "self_approve_pr",
+        "production_deploy"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "software-engineer",
+          "obd-iot",
+          "data-recommendations",
+          "devops"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "software-engineer",
+      "instructionFile": "agents/software-engineer.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Implement approved TypeScript/Expo/API changes in an isolated sandbox",
+        "Provide scoped diff, tests, PR summary, and rollback steps"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/**",
+        "artifacts/api-server/**",
+        "lib/**"
+      ],
+      "forbiddenActions": [
+        "direct_main_push",
+        "production_data_access",
+        "production_deploy",
+        "self_approve_pr"
+      ],
+      "handoff": {
+        "nextAgentIds": ["qa-automation", "cybersecurity"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "obd-iot",
+      "instructionFile": "agents/obd-iot.md",
+      "maxLevel": "L1",
+      "responsibilities": [
+        "Validate ELM327/BLE/OBD handling on fixtures and simulators",
+        "Produce PID matrix, parser tests, and disconnect/recovery cases"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/src/obd/**",
+        "artifacts/mfk-mobile/lib/obd/**",
+        "docs/obd-ble-integration.md",
+        "docs/obd-installation-guides-phase1.md"
+      ],
+      "forbiddenActions": [
+        "live_obd_write",
+        "obd_mode_04",
+        "obd_safety_control"
+      ],
+      "handoff": {
+        "nextAgentIds": ["qa-automation", "cybersecurity", "software-engineer"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "data-recommendations",
+      "instructionFile": "agents/data-recommendations.md",
+      "maxLevel": "L1",
+      "responsibilities": [
+        "Validate maintenance rules, schedules, and derived recommendations",
+        "Produce deterministic fixtures and false-positive analysis"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/lib/**",
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "autonomous_maintenance_safety_claim",
+        "production_db_write"
+      ],
+      "handoff": {
+        "nextAgentIds": ["qa-automation", "software-engineer"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "devops",
+      "instructionFile": "agents/devops.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Improve non-production CI, configuration, and observability via PR"
+      ],
+      "allowedPaths": [
+        ".github/workflows/**",
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "production_credentials",
+        "production_release",
+        "change_environment_reviewers",
+        "disable_branch_protection",
+        "alter_pnpm_security_settings"
+      ],
+      "handoff": {
+        "nextAgentIds": ["qa-automation", "cybersecurity"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "qa-automation",
+      "instructionFile": "agents/qa-automation.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Independently verify engineering changes",
+        "Publish regression matrix, test logs, and blockers"
+      ],
+      "allowedPaths": [
+        "artifacts/**",
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "approve_own_implementation",
+        "mark_unexecuted_pass"
+      ],
+      "handoff": {
+        "nextAgentIds": ["cybersecurity"],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "cybersecurity",
+      "instructionFile": "agents/cybersecurity.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Independently inspect risks and suggest mitigations",
+        "Produce threat model, secret checks, least-privilege findings, and risk tier"
+      ],
+      "allowedPaths": [
+        "agents/**",
+        "policies/**",
+        "docs/**",
+        ".github/**",
+        "artifacts/**",
+        "lib/**",
+        "supabase1/**"
+      ],
+      "forbiddenActions": [
+        "self_approve",
+        "direct_credential_rotation",
+        "production_db_write"
+      ],
+      "handoff": {
+        "nextAgentIds": [],
+        "requiresHumanDecision": true
+      }
+    }
+  ]
+}

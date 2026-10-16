@@ -119,7 +119,7 @@ export default function VehiclesScreen() {
                         {item.adapterMac && (
                           <View style={[styles.connBadge, { backgroundColor: "#22c55e18" }]}>
                             <Ionicons name="wifi" size={10} color="#22c55e" />
-                            <Text style={[styles.connText, { color: "#22c55e" }]}>متصل</Text>
+                            <Text style={[styles.connText, { color: "#22c55e" }]}>مقترن</Text>
                           </View>
                         )}
                       </View>
@@ -186,7 +186,7 @@ export default function VehiclesScreen() {
                     </Pressable>
                     <Pressable
                       style={[styles.actionBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30" }]}
-                      onPress={() => router.push("/(tabs)/diagnostics")}
+                      onPress={() => router.push("/diagnostics")}
                     >
                       <Ionicons name="pulse-outline" size={15} color={colors.primary} />
                       <Text style={[styles.actionText, { color: colors.primary }]}>تشخيص</Text>

@@ -7,7 +7,6 @@ import {
   Car,
   Activity,
   Wrench,
-  MapPin,
   Calendar,
   MessageSquare,
   Lightbulb,
@@ -26,6 +25,11 @@ import {
   Zap,
   Fuel,
   MoreHorizontal,
+  Package,
+  Smartphone,
+  Building2,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MfkLogo } from "@/components/MfkLogo";
@@ -209,9 +213,11 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
     { href: "/admin", label: "نظرة عامة", shortLabel: "الرئيسية", icon: LayoutDashboard },
     { href: "/admin/users", label: "المستخدمين", shortLabel: "المستخدمين", icon: Users },
     { href: "/admin/vehicles", label: "المركبات", shortLabel: "المركبات", icon: Car },
-    { href: "/admin/diagnostics", label: "التشخيص الحي", shortLabel: "التشخيص", icon: Activity },
-    { href: "/admin/issues", label: "الأعطال الشائعة", shortLabel: "الأعطال", icon: ShieldAlert },
-    { href: "/admin/workshops", label: "الورش والعوائد", shortLabel: "الورش", icon: MapPin },
+    { href: "/admin/orders", label: "الطلبات", shortLabel: "الطلبات", icon: Package },
+    { href: "/admin/devices", label: "الأجهزة", shortLabel: "الأجهزة", icon: Smartphone },
+    { href: "/admin/fleet-accounts", label: "حسابات الأسطول", shortLabel: "الأسطول", icon: Building2 },
+    { href: "/admin/reports", label: "التقارير", shortLabel: "التقارير", icon: BarChart3 },
+    { href: "/admin/settings", label: "الإعدادات", shortLabel: "الإعدادات", icon: Settings },
     { href: "/admin/revenue", label: "المالية", shortLabel: "المالية", icon: CreditCard },
   ];
 
@@ -296,7 +302,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
   return (
     <div className="min-h-screen bg-background flex w-full" dir="rtl">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex w-[280px] flex-col border-l border-border/80 bg-card/80 backdrop-blur shrink-0 sticky top-0 h-screen">
+      <aside className="hidden xl:flex w-[280px] flex-col border-l border-border/80 bg-card/80 backdrop-blur shrink-0 sticky top-0 h-screen">
         <div className="h-16 flex items-center px-5 border-b border-border/80">
           <Link href="/" className="flex items-center gap-2">
             <MfkLogo size="sm" />
@@ -345,7 +351,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
         {/* Topbar */}
         <header className="h-16 border-b border-border/80 bg-card/90 backdrop-blur flex items-center justify-between px-3 sm:px-4 md:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="lg:hidden">
+            <div className="xl:hidden">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-2xl">
@@ -353,7 +359,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
                   </Button>
                 </SheetTrigger>
 
-                <SheetContent side="right" className="w-[290px] p-0">
+                <SheetContent side="right" className="w-[min(92vw,320px)] p-0">
                   <div className="h-16 flex items-center px-5 border-b border-border gap-2">
                     <MfkLogo size="sm" />
                     {isAdmin && (
@@ -384,7 +390,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
               </Sheet>
             </div>
 
-            <Link href="/app" className="lg:hidden flex items-center shrink-0">
+            <Link href="/app" className="xl:hidden flex items-center shrink-0">
               <MfkLogo size="sm" />
             </Link>
           </div>
@@ -546,8 +552,8 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-24 lg:pb-6">
-          <div className="mx-auto w-full max-w-[1600px]">
+        <main className="flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-24 xl:pb-6">
+          <div className="mx-auto w-full max-w-[min(100%,1760px)]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={pageKey}
@@ -563,7 +569,7 @@ export function Shell({ children, isAdmin = false }: ShellProps) {
         </main>
 
         {/* Mobile / Tablet Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <nav className="xl:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="grid grid-cols-6 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
