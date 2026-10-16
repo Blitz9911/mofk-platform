@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: MFK agent policy
+    url: https://github.com/Blitz9911/mofk-platform
+    about: Agents are untrusted. Read policies/AGENT_POLICY.md in this repository before filing a task.
