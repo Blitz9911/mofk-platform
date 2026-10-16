@@ -24,7 +24,7 @@
     "serve": "node server/serve.js",
     "test:obd": "node scripts/test-obd-parsers.cjs",
     "test:binding": "node scripts/test-vehicle-binding.cjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "node scripts/generate-router-types.cjs && tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
