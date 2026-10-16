@@ -114,6 +114,28 @@ jobs:
       - name: Skip workforce config validate
         run: echo "No AI workforce config paths in this PR."
 
+  ai-sandbox-tests:
+    name: AI sandbox tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Run Phase 3, 4A, and 4B sandbox tests
+        env:
+          MFK_SANDBOX_LIVE_RUN: ""
+          MFK_SANDBOX_ALLOW_REAL_NETWORK: ""
+          MFK_SANDBOX_OPENAI_API_KEY: ""
+        run: node --test agents/runtime/test/runtime.test.mjs agents/runtime/test/model-adapter.test.mjs agents/runtime/test/live-sandbox.test.mjs
+
   pr-required:
     name: PR required checks
     needs:
@@ -122,6 +144,7 @@ jobs:
       - mobile-not-required
       - workforce-validate
       - workforce-not-required
+      - ai-sandbox-tests
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -135,6 +158,7 @@ jobs:
           MOBILE_SKIP: ${{ needs.mobile-not-required.result }}
           WORKFORCE_RUN: ${{ needs.workforce-validate.result }}
           WORKFORCE_SKIP: ${{ needs.workforce-not-required.result }}
+          SANDBOX_RUN: ${{ needs.ai-sandbox-tests.result }}
         run: |
           set -e
           if [ "$SELECT" != "success" ]; then
@@ -157,4 +181,8 @@ jobs:
             echo "Workforce skip stub did not succeed ($WORKFORCE_SKIP)."
             exit 1
           fi
-          echo "PR required checks passed. mobile=$MOBILE workforce=$WORKFORCE"
+          if [ "$SANDBOX_RUN" != "success" ]; then
+            echo "AI sandbox tests did not succeed ($SANDBOX_RUN)."
+            exit 1
+          fi
+          echo "PR required checks passed. mobile=$MOBILE workforce=$WORKFORCE sandbox=always"

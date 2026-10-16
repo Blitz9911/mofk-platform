@@ -41,4 +41,4 @@ AI cannot approve L4. Auto-merge is forbidden.
 
 Machine-readable copy: `agents/registry.json` fields `sensitiveOperations`, `globalForbiddenActions`, and `handoffContract.failClosedIfMissingEvidence`.
 
-Model adapter output cannot occupy a human seat, cannot self-approve, and cannot count simulated QA or security text as executed verification. Live providers stay disabled (`docs/AI_MODEL_ADAPTER.md`).
+Model adapter output cannot occupy a human seat, cannot self-approve, and cannot count simulated QA or security text as executed verification. Live providers stay disabled in committed policy. Founder sandbox approval is an environment/option string compared before any provider call and is independent of model text (`docs/AI_LIVE_SANDBOX.md`).

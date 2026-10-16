@@ -16,11 +16,14 @@
 **Repo-side:** offline deterministic runtime in `agents/runtime/` (no LLM, no GitHub writes, no production). Pipeline stops at human approval. See `docs/AGENT_RUNTIME.md`. `operational` stays false.
 **Still later:** OBD and recommendations agents using simulators/recorded synthetic responses only. No live vehicle-write access.
 
-## Phase 4A — secure model adapter foundation (this branch)
-Offline, provider-independent `ModelAdapter` in `agents/runtime/src/model/`. Mock adapter only. Live providers remain disabled. No credentials, no network, no change to `operational=false`. Human approval stays mandatory. See `docs/AI_MODEL_ADAPTER.md`.
+## Phase 4A — secure model adapter foundation
+Offline, provider-independent `ModelAdapter` in `agents/runtime/src/model/`. Mock adapter only. Live providers remain disabled. See `docs/AI_MODEL_ADAPTER.md`.
+
+## Phase 4B — secure live LLM sandbox (this branch)
+Gated OpenAI Chat Completions adapter with stubbed transports in tests. Committed policy keeps `liveProvidersEnabled=false`. Product-manager synthetic demo is mock-by-default. Host egress and secret isolation are **not** provided by this repository. See `docs/AI_LIVE_SANDBOX.md`.
 
 ## Phase 4 — governed automation (later)
-Do not connect a live provider until every prerequisite in `docs/AI_MODEL_ADAPTER.md` is met. Then: orchestration service, queue, execution audit, rate/time/token cost caps, dead-letter retries, rollbacks, stop button. Protect production with separate human reviewer. Add staged canaries and release observability.
+Do not connect a live provider until every prerequisite in `docs/AI_LIVE_SANDBOX.md` is met. Then: orchestration service, queue, execution audit, rate/time/token cost caps, dead-letter retries, rollbacks, stop button. Protect production with separate human reviewer. Add staged canaries and release observability.
 
 ## Success metrics
 PR rollback rate, escaped bugs, false approvals, security findings, review turnaround, flaky tests, cost per merged PR, percentage of tasks completed without rework.
