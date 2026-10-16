@@ -76,7 +76,8 @@ export default function SubscriptionScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { refreshUser } = useAuth();
-  const inTabs = useSegments().includes("(tabs)");
+  const segments: readonly string[] = useSegments();
+  const inTabs = segments.includes("(tabs)");
   const tabClearance = inTabs ? 124 : 12;
   const isDark = colors.mode === "dark";
   const pageGradient: readonly [string, string, string, string] = isDark
