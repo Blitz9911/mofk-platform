@@ -225,7 +225,10 @@ const githubFiles = [
   ".github/CODEOWNERS",
   ".github/workflows/ai-workforce-config-validate.yml",
   ".github/workflows/mobile-typecheck.yml",
+  ".github/workflows/pr-gate.yml",
+  ".github/scripts/select-ci-paths.mjs",
   "docs/github-controls.md",
+  "docs/CI_PR_GATE.md",
   "docs/FAIL_CLOSED_APPROVALS.md",
   "docs/AI_WORKFORCE_PHASE01_VALIDATION.md",
 ];
@@ -264,6 +267,23 @@ if (mobile) {
   if (!/node-version:\s*20/.test(mobile)) fail("mobile-typecheck.yml must stay on Node 20");
   if (!mobile.includes("pnpm --filter @workspace/mfk-mobile typecheck")) {
     fail("mobile-typecheck.yml job steps were altered");
+  }
+}
+
+const gate = read(".github/workflows/pr-gate.yml");
+if (gate) {
+  if (!gate.includes("contents: read")) fail("pr-gate.yml must set contents: read");
+  if (!gate.includes("select-ci-paths.mjs")) fail("pr-gate.yml must classify paths");
+  if (!gate.includes("windows-latest")) fail("pr-gate.yml must keep Windows mobile typecheck");
+  if (!/node-version:\s*20/.test(gate)) fail("pr-gate.yml mobile job must stay on Node 20");
+  if (!gate.includes("pnpm --filter @workspace/mfk-mobile typecheck")) {
+    fail("pr-gate.yml must run the mobile typecheck command when selected");
+  }
+  if (!gate.includes("validate-ai-workforce.mjs")) {
+    fail("pr-gate.yml must keep workforce config validation");
+  }
+  if (!gate.includes("name: PR required checks")) {
+    fail("pr-gate.yml must expose a permanent required job named PR required checks");
   }
 }
 

@@ -1,0 +1,160 @@
+name: PR Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  select-paths:
+    name: Select CI paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mobile: ${{ steps.classify.outputs.mobile }}
+      workforce: ${{ steps.classify.outputs.workforce }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Prove path-selection tests
+        run: node --test .github/scripts/select-ci-paths.test.mjs
+
+      - name: Classify changed paths
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node .github/scripts/select-ci-paths.mjs >> "$GITHUB_OUTPUT"
+
+  mobile-typecheck:
+    name: Check mobile TypeScript (gate)
+    needs: select-paths
+    if: needs.select-paths.outputs.mobile == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build API client types
+        run: pnpm exec tsc --build lib/api-client-react/tsconfig.json --force --pretty false
+
+      - name: Typecheck mobile application
+        run: pnpm --filter @workspace/mfk-mobile typecheck
+
+  mobile-not-required:
+    name: Skip mobile TypeScript (gate)
+    needs: select-paths
+    if: needs.select-paths.outputs.mobile != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Skip mobile typecheck
+        run: echo "No mobile or shared-dependency paths in this PR. Existing mobile-typecheck.yml is unchanged."
+
+  workforce-validate:
+    name: Validate agent registry and GitHub templates (gate)
+    needs: select-paths
+    if: needs.select-paths.outputs.workforce == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Validate AI workforce files
+        run: node .github/scripts/validate-ai-workforce.mjs
+
+  workforce-not-required:
+    name: Skip workforce config validate (gate)
+    needs: select-paths
+    if: needs.select-paths.outputs.workforce != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Skip workforce config validate
+        run: echo "No AI workforce config paths in this PR."
+
+  pr-required:
+    name: PR required checks
+    needs:
+      - select-paths
+      - mobile-typecheck
+      - mobile-not-required
+      - workforce-validate
+      - workforce-not-required
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Fail closed unless selected suites succeeded
+        env:
+          SELECT: ${{ needs.select-paths.result }}
+          MOBILE: ${{ needs.select-paths.outputs.mobile }}
+          WORKFORCE: ${{ needs.select-paths.outputs.workforce }}
+          MOBILE_RUN: ${{ needs.mobile-typecheck.result }}
+          MOBILE_SKIP: ${{ needs.mobile-not-required.result }}
+          WORKFORCE_RUN: ${{ needs.workforce-validate.result }}
+          WORKFORCE_SKIP: ${{ needs.workforce-not-required.result }}
+        run: |
+          set -e
+          if [ "$SELECT" != "success" ]; then
+            echo "Path selection failed."
+            exit 1
+          fi
+          if [ "$MOBILE" = "true" ] && [ "$MOBILE_RUN" != "success" ]; then
+            echo "Mobile typecheck was selected and did not succeed ($MOBILE_RUN)."
+            exit 1
+          fi
+          if [ "$MOBILE" != "true" ] && [ "$MOBILE_SKIP" != "success" ]; then
+            echo "Mobile skip stub did not succeed ($MOBILE_SKIP)."
+            exit 1
+          fi
+          if [ "$WORKFORCE" = "true" ] && [ "$WORKFORCE_RUN" != "success" ]; then
+            echo "Workforce validation was selected and did not succeed ($WORKFORCE_RUN)."
+            exit 1
+          fi
+          if [ "$WORKFORCE" != "true" ] && [ "$WORKFORCE_SKIP" != "success" ]; then
+            echo "Workforce skip stub did not succeed ($WORKFORCE_SKIP)."
+            exit 1
+          fi
+          echo "PR required checks passed. mobile=$MOBILE workforce=$WORKFORCE"
