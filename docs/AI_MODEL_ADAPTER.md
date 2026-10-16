@@ -53,3 +53,5 @@ Do **not** flip `liveProvidersEnabled` or add API keys until all of the followin
 8. Contract tests against the real provider’s schema **in a sandbox**, not claimed from mock runs.
 
 Until then, `LiveDisabledAdapter.complete()` must throw `LIVE_PROVIDER_DISABLED` before any network primitive.
+
+Phase 4B (`docs/AI_LIVE_SANDBOX.md`) adds a gated OpenAI adapter. Committed policy still disables live providers. Host egress is a separate requirement.

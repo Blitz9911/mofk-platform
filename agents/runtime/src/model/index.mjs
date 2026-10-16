@@ -1,10 +1,13 @@
 export { assertAdapter, assertOfflineAdapter } from "./adapter.mjs";
 export { MockModelAdapter, createMockAdapter } from "./mock-adapter.mjs";
 export { LiveDisabledAdapter } from "./live-disabled.mjs";
+export { OpenAIChatAdapter, createRealFetchTransport } from "./openai-adapter.mjs";
 export { loadModelRouting, resolveRoute } from "./routing.mjs";
+export { loadSandboxPolicy, assertSandboxAuthorization, expectedFounderApproval } from "./sandbox-gate.mjs";
 export { buildPrompt, assertPromptChannels } from "./prompt.mjs";
 export { parseAndValidateModelOutput, validateModelResponse } from "./schema.mjs";
 export { DEFAULT_BUDGETS, mergeBudgets } from "./budgets.mjs";
 export { invokeModelForAgent } from "./invoke.mjs";
+export { invokeSandboxModel } from "./invoke-sandbox.mjs";
 export { MODEL_ERROR_CODES } from "./errors.mjs";
 export { modelAuditMetadata, redact, digest } from "./audit-meta.mjs";

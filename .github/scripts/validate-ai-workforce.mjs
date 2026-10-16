@@ -231,8 +231,23 @@ const githubFiles = [
   "docs/CI_PR_GATE.md",
   "docs/FAIL_CLOSED_APPROVALS.md",
   "docs/AI_WORKFORCE_PHASE01_VALIDATION.md",
+  "docs/AI_LIVE_SANDBOX.md",
+  "agents/runtime/contracts/sandbox-policy.json",
 ];
 for (const file of githubFiles) read(file);
+
+const sandboxPolicy = readJson("agents/runtime/contracts/sandbox-policy.json");
+if (sandboxPolicy) {
+  if (sandboxPolicy.liveProvidersEnabled !== false) {
+    fail("sandbox-policy.json liveProvidersEnabled must be false");
+  }
+  if (sandboxPolicy.providers?.openai?.enabled !== false) {
+    fail("sandbox-policy.json openai.enabled must be false");
+  }
+  if (sandboxPolicy.retriesEnabled !== false) {
+    fail("sandbox-policy.json retriesEnabled must be false");
+  }
+}
 
 const issueForm = read(".github/ISSUE_TEMPLATE/mfk-task.yml");
 if (issueForm) {
@@ -284,6 +299,18 @@ if (gate) {
   }
   if (!gate.includes("name: PR required checks")) {
     fail("pr-gate.yml must expose a permanent required job named PR required checks");
+  }
+  if (!gate.includes("name: AI sandbox tests")) {
+    fail("pr-gate.yml must always run AI sandbox tests");
+  }
+  if (!gate.includes("live-sandbox.test.mjs")) {
+    fail("pr-gate.yml must execute live-sandbox.test.mjs");
+  }
+  if (!gate.includes("ai-sandbox-tests")) {
+    fail("pr-gate.yml PR required checks must depend on ai-sandbox-tests");
+  }
+  if (!gate.includes("SANDBOX_RUN")) {
+    fail("pr-gate.yml must fail closed when sandbox tests do not succeed");
   }
 }
 

@@ -18,7 +18,8 @@ Illegal shortcuts (engineering → human approval, QA → human approval without
 
 ```bash
 node agents/runtime/cli.mjs --fixture agents/runtime/fixtures/maintenance-recommendation-task.json
-node --test agents/runtime/test/runtime.test.mjs agents/runtime/test/model-adapter.test.mjs
+node agents/runtime/cli-sandbox.mjs
+node --test agents/runtime/test/runtime.test.mjs agents/runtime/test/model-adapter.test.mjs agents/runtime/test/live-sandbox.test.mjs
 ```
 
 Kill switch: set `MFK_AGENT_RUNTIME_KILLED=1` or create `agents/runtime/KILL`.

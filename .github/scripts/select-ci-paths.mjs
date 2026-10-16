@@ -31,6 +31,8 @@ export const WORKFORCE_PATTERNS = [
   "docs/CI_PR_GATE.md",
   "docs/AGENT_RUNTIME.md",
   "docs/AGENT_RUNTIME_SECURITY.md",
+  "docs/AI_MODEL_ADAPTER.md",
+  "docs/AI_LIVE_SANDBOX.md",
   ".github/CODEOWNERS",
   ".github/ISSUE_TEMPLATE/**",
   ".github/pull_request_template.md",

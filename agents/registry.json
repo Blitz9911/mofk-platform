@@ -7,7 +7,8 @@
   "notes": [
     "This registry is documentation plus CI-validated configuration. It does not grant credentials or start agents.",
     "operational remains false until a tested orchestrator, scoped GitHub App, sandbox, and protected environments exist. agents/runtime is simulation-only and must keep refusing operational=true.",
-    "Phase 4A model adapter is offline-only. Live providers, API keys, and network calls stay disabled."
+    "Phase 4A model adapter is offline-only. Live providers, API keys, and network calls stay disabled.",
+    "Phase 4B adds a gated OpenAI sandbox adapter. liveProvidersEnabled remains false. operational remains false."
   ],
   "handoffContract": {
     "requiredInputs": [

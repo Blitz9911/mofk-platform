@@ -28,7 +28,7 @@ Canonical list: `agents/registry.json`. IDs: `orchestrator`, `product-lead`, `pr
 
 `registry.json` `operational` is **false**. Markdown plus CI file checks are not an orchestrator.
 
-Phase 3 adds an offline simulation runtime in `agents/runtime/`. Phase 4A adds a provider-independent model adapter that **must not** make live provider API calls. Mock output is not evidence of real QA or security verification.
+Phase 3 adds an offline simulation runtime in `agents/runtime/`. Phase 4A adds a provider-independent model adapter that **must not** make live provider API calls. Phase 4B adds a gated OpenAI sandbox path that stays disabled in committed policy. Application-level denies are not host network isolation. Mock or sandbox output is not evidence of real QA or security verification.
 
 ## Data lifecycle
 Use `dev` synthetic DB, `staging` masked fixtures / separate auth keys, `production` customer data only. Keep per-environment migration histories and documented restoration procedures. `production` release must use approved CI job and scoped credentials.

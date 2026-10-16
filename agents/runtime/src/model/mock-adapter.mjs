@@ -30,6 +30,10 @@ export class MockModelAdapter {
     switch (scenario) {
       case "ok":
         return validProposal();
+      case "product-demo":
+        return validProposal(
+          "Fictional product need: after a synthetic oil log at 80,000 km, show the next 90,000 km interval as scheduled.",
+        );
       case "refusal":
         return envelope({
           kind: "refusal",

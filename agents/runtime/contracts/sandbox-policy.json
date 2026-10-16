@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "liveProvidersEnabled": false,
+  "requireExplicitAuthorization": true,
+  "requireLiveRunEnv": "MFK_SANDBOX_LIVE_RUN",
+  "requireFounderApprovalEnv": "MFK_SANDBOX_FOUNDER_APPROVAL",
+  "requireAllowRealNetworkEnv": "MFK_SANDBOX_ALLOW_REAL_NETWORK",
+  "allowedAgents": ["product-manager"],
+  "syntheticTasksOnly": true,
+  "retriesEnabled": false,
+  "maxRetriesIfEnabled": 1,
+  "maxSpendUsd": 0.25,
+  "maxRequestsPerProvider": 2,
+  "requestTimeoutMs": 8000,
+  "maxResponseBytes": 16384,
+  "maxOutputChars": 4000,
+  "estimatedTokenBudget": 2500,
+  "notes": [
+    "Committed policy keeps liveProvidersEnabled false.",
+    "API keys are read only from environment variable names listed here. No key values belong in Git.",
+    "Application-level denies are not a network sandbox. Host egress must still be enforced outside this repo."
+  ],
+  "providers": {
+    "openai": {
+      "kind": "live",
+      "enabled": false,
+      "live": true,
+      "baseUrl": "https://api.openai.com/v1/chat/completions",
+      "apiKeyEnv": "MFK_SANDBOX_OPENAI_API_KEY",
+      "allowedModels": ["gpt-4o-mini"],
+      "inputUsdPer1kTokens": 0.00015,
+      "outputUsdPer1kTokens": 0.0006
+    }
+  }
+}

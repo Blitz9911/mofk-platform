@@ -7,6 +7,7 @@ Repository workflows cannot edit GitHub Rulesets. A founder with admin must appl
 | Workflow | When it runs | Required in Ruleset? |
 |---|---|---|
 | `PR Gate` / job **`PR required checks`** | Every pull request | **Yes — this is the permanent required check** |
+| `PR Gate` / job **`AI sandbox tests`** | Every pull request (not path-filtered) | Indirectly, because `PR required checks` fails if this job fails |
 | `Mobile Typecheck` / `Check mobile TypeScript` | Path-filtered (unchanged Windows / Node 20) | **No** (would block docs-only and workforce-only PRs when skipped) |
 | `AI Workforce Config Validate` | Path-filtered | **No** (same skip problem). The gate re-runs validation when workforce paths change. |
 
