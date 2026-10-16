@@ -9,7 +9,7 @@
 **Still human:** enable “Require review from Code Owners”, required status checks after the workflow exists on the default branch, benchmark 10 historic issues with product-manager / engineering-lead / cybersecurity **prompts only**. Do not issue write tokens.
 
 ## Phase 2 — CI hardening (repo) and isolated implementation (later)
-**Repo-side:** `PR Gate` workflow always runs on pull requests. Path selection in `.github/scripts/select-ci-paths.mjs` runs Windows/Node 20 mobile typecheck only for mobile/shared-dependency changes, and workforce validation only for agent/policy/template/CI-config changes. Docs-only PRs get skip stubs. Existing `mobile-typecheck.yml` is preserved. Humans must require status check `PR required checks` (`docs/CI_PR_GATE.md`).
+**Repo-side:** `PR Gate` workflow always runs on pull requests. Path selection in `.github/scripts/select-ci-paths.mjs` runs Windows/Node 20/pnpm 10.34.7 mobile typecheck (`--frozen-lockfile`, Expo Router types generated before `tsc`) only for mobile/shared-dependency or classifier-script changes, and workforce validation only for agent/policy/template/CI-config changes. Docs-only PRs get skip stubs. `mobile-typecheck.yml` stays as the historical Windows job with the same pnpm pin. Humans must require status check `PR required checks` (`docs/CI_PR_GATE.md`) instead of the two path-filtered job names; other unrelated required checks stay in place.
 **Still later:** software engineer and QA on single-task sandbox branches; PRs with no auto-merge; founder approval. No agent write tokens.
 
 ## Phase 3 — simulation runtime (this branch) then specialized OBD/product

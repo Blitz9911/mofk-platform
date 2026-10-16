@@ -56,7 +56,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          version: 10.34.7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -66,7 +66,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build API client types
         run: pnpm exec tsc --build lib/api-client-react/tsconfig.json --force --pretty false
@@ -77,12 +77,12 @@ jobs:
   mobile-not-required:
     name: Skip mobile TypeScript (gate)
     needs: select-paths
-    if: needs.select-paths.outputs.mobile != 'true'
+    if: needs.select-paths.outputs.mobile == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Skip mobile typecheck
-        run: echo "No mobile or shared-dependency paths in this PR. Existing mobile-typecheck.yml is unchanged."
+        run: echo "No mobile or shared-dependency paths in this PR."
 
   workforce-validate:
     name: Validate agent registry and GitHub templates (gate)
@@ -107,7 +107,7 @@ jobs:
   workforce-not-required:
     name: Skip workforce config validate (gate)
     needs: select-paths
-    if: needs.select-paths.outputs.workforce != 'true'
+    if: needs.select-paths.outputs.workforce == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -165,11 +165,19 @@ jobs:
             echo "Path selection failed."
             exit 1
           fi
+          if [ "$MOBILE" != "true" ] && [ "$MOBILE" != "false" ]; then
+            echo "Invalid mobile classification '$MOBILE' (must be true or false)."
+            exit 1
+          fi
+          if [ "$WORKFORCE" != "true" ] && [ "$WORKFORCE" != "false" ]; then
+            echo "Invalid workforce classification '$WORKFORCE' (must be true or false)."
+            exit 1
+          fi
           if [ "$MOBILE" = "true" ] && [ "$MOBILE_RUN" != "success" ]; then
             echo "Mobile typecheck was selected and did not succeed ($MOBILE_RUN)."
             exit 1
           fi
-          if [ "$MOBILE" != "true" ] && [ "$MOBILE_SKIP" != "success" ]; then
+          if [ "$MOBILE" = "false" ] && [ "$MOBILE_SKIP" != "success" ]; then
             echo "Mobile skip stub did not succeed ($MOBILE_SKIP)."
             exit 1
           fi
@@ -177,7 +185,7 @@ jobs:
             echo "Workforce validation was selected and did not succeed ($WORKFORCE_RUN)."
             exit 1
           fi
-          if [ "$WORKFORCE" != "true" ] && [ "$WORKFORCE_SKIP" != "success" ]; then
+          if [ "$WORKFORCE" = "false" ] && [ "$WORKFORCE_SKIP" != "success" ]; then
             echo "Workforce skip stub did not succeed ($WORKFORCE_SKIP)."
             exit 1
           fi

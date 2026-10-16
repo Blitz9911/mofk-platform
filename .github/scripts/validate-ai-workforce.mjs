@@ -283,6 +283,10 @@ if (mobile) {
   if (!mobile.includes("pnpm --filter @workspace/mfk-mobile typecheck")) {
     fail("mobile-typecheck.yml job steps were altered");
   }
+  if (!mobile.includes("10.34.7")) fail("mobile-typecheck.yml must pin pnpm 10.34.7");
+  if (!mobile.includes("pnpm install --frozen-lockfile")) {
+    fail("mobile-typecheck.yml must install with --frozen-lockfile");
+  }
 }
 
 const gate = read(".github/workflows/pr-gate.yml");
@@ -311,6 +315,16 @@ if (gate) {
   }
   if (!gate.includes("SANDBOX_RUN")) {
     fail("pr-gate.yml must fail closed when sandbox tests do not succeed");
+  }
+  if (!gate.includes("10.34.7")) fail("pr-gate.yml must pin pnpm 10.34.7");
+  if (!gate.includes("pnpm install --frozen-lockfile")) {
+    fail("pr-gate.yml must install with --frozen-lockfile");
+  }
+  if (!gate.includes('outputs.mobile == \'false\'') && !gate.includes('outputs.mobile == "false"')) {
+    fail("pr-gate.yml must skip mobile only when classification is false");
+  }
+  if (!gate.includes("Invalid mobile classification")) {
+    fail("pr-gate.yml must reject missing or invalid classifier outputs");
   }
 }
 

@@ -37,11 +37,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          version: 10.34.7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -51,7 +53,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build API client types
         run: pnpm exec tsc --build lib/api-client-react/tsconfig.json --force --pretty false
