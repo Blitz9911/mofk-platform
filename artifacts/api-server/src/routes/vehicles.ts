@@ -1,8 +1,10 @@
-import { Router, type IRouter } from "express";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { Router, type IRouter, type Response } from "express";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   vehiclesTable,
+  usersTable,
+  subscriptionPlansTable,
   dtcCodesTable,
   maintenanceTable,
   diagnosticSessionsTable,
@@ -26,6 +28,101 @@ import {
 
 const router: IRouter = Router();
 
+function planAliases(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+    case "individual-basic":
+      return ["plus", "mofk", "individual-basic"];
+    case "family":
+    case "pro":
+    case "premium":
+    case "individual-advanced":
+      return ["family", "pro", "premium", "individual-advanced"];
+    case "fleet":
+      return ["fleet"];
+    case "free":
+    default:
+      return ["free"];
+  }
+}
+
+function fallbackMaxVehicles(tier?: string | null) {
+  switch (tier) {
+    case "fleet":
+      return null;
+    case "family":
+    case "pro":
+    case "premium":
+    case "individual-advanced":
+      return 3;
+    case "plus":
+    case "mofk":
+    case "individual-basic":
+    case "free":
+    default:
+      return 1;
+  }
+}
+
+function planLabel(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+    case "individual-basic":
+      return "باقة مفك";
+    case "family":
+    case "pro":
+    case "premium":
+    case "individual-advanced":
+      return "باقة العائلة";
+    case "fleet":
+      return "باقة الاسطول";
+    case "free":
+    default:
+      return "الباقة المجانية";
+  }
+}
+
+async function getVehicleLimitForUser(userId: string) {
+  const [user] = await db
+    .select({ subscriptionTier: usersTable.subscriptionTier })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  const tier = user?.subscriptionTier ?? "free";
+  const aliases = planAliases(tier);
+  const [plan] = await db
+    .select({ maxVehicles: subscriptionPlansTable.maxVehicles })
+    .from(subscriptionPlansTable)
+    .where(inArray(subscriptionPlansTable.id, aliases))
+    .limit(1);
+
+  return {
+    tier,
+    maxVehicles: plan?.maxVehicles ?? fallbackMaxVehicles(tier),
+  };
+}
+
+async function assertCanCreateVehicle(userId: string, res: Response) {
+  const { tier, maxVehicles } = await getVehicleLimitForUser(userId);
+  if (maxVehicles === null) return true;
+
+  const [{ vehicleCount }] = await db
+    .select({ vehicleCount: sql<number>`count(*)::int` })
+    .from(vehiclesTable)
+    .where(eq(vehiclesTable.userId, userId));
+
+  if (vehicleCount < maxVehicles) return true;
+
+  res.status(403).json({
+    code: "VEHICLE_LIMIT_REACHED",
+    error: `لا يمكن إضافة مركبة جديدة. ${planLabel(tier)} تسمح بـ ${maxVehicles} مركبة فقط، وتحتاج ترقية الباقة لإضافة مركبة أخرى.`,
+  });
+  return false;
+}
+
 router.get("/vehicles", async (req, res): Promise<void> => {
   const rows = await db
     .select()
@@ -41,6 +138,8 @@ router.post("/vehicles", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+
+  if (!(await assertCanCreateVehicle(req.userId, res))) return;
 
   // Prevent duplicate plate number for this user
   if (parsed.data.plateNumber) {

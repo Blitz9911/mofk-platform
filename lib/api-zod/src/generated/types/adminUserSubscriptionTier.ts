@@ -11,6 +11,10 @@ export type AdminUserSubscriptionTier =
 
 export const AdminUserSubscriptionTier = {
   free: "free",
+  plus: "plus",
+  mofk: "mofk",
+  family: "family",
+  pro: "pro",
   premium: "premium",
   fleet: "fleet",
 } as const;

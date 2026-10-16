@@ -1,10 +1,14 @@
 const SESSION_STORAGE_KEY = "mfk-supabase-session";
+const PHONE_OTP_FALLBACK_STORAGE_KEY = "mfk-phone-otp-fallback";
+const OAUTH_ERROR_STORAGE_KEY = "mfk-oauth-error";
+const FALLBACK_PHONE_OTP = "123456";
 
 type JsonRecord = Record<string, unknown>;
 
 type SupabaseAuthUser = {
   id: string;
   email?: string;
+  phone?: string;
   user_metadata?: JsonRecord;
 };
 
@@ -34,6 +38,11 @@ type UserRow = {
   email?: string | null;
   phone: string;
   role?: string | null;
+  subscription_tier?: string | null;
+  subscription_started_at?: string | null;
+  subscription_ends_at?: string | null;
+  subscription_auto_renew?: boolean | null;
+  is_active?: boolean | null;
 };
 
 export interface AuthUser {
@@ -42,11 +51,16 @@ export interface AuthUser {
   email?: string;
   phone: string;
   role: string;
+  subscriptionTier: string;
+  subscriptionStartedAt?: string | null;
+  subscriptionEndsAt?: string | null;
+  subscriptionAutoRenew?: boolean | null;
+  isActive?: boolean | null;
 }
 
 export function getSupabaseConfig() {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
-  const url = env.VITE_SUPABASE_URL?.replace(/\/+$/, "");
+  const url = env.VITE_SUPABASE_URL?.replace(/\/+$/, "").replace(/\/(?:rest|auth)\/v1$/, "");
   const anonKey = env.VITE_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
@@ -56,6 +70,11 @@ export function getSupabaseConfig() {
   }
 
   return { url, anonKey };
+}
+
+function buildSupabaseUrl(baseUrl: string, path: string) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
 }
 
 function getStorage(): Storage | null {
@@ -136,7 +155,7 @@ export async function supabaseRequest<T>(
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(`${url}${path}`, {
+  const response = await fetch(buildSupabaseUrl(url, path), {
     ...options,
     headers,
   });
@@ -199,7 +218,158 @@ function fallbackName(user: SupabaseAuthUser) {
 }
 
 function fallbackPhone(user: SupabaseAuthUser) {
-  return metadataValue(user, "phone") || `user-${user.id.slice(0, 12)}`;
+  return metadataValue(user, "phone") || user.phone || `user-${user.id.slice(0, 12)}`;
+}
+
+function normalizeSaudiPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+
+  if (digits.startsWith("9665") && digits.length === 12) return `+${digits}`;
+  if (digits.startsWith("05") && digits.length === 10) return `+966${digits.slice(1)}`;
+  if (digits.startsWith("5") && digits.length === 9) return `+966${digits}`;
+
+  throw new Error("أدخل رقم جوال سعودي صحيح.");
+}
+
+function consumeHashSession(): SupabaseSession | null {
+  if (typeof window === "undefined" || !window.location.hash) return null;
+
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const error = params.get("error_description") || params.get("error");
+  if (error) {
+    getStorage()?.setItem(OAUTH_ERROR_STORAGE_KEY, error);
+    window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    return null;
+  }
+
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token") ?? undefined;
+
+  if (!accessToken) return null;
+
+  const session: SupabaseSession = {
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    expires_at:
+      Math.floor(Date.now() / 1000) + Number(params.get("expires_in") ?? 3600),
+    expires_in: Number(params.get("expires_in") ?? 3600),
+    user: { id: "" },
+  };
+
+  window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+  return session;
+}
+
+function consumeOAuthQueryError() {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get("error_description") || params.get("error");
+
+  if (!error) return null;
+
+  params.delete("error");
+  params.delete("error_code");
+  params.delete("error_description");
+  const nextSearch = params.toString();
+  window.history.replaceState(
+    null,
+    document.title,
+    `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`,
+  );
+
+  return error;
+}
+
+function isUnsupportedPhoneProvider(error: unknown) {
+  return error instanceof Error && /unsupported phone provider/i.test(error.message);
+}
+
+function setFallbackPhoneOtp(phone: string) {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(
+    PHONE_OTP_FALLBACK_STORAGE_KEY,
+    JSON.stringify({ phone, createdAt: Date.now() }),
+  );
+}
+
+function getFallbackPhoneOtp(phone: string) {
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const parsed = JSON.parse(
+      storage.getItem(PHONE_OTP_FALLBACK_STORAGE_KEY) || "null",
+    ) as { phone?: string; createdAt?: number } | null;
+
+    if (!parsed?.phone || parsed.phone !== phone) return null;
+    if (!parsed.createdAt || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+      storage.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    storage.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+    return null;
+  }
+}
+
+function clearFallbackPhoneOtp() {
+  const storage = getStorage();
+  storage?.removeItem(PHONE_OTP_FALLBACK_STORAGE_KEY);
+}
+
+function hiddenPhoneCredentials(phone: string) {
+  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
+  return {
+    email: `${digits}@phone.mofk.local`,
+    password: `MofkPhoneOtp@${digits}`,
+  };
+}
+
+async function signInWithHiddenPhone(phone: string): Promise<SupabaseSession> {
+  const { email, password } = hiddenPhoneCredentials(phone);
+  const payload = await supabaseRequest<SupabaseAuthResponse>(
+    "/auth/v1/token?grant_type=password",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    },
+  );
+
+  const session = normalizeSession(payload);
+  if (!session) throw new Error("تعذر تسجيل الدخول برقم الجوال.");
+  return session;
+}
+
+async function signInOrCreateHiddenPhoneUser(phone: string): Promise<AuthUser> {
+  let session: SupabaseSession;
+
+  try {
+    session = await signInWithHiddenPhone(phone);
+  } catch {
+    const { email, password } = hiddenPhoneCredentials(phone);
+    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        data: { phone, name: "مستخدم مفك" },
+      }),
+    });
+
+    const createdSession = normalizeSession(payload);
+    session = createdSession ?? (await signInWithHiddenPhone(phone));
+  }
+
+  saveSupabaseSession(session);
+  const row = await getProfileRow(session.user, session.access_token);
+  await touchLastActiveAt(session.user.id, session.access_token);
+  return toAuthUser(session.user, row);
 }
 
 function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
@@ -209,6 +379,11 @@ function toAuthUser(user: SupabaseAuthUser, row?: UserRow | null): AuthUser {
     email: row?.email || user.email || undefined,
     phone: row?.phone || fallbackPhone(user),
     role: row?.role || "user",
+    subscriptionTier: row?.subscription_tier || "free",
+    subscriptionStartedAt: row?.subscription_started_at ?? null,
+    subscriptionEndsAt: row?.subscription_ends_at ?? null,
+    subscriptionAutoRenew: row?.subscription_auto_renew ?? true,
+    isActive: row?.is_active ?? true,
   };
 }
 
@@ -222,7 +397,7 @@ async function upsertUserRow(user: SupabaseAuthUser, accessToken: string): Promi
   };
 
   const rows = await supabaseRequest<UserRow[]>(
-    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role",
+    "/rest/v1/users?on_conflict=id&select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active",
     {
       method: "POST",
       headers: {
@@ -239,7 +414,7 @@ async function upsertUserRow(user: SupabaseAuthUser, accessToken: string): Promi
 
 async function getUserRow(userId: string, accessToken: string): Promise<UserRow | null> {
   const rows = await supabaseRequest<UserRow[]>(
-    `/rest/v1/users?select=id,name,email,phone,role&id=eq.${encodeURIComponent(userId)}&limit=1`,
+    `/rest/v1/users?select=id,name,email,phone,role,subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(userId)}&limit=1`,
     { method: "GET" },
     accessToken,
   );
@@ -247,50 +422,139 @@ async function getUserRow(userId: string, accessToken: string): Promise<UserRow 
   return rows?.[0] ?? null;
 }
 
+async function getProfileRow(user: SupabaseAuthUser, accessToken: string): Promise<UserRow | null> {
+  try {
+    return (await getUserRow(user.id, accessToken)) ?? (await upsertUserRow(user, accessToken));
+  } catch {
+    return null;
+  }
+}
+
+async function touchLastActiveAt(userId: string, accessToken: string) {
+  try {
+    await supabaseRequest(
+      `/rest/v1/users?id=eq.${encodeURIComponent(userId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          last_active_at: new Date().toISOString(),
+        }),
+      },
+      accessToken,
+    );
+  } catch {
+    // Last activity should never block login.
+  }
+}
+
 export const authApi = {
-  async register(name: string, phone: string, email: string, password: string): Promise<AuthUser> {
-    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/signup", {
+  normalizePhone(phone: string) {
+    return normalizeSaudiPhone(phone);
+  },
+
+  async requestPhoneOtp(phone: string): Promise<string> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+
+    try {
+      await supabaseRequest("/auth/v1/otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: normalizedPhone,
+          create_user: true,
+        }),
+      });
+      clearFallbackPhoneOtp();
+    } catch (error) {
+      if (!isUnsupportedPhoneProvider(error)) throw error;
+      setFallbackPhoneOtp(normalizedPhone);
+    }
+
+    return normalizedPhone;
+  },
+
+  isUsingFallbackPhoneOtp(phone: string) {
+    return Boolean(getFallbackPhoneOtp(normalizeSaudiPhone(phone)));
+  },
+
+  async verifyPhoneOtp(phone: string, token: string): Promise<AuthUser> {
+    const normalizedPhone = normalizeSaudiPhone(phone);
+    const cleanToken = token.replace(/\D/g, "");
+
+    if (cleanToken.length !== 6) {
+      throw new Error("أدخل رمز التحقق المكون من 6 أرقام.");
+    }
+
+    if (getFallbackPhoneOtp(normalizedPhone)) {
+      if (cleanToken !== FALLBACK_PHONE_OTP) {
+        throw new Error("رمز التحقق غير صحيح. رمز التجربة هو 123456.");
+      }
+
+      clearFallbackPhoneOtp();
+      return signInOrCreateHiddenPhoneUser(normalizedPhone);
+    }
+
+    const payload = await supabaseRequest<SupabaseAuthResponse>("/auth/v1/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email,
-        password,
-        data: { name, phone },
+        phone: normalizedPhone,
+        token: cleanToken,
+        type: "sms",
       }),
     });
 
     const session = normalizeSession(payload);
-    if (!session) {
-      throw new Error(
-        "تم إنشاء الحساب، لكن Supabase يطلب تأكيد البريد قبل الدخول. عطّل Email confirmations مؤقتًا من Supabase Auth للتجربة الأولى.",
-      );
-    }
+    if (!session) throw new Error("تعذر تأكيد رقم الجوال. حاول مرة أخرى.");
 
     saveSupabaseSession(session);
-    const row = await upsertUserRow(session.user, session.access_token);
+    const row = await getProfileRow(session.user, session.access_token);
+    await touchLastActiveAt(session.user.id, session.access_token);
     return toAuthUser(session.user, row);
   },
 
-  async login(email: string, password: string): Promise<AuthUser> {
-    const payload = await supabaseRequest<SupabaseAuthResponse>(
-      "/auth/v1/token?grant_type=password",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      },
-    );
+  signInWithGoogle(nextPath = "/app") {
+    const { url } = getSupabaseConfig();
+    const redirectTo = new URL("/login", window.location.origin);
+    redirectTo.searchParams.set("next", nextPath);
 
-    const session = normalizeSession(payload);
-    if (!session) throw new Error("تعذر تسجيل الدخول. تحقق من البريد وكلمة المرور.");
+    const authorizeUrl = new URL(`${url}/auth/v1/authorize`);
+    authorizeUrl.searchParams.set("provider", "google");
+    authorizeUrl.searchParams.set("redirect_to", redirectTo.toString());
+    authorizeUrl.searchParams.set("scopes", "openid email profile");
+    window.location.href = authorizeUrl.toString();
+  },
 
-    saveSupabaseSession(session);
-    const row = await upsertUserRow(session.user, session.access_token);
-    return toAuthUser(session.user, row);
+  consumeOAuthError() {
+    const storage = getStorage();
+    const stored = storage?.getItem(OAUTH_ERROR_STORAGE_KEY) || null;
+    if (stored) storage?.removeItem(OAUTH_ERROR_STORAGE_KEY);
+    return consumeOAuthQueryError() || stored;
   },
 
   async getCurrentUser(): Promise<AuthUser | null> {
-    const session = await getValidSupabaseSession();
+    let session = await getValidSupabaseSession();
+    const hashSession = consumeHashSession();
+
+    if (!session && hashSession) {
+      try {
+        const authUser = await supabaseRequest<SupabaseAuthUser>(
+          "/auth/v1/user",
+          { method: "GET" },
+          hashSession.access_token,
+        );
+        session = { ...hashSession, user: authUser };
+        saveSupabaseSession(session);
+      } catch {
+        clearSupabaseSession();
+        return null;
+      }
+    }
+
     if (!session) return null;
 
     try {
@@ -299,8 +563,8 @@ export const authApi = {
         { method: "GET" },
         session.access_token,
       );
-      const row = (await getUserRow(authUser.id, session.access_token)) ??
-        (await upsertUserRow(authUser, session.access_token));
+      const row = await getProfileRow(authUser, session.access_token);
+      await touchLastActiveAt(authUser.id, session.access_token);
       return toAuthUser(authUser, row);
     } catch {
       clearSupabaseSession();

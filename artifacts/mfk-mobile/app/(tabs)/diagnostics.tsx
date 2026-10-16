@@ -1,9 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useListVehicles, useGetLiveTelemetry, useListDiagnosticSessions } from "@workspace/api-client-react";
-import React, { useState } from "react";
+import {
+  getListDiagnosticSessionsQueryKey,
+  getListVehiclesQueryKey,
+  useCloseDiagnosticSession,
+  useGetLiveTelemetry,
+  useListDiagnosticSessions,
+  useListVehicles,
+  usePairAdapter,
+  useStartDiagnosticSession,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +26,47 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useObdConnection } from "@/hooks/useObdConnection";
+import { ObdConnectionState, ScannedObdDevice } from "@/lib/obd/ObdBleManager";
+
+const OBD_STATE_LABELS: Record<ObdConnectionState, string> = {
+  idle: "غير متصل",
+  scanning: "جاري البحث عن الجهاز...",
+  connecting: "جاري الاتصال بالجهاز...",
+  discovering: "جاري فحص الجهاز...",
+  subscribing: "جاري تفعيل الإشعارات...",
+  initializing: "جاري تهيئة المهايئ...",
+  "searching-protocol": "جاري البحث عن بروتوكول المركبة...",
+  ready: "متصل ويعمل",
+  recovering: "جاري إعادة الاتصال...",
+  disconnected: "انقطع الاتصال",
+  error: "حدث خطأ في الاتصال",
+};
+
+const OBD_BUSY_STATES = new Set<ObdConnectionState>([
+  "scanning",
+  "connecting",
+  "discovering",
+  "subscribing",
+  "initializing",
+  "searching-protocol",
+  "recovering",
+]);
+
+function obdErrorMessage(error: unknown): string {
+  const code = error instanceof Error ? error.message : String(error);
+  switch (code) {
+    case "BLUETOOTH_PERMISSION_DENIED":
+      return "يرجى السماح بإذن البلوتوث والموقع من إعدادات الهاتف.";
+    case "BLUETOOTH_OFF":
+      return "يرجى تفعيل البلوتوث في هاتفك.";
+    case "FFE1_NOT_NOTIFIABLE":
+    case "FFE2_NOT_WRITABLE":
+      return "الجهاز المكتشف لا يطابق مواصفات V011.";
+    default:
+      return "حدث خطأ غير متوقع أثناء الاتصال بالجهاز.";
+  }
+}
 
 function GaugeCard({ label, value, unit, color, icon }: { label: string; value: string | number; unit: string; color: string; icon: string }) {
   const colors = useColors();
@@ -47,8 +100,82 @@ export default function DiagnosticsScreen() {
     { query: { enabled: !!activeId } as any }
   );
 
+  const queryClient = useQueryClient();
+  const obd = useObdConnection();
+  const pairAdapter = usePairAdapter();
+  const startSession = useStartDiagnosticSession();
+  const closeSession = useCloseDiagnosticSession();
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<ScannedObdDevice[]>([]);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [connectBusy, setConnectBusy] = useState(false);
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const activeVehicle = vehicles?.find((v) => v.id === activeId);
+
+  const finishConnect = useCallback(
+    async (deviceId: string) => {
+      if (!activeId) return;
+      try {
+        await obd.connect(deviceId);
+        await pairAdapter.mutateAsync({
+          vehicleId: activeId,
+          data: { adapterMac: deviceId },
+        });
+        queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
+        const session = await startSession.mutateAsync({
+          data: { vehicleId: activeId, odometerKm: activeVehicle?.odometerKm },
+        });
+        setActiveSessionId(session.id);
+      } catch (error) {
+        Alert.alert("تعذر الاتصال", obdErrorMessage(error));
+      }
+    },
+    [activeId, activeVehicle, obd, pairAdapter, queryClient, startSession]
+  );
+
+  const handleNewSessionPress = useCallback(async () => {
+    if (obd.state === "ready" || OBD_BUSY_STATES.has(obd.state)) {
+      if (activeSessionId) {
+        await closeSession.mutateAsync({ sessionId: activeSessionId }).catch(() => undefined);
+        setActiveSessionId(null);
+        queryClient.invalidateQueries({
+          queryKey: getListDiagnosticSessionsQueryKey({ vehicleId: activeId ?? "", limit: 8 }),
+        });
+      }
+      await obd.disconnect();
+      return;
+    }
+    if (!activeId) {
+      Alert.alert("لا توجد مركبة", "أضف مركبة أولاً لبدء جلسة تشخيص.");
+      return;
+    }
+    setConnectBusy(true);
+    try {
+      const found = await obd.scan();
+      if (found.length === 0) {
+        Alert.alert("لم يتم العثور على الجهاز", "تأكد من تشغيل جهاز V011 وأنه بالقرب من الهاتف.");
+        return;
+      }
+      if (found.length === 1) {
+        await finishConnect(found[0].id);
+      } else {
+        setCandidates(found);
+        setPickerVisible(true);
+      }
+    } catch (error) {
+      Alert.alert("تعذر البحث", obdErrorMessage(error));
+    } finally {
+      setConnectBusy(false);
+    }
+  }, [activeId, activeSessionId, closeSession, finishConnect, obd, queryClient]);
+
+  const newSessionLabel = OBD_BUSY_STATES.has(obd.state) || connectBusy
+    ? "جاري الاتصال..."
+    : obd.state === "ready"
+      ? "إنهاء الجلسة"
+      : "بدء جلسة جديدة";
+  const bleTelemetry = obd.state === "ready";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
@@ -56,16 +183,32 @@ export default function DiagnosticsScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable
           style={[styles.newSessionBtn, { backgroundColor: colors.primary }]}
-          onPress={() => Alert.alert("جلسة جديدة", "قم بتوصيل جهاز OBD-II ثم ابدأ الجلسة من التطبيق.")}
+          onPress={handleNewSessionPress}
+          disabled={connectBusy}
         >
-          <Ionicons name="play-circle-outline" size={18} color="#fff" />
-          <Text style={styles.newSessionText}>بدء جلسة جديدة</Text>
+          <Ionicons
+            name={obd.state === "ready" ? "stop-circle-outline" : "play-circle-outline"}
+            size={18}
+            color="#fff"
+          />
+          <Text style={styles.newSessionText}>{newSessionLabel}</Text>
         </Pressable>
         <View style={styles.headerRight}>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>التشخيص المباشر</Text>
           <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>مراقبة حية لبيانات المركبة</Text>
         </View>
       </View>
+
+      {obd.state !== "idle" && (
+        <View style={[styles.obdStatusBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.obdStatusText, { color: colors.mutedForeground }]}>
+            {OBD_STATE_LABELS[obd.state]}
+          </Text>
+          {OBD_BUSY_STATES.has(obd.state) && (
+            <ActivityIndicator size="small" color={colors.primary} />
+          )}
+        </View>
+      )}
 
       {/* Vehicle selector */}
       {vehicles && vehicles.length > 1 && (
@@ -128,7 +271,23 @@ export default function DiagnosticsScreen() {
         )}
 
         {/* Live telemetry */}
-        {telLoading ? (
+        {bleTelemetry ? (
+          <View style={styles.gaugesSection}>
+            <View style={styles.liveHeader}>
+              <View style={[styles.liveDot]} />
+              <Text style={[styles.liveTitle, { color: colors.foreground }]}>بيانات حية من جهاز V011</Text>
+            </View>
+            <Text style={[styles.liveSub, { color: colors.mutedForeground }]}>قراءات المحرك المباشرة من المهايئ الفعلي</Text>
+            <View style={styles.gaugeGrid}>
+              <GaugeCard label="السرعة" value={obd.telemetry.speedKmh ?? 0} unit="كم/س" color={colors.primary} icon="speedometer-outline" />
+              <GaugeCard label="سرعة المحرك" value={obd.telemetry.rpm ?? 0} unit="RPM" color="#06b6d4" icon="sync-outline" />
+              <GaugeCard label="حرارة المبرد" value={obd.telemetry.coolantTemp ?? 0} unit="°م" color="#f59e0b" icon="thermometer-outline" />
+              <GaugeCard label="البطارية" value={(obd.telemetry.batteryV ?? 0).toFixed(1)} unit="V" color="#22c55e" icon="battery-half-outline" />
+              <GaugeCard label="مستوى الوقود" value={obd.telemetry.fuelLevelPct ?? 0} unit="%" color="#8b5cf6" icon="water-outline" />
+              <GaugeCard label="حمل المحرك" value={obd.telemetry.engineLoad ?? 0} unit="%" color="#ec4899" icon="analytics-outline" />
+            </View>
+          </View>
+        ) : telLoading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
@@ -210,6 +369,44 @@ export default function DiagnosticsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={pickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>اختر جهاز V011</Text>
+            <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+              تم العثور على أكثر من جهاز قريب، اختر الجهاز الصحيح
+            </Text>
+            <FlatList
+              data={candidates}
+              keyExtractor={(item) => item.id}
+              style={{ maxHeight: 280 }}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.candidateRow, { borderColor: colors.border }]}
+                  onPress={() => {
+                    setPickerVisible(false);
+                    void finishConnect(item.id);
+                  }}
+                >
+                  <Text style={[styles.candidateRssi, { color: colors.mutedForeground }]}>
+                    {item.rssi != null ? `${item.rssi} dBm` : ""}
+                  </Text>
+                  <Text style={[styles.candidateName, { color: colors.foreground }]}>{item.name || item.id}</Text>
+                </Pressable>
+              )}
+            />
+            <Pressable style={styles.modalCancel} onPress={() => setPickerVisible(false)}>
+              <Text style={[styles.modalCancelText, { color: colors.mutedForeground }]}>إلغاء</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -305,4 +502,44 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   dtcBadge: { flexDirection: "row-reverse", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   dtcBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  obdStatusBar: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  obdStatusText: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "right" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalSheet: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 18,
+    gap: 8,
+  },
+  modalTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
+  modalSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", marginBottom: 6 },
+  candidateRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  candidateName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  candidateRssi: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  modalCancel: { alignItems: "center", paddingVertical: 12, marginTop: 4 },
+  modalCancelText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });
