@@ -8,8 +8,9 @@
 **Repo-side (this branch):** `agents/registry.json`, GitHub issue/PR templates, CODEOWNERS, isolated config-validation workflow (does not run mobile typecheck).
 **Still human:** enable “Require review from Code Owners”, required status checks after the workflow exists on the default branch, benchmark 10 historic issues with product-manager / engineering-lead / cybersecurity **prompts only**. Do not issue write tokens.
 
-## Phase 2 — isolated implementation
-Add software engineer and QA on single-task sandbox branches; create PRs (no auto-merge). Run workflow; require founder approval.
+## Phase 2 — CI hardening (repo) and isolated implementation (later)
+**Repo-side:** `PR Gate` workflow always runs on pull requests. Path selection in `.github/scripts/select-ci-paths.mjs` runs Windows/Node 20 mobile typecheck only for mobile/shared-dependency changes, and workforce validation only for agent/policy/template/CI-config changes. Docs-only PRs get skip stubs. Existing `mobile-typecheck.yml` is preserved. Humans must require status check `PR required checks` (`docs/CI_PR_GATE.md`).
+**Still later:** software engineer and QA on single-task sandbox branches; PRs with no auto-merge; founder approval. No agent write tokens.
 
 ## Phase 3 — specialized OBD/product
 Add OBD and recommendations agents using simulators/recorded synthetic responses, test matrices for unsupported PIDs and fail-safe timeouts. No live vehicle-write access.
