@@ -2,7 +2,7 @@
 
 **Mode:** deterministic, offline, read-only. `agents/registry.json` `operational` remains **false**.
 
-This is not a live multi-agent product. There is no LLM client, no GitHub App token, and no production network.
+This is not a live multi-agent product. There is no live LLM client, no GitHub App token, and no production network. Phase 4A adds an offline `ModelAdapter` (`docs/AI_MODEL_ADAPTER.md`) that stays mock-only unless a future human-gated change enables a provider.
 
 ## Location
 
@@ -18,7 +18,7 @@ Illegal shortcuts (engineering → human approval, QA → human approval without
 
 ```bash
 node agents/runtime/cli.mjs --fixture agents/runtime/fixtures/maintenance-recommendation-task.json
-node --test agents/runtime/test/runtime.test.mjs
+node --test agents/runtime/test/runtime.test.mjs agents/runtime/test/model-adapter.test.mjs
 ```
 
 Kill switch: set `MFK_AGENT_RUNTIME_KILLED=1` or create `agents/runtime/KILL`.

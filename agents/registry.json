@@ -6,7 +6,8 @@
   "humanOwner": "founder",
   "notes": [
     "This registry is documentation plus CI-validated configuration. It does not grant credentials or start agents.",
-    "operational remains false until a tested orchestrator, scoped GitHub App, sandbox, and protected environments exist. agents/runtime is simulation-only and must keep refusing operational=true."
+    "operational remains false until a tested orchestrator, scoped GitHub App, sandbox, and protected environments exist. agents/runtime is simulation-only and must keep refusing operational=true.",
+    "Phase 4A model adapter is offline-only. Live providers, API keys, and network calls stay disabled."
   ],
   "handoffContract": {
     "requiredInputs": [
@@ -49,7 +50,9 @@
     "change_environment_reviewers",
     "credential_elevation",
     "create_production_write_token",
-    "auto_merge"
+    "auto_merge",
+    "execute_shell",
+    "llm_api_call"
   ],
   "sensitiveOperations": {
     "database_migration": {

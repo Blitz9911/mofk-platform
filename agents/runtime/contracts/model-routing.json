@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "liveProvidersEnabled": false,
+  "defaultProvider": "mock",
+  "notes": [
+    "Phase 4A is infrastructure only. Live providers stay disabled.",
+    "No API keys, credentials, or network clients are configured here."
+  ],
+  "providers": {
+    "mock": {
+      "kind": "offline-mock",
+      "enabled": true,
+      "live": false
+    },
+    "openai": {
+      "kind": "live",
+      "enabled": false,
+      "live": true,
+      "reason": "Phase 4A refuses live OpenAI calls"
+    },
+    "anthropic": {
+      "kind": "live",
+      "enabled": false,
+      "live": true,
+      "reason": "Phase 4A refuses live Anthropic calls"
+    }
+  },
+  "roleRoutes": {
+    "orchestrator": { "provider": "mock", "modelId": "mock-orchestrator" },
+    "product-manager": { "provider": "mock", "modelId": "mock-product" },
+    "software-engineer": { "provider": "mock", "modelId": "mock-engineering" },
+    "qa-automation": { "provider": "mock", "modelId": "mock-qa" },
+    "cybersecurity": { "provider": "mock", "modelId": "mock-security" }
+  },
+  "budgets": {
+    "maxInputChars": 12000,
+    "maxOutputChars": 4000,
+    "maxAttempts": 2,
+    "maxDurationMs": 2000,
+    "estimatedTokenBudget": 4000
+  }
+}
