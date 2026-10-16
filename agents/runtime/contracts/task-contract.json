@@ -1,0 +1,29 @@
+{
+  "$id": "mfk-agent-task-contract",
+  "title": "MFK simulated workforce task",
+  "required": [
+    "taskId",
+    "title",
+    "area",
+    "objective",
+    "acceptanceCriteria",
+    "riskTier",
+    "sensitiveChanges",
+    "requester"
+  ],
+  "properties": {
+    "taskId": { "type": "string", "pattern": "^synthetic-" },
+    "title": { "type": "string" },
+    "area": {
+      "enum": ["product", "mobile", "api", "obd", "recommendations", "infra", "workforce-docs"]
+    },
+    "objective": { "type": "string" },
+    "nonGoals": { "type": "array", "items": { "type": "string" } },
+    "acceptanceCriteria": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "riskTier": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
+    "sensitiveChanges": { "type": "array", "items": { "type": "string" } },
+    "requestedOperations": { "type": "array", "items": { "type": "string" } },
+    "requester": { "enum": ["ceo", "human", "synthetic"] },
+    "source": { "const": "synthetic" }
+  }
+}

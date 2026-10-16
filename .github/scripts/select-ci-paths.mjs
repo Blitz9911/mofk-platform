@@ -29,6 +29,8 @@ export const WORKFORCE_PATTERNS = [
   "docs/FAIL_CLOSED_APPROVALS.md",
   "docs/AI_WORKFORCE_PHASE01_VALIDATION.md",
   "docs/CI_PR_GATE.md",
+  "docs/AGENT_RUNTIME.md",
+  "docs/AGENT_RUNTIME_SECURITY.md",
   ".github/CODEOWNERS",
   ".github/ISSUE_TEMPLATE/**",
   ".github/pull_request_template.md",

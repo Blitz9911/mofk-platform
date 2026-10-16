@@ -1,0 +1,29 @@
+{
+  "taskId": "synthetic-maint-rec-001",
+  "title": "Show the next oil-change interval on recommendations after a completed log",
+  "area": "recommendations",
+  "objective": "When a synthetic vehicle has an oil change logged at 80,000 km, the recommendations surface must show the next due interval at 90,000 km as scheduled, not hide it.",
+  "nonGoals": [
+    "No live OBD writes",
+    "No production database changes",
+    "No EAS publish"
+  ],
+  "acceptanceCriteria": [
+    "Oil log at 80,000 km yields a scheduled card for 90,000 km",
+    "A resolved overlay on the previous interval does not hide the next interval",
+    "Unexecuted tests stay Not tested"
+  ],
+  "riskTier": "L1",
+  "sensitiveChanges": ["none"],
+  "requestedOperations": [],
+  "requester": "ceo",
+  "source": "synthetic",
+  "vehicleFixture": {
+    "id": "synthetic-vehicle-1",
+    "make": "Toyota",
+    "model": "Camry",
+    "year": 2019,
+    "odometerKm": 80000,
+    "vin": "not-a-real-vin"
+  }
+}
