@@ -9,6 +9,8 @@ import { resolve } from "node:path";
 
 /** Same mobile surfaces as .github/workflows/mobile-typecheck.yml, plus the gate that can run that job. */
 export const MOBILE_PATTERNS = [
+  ".github/scripts/select-ci-paths.mjs",
+  ".github/scripts/select-ci-paths.test.mjs",
   "artifacts/mfk-mobile/**",
   "lib/api-client-react/**",
   "package.json",
@@ -74,10 +76,14 @@ function gitChangedFiles(baseSha, headSha) {
   if (!baseSha || !headSha) {
     throw new Error("missing BASE_SHA or HEAD_SHA");
   }
-  const output = execFileSync("git", ["diff", "--name-only", "--no-renames", baseSha, headSha], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const output = execFileSync(
+    "git",
+    ["diff", "--name-only", "--no-renames", `${baseSha}...${headSha}`],
+    {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   return output
     .split(/\r?\n/)
     .map((line) => line.trim())

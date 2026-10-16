@@ -18,13 +18,13 @@ Settings → Branches → Branch protection rule (or Ruleset) for `main`:
 - Require conversation resolution
 - Block merge if PR template fail-closed checklist is incomplete (process; GitHub cannot parse the checklist unless you add an extra required status)
 
-After `pr-gate.yml` has run on the default branch at least once, set the **only** required status check to:
+After `pr-gate.yml` has run on the default branch at least once, replace the two **path-filtered** check names that the gate already covers with this single required check:
 
 - `PR required checks`
 
-Do **not** require `Check mobile TypeScript` or `Validate agent registry and GitHub templates`. Those jobs are path-filtered and GitHub treats a missing required check as a merge blocker, which would stall documentation-only and AI Workforce PRs.
+Do **not** require `Check mobile TypeScript` or `Validate agent registry and GitHub templates`. GitHub treats a missing required check as a merge blocker, which would stall documentation-only and AI Workforce PRs. Keep any other already-required security, build, or review checks that are not covered by this gate.
 
-Keep `.github/workflows/mobile-typecheck.yml` as the Windows / Node 20 historical job. The gate re-runs that same typecheck when mobile or shared-dependency paths change. Details: `docs/CI_PR_GATE.md`.
+Keep `.github/workflows/mobile-typecheck.yml` as the Windows / Node 20 / pnpm 10.34.7 historical job (frozen-lockfile install). The gate re-runs that same typecheck, including Expo Router type generation, when mobile or shared-dependency paths change. Details: `docs/CI_PR_GATE.md`.
 
 Do not replace the mobile Windows/Node 20 workflow with Ubuntu typecheck.
 
@@ -78,7 +78,7 @@ Do not give the app: `administration`, environment secret write, ability to edit
 | Issue / PR templates | yes | templates apply after default-branch merge |
 | Config validator workflow | yes | via gate when workforce paths change |
 | PR gate / `PR required checks` | yes | **human must add the required check name** |
-| Mobile typecheck Windows/Node 20 | unchanged path-filtered workflow | do not require this name |
+| Mobile typecheck Windows/Node 20 / pnpm 10.34.7 | path-filtered workflow with frozen-lockfile | do not require this job name |
 | Protected `main` | documented | **human** |
 | `production` environment | documented | **human** |
 | GitHub App | documented | **human** |

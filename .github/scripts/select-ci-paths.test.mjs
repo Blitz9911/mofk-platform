@@ -99,3 +99,21 @@ test("undetermined file list fail-closed runs both suites", () => {
   assert.equal(result.workforce, true);
   assert.equal(result.failClosed, true);
 });
+
+test("classifier changes select both CI suites", () => {
+  for (const file of [
+    ".github/scripts/select-ci-paths.mjs",
+    ".github/scripts/select-ci-paths.test.mjs",
+  ]) {
+    const result = classifyPaths([file]);
+    assert.equal(result.mobile, true, file);
+    assert.equal(result.workforce, true, file);
+  }
+});
+
+test("deleted and renamed paths still classify", () => {
+  const deleted = classifyPaths(["artifacts/mfk-mobile/app/gone.tsx"]);
+  assert.equal(deleted.mobile, true);
+  const renamed = classifyPaths(["agents/old-name.md"]);
+  assert.equal(renamed.workforce, true);
+});
