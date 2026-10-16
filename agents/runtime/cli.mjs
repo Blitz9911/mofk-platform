@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Offline simulation CLI. No network, no git writes, no LLM.
+ * Offline simulation CLI. No network, no git writes, no live LLM.
  * Usage: node agents/runtime/cli.mjs --fixture agents/runtime/fixtures/maintenance-recommendation-task.json
  */
 import { readFileSync } from "node:fs";

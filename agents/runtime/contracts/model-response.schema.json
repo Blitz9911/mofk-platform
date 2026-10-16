@@ -1,0 +1,39 @@
+{
+  "$id": "mfk-model-response",
+  "title": "MFK model adapter response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "summary",
+    "proposedActions",
+    "toolRequests",
+    "approvalNeeded",
+    "confidence"
+  ],
+  "properties": {
+    "kind": { "enum": ["proposal", "refusal"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "proposedActions": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 500 }
+    },
+    "toolRequests": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "args": { "type": "object" }
+        }
+      }
+    },
+    "approvalNeeded": { "const": true },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "refusalReason": { "type": "string", "maxLength": 500 }
+  }
+}

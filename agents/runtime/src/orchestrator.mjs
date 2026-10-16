@@ -10,6 +10,8 @@ import { runProductAgent } from "./agents/product.mjs";
 import { runEngineeringAgent } from "./agents/engineering.mjs";
 import { runQaAgent } from "./agents/qa.mjs";
 import { runCybersecurityAgent } from "./agents/cybersecurity.mjs";
+import { invokeModelForAgent } from "./model/invoke.mjs";
+import { createMockAdapter } from "./model/mock-adapter.mjs";
 
 const PIPELINE = [
   { id: "product-manager", run: runProductAgent, from: STATES.ROUTED, to: STATES.PRODUCT_COMPLETE },
@@ -38,13 +40,19 @@ function finish(status, state, task, audit, extra = {}) {
     outputs: extra.outputs || {},
     reason: extra.reason || null,
     limits: extra.limits || null,
+    model: extra.model || { enabled: false, live: false, provider: "none" },
     audit: audit.report(task),
   };
 }
 
 export function runSimulation(rawTask, options = {}) {
   const audit = options.audit || createAuditLog({ now: options.now });
-  const limiter = options.limiter || createLimiter(options.limits);
+  const limiter =
+    options.limiter ||
+    createLimiter({
+      ...options.limits,
+      maxSteps: options.limits?.maxSteps ?? (options.useModelAdapter ? 24 : 12),
+    });
   const registry = options.registry || loadWorkforceRegistry(options.registryPath);
 
   try {
@@ -87,6 +95,8 @@ export function runSimulation(rawTask, options = {}) {
     });
 
     const outputs = {};
+    const modelCalls = [];
+    const modelEnabled = options.useModelAdapter === true;
     for (const step of PIPELINE) {
       limiter.tick(step.id);
       assertNotKilled(options);
@@ -96,6 +106,33 @@ export function runSimulation(rawTask, options = {}) {
       }
       if (options.forbiddenAgentId === step.id) {
         throw new Error(`role ${step.id} is not permitted for this run`);
+      }
+      if (modelEnabled) {
+        const invoked = invokeModelForAgent({
+          agentId: step.id,
+          task,
+          registry,
+          adapter: options.modelAdapter || createMockAdapter(options.modelScenario),
+          routing: options.modelRouting,
+          budgets: options.modelBudgets,
+          audit,
+          limiter,
+          now: options.now,
+          scenario: options.modelScenario,
+          killed: options.killed,
+          killFile: options.killFile,
+        });
+        modelCalls.push(invoked.auditMeta);
+        if (!invoked.ok) {
+          state = transition(state, STATES.REJECTED);
+          audit.record("fail_closed", { reason: invoked.reason, code: invoked.code });
+          return finish("rejected", state, task, audit, {
+            reason: invoked.reason,
+            outputs,
+            limits: limiter.snapshot(),
+            model: { enabled: true, live: false, provider: "mock", calls: modelCalls },
+          });
+        }
       }
       const output = step.run(task, options.agentOptions?.[step.id] || {});
       const outputValid = validateAgentOutput(output);
@@ -151,6 +188,12 @@ export function runSimulation(rawTask, options = {}) {
     return finish("human_approval_pending", state, task, audit, {
       outputs,
       limits: limiter.snapshot(),
+      model: {
+        enabled: modelEnabled,
+        live: false,
+        provider: modelEnabled ? "mock" : "none",
+        calls: modelCalls,
+      },
     });
   } catch (error) {
     const killed = error.code === "RUNTIME_KILLED";
