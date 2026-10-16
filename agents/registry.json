@@ -6,7 +6,7 @@
   "humanOwner": "founder",
   "notes": [
     "This registry is documentation plus CI-validated configuration. It does not grant credentials or start agents.",
-    "operational remains false until an orchestrator, scoped GitHub App, sandbox, and protected environments have been tested."
+    "operational remains false until a tested orchestrator, scoped GitHub App, sandbox, and protected environments exist. agents/runtime is simulation-only and must keep refusing operational=true."
   ],
   "handoffContract": {
     "requiredInputs": [
