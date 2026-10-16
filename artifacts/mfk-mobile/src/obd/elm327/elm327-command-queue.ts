@@ -1,10 +1,10 @@
 import {
   ELM327_DEFAULT_RETRIES,
   ELM327_DEFAULT_TIMEOUT_MS,
-  ELM327_INTER_COMMAND_DELAY_MS,
   ELM327_MAX_BUFFER_SIZE,
+  ELM327_PROMPT_GUARD_MS,
 } from "./elm327.constants";
-import { hasElm327Prompt, normalizeElm327Response } from "./elm327-response-parser";
+import { hasElm327Prompt, normalizeElm327Response, takeCompletedElm327Frame } from "./elm327-response-parser";
 import { obdLogger } from "../services/obd-logger";
 import type { Elm327Command, Elm327CommandOptions, Elm327Transport } from "../types/obd.types";
 
@@ -22,13 +22,17 @@ export class Elm327CommandQueue {
   private timeout: ReturnType<typeof setTimeout> | null = null;
   private unsubscribe: (() => void) | null = null;
   private disposed = false;
+  private generation = 0;
+  private activeGeneration = 0;
+  private faulted = false;
+  private guardUntil = 0;
 
   constructor(private readonly transport: Elm327Transport) {
     this.unsubscribe = transport.onChunk((chunk) => this.handleChunk(chunk));
   }
 
   send(commandText: string, options: Elm327CommandOptions = {}) {
-    if (!this.transport.isReady()) {
+    if (this.disposed || this.faulted || !this.transport.isReady()) {
       return Promise.reject(new Error("ELM327 transport is not ready"));
     }
 
@@ -42,7 +46,7 @@ export class Elm327CommandQueue {
       status: "queued",
     };
 
-    if (options.dedupeKey && this.queue.some((item) => item.dedupeKey === options.dedupeKey)) {
+    if (options.dedupeKey && (this.active?.dedupeKey === options.dedupeKey || this.queue.some((item) => item.dedupeKey === options.dedupeKey))) {
       return Promise.reject(new Error(`Duplicate queued command: ${options.dedupeKey}`));
     }
 
@@ -54,7 +58,10 @@ export class Elm327CommandQueue {
   }
 
   cancelAll(reason = "Command queue cancelled") {
+    // Cancellation of an in-flight untagged ELM stream requires a new session.
+    if (this.active) this.faulted = true;
     this.clearTimer();
+    this.generation += 1;
     if (this.active) {
       this.active.command.status = "cancelled";
       this.active.command.error = reason;
@@ -76,12 +83,21 @@ export class Elm327CommandQueue {
     this.unsubscribe = null;
   }
 
+  getMetrics() {
+    return {
+      queueDepth: this.queue.length + (this.active ? 1 : 0),
+      active: Boolean(this.active),
+    };
+  }
+
   private async pump() {
-    if (this.disposed || this.active || this.queue.length === 0) return;
+    if (this.disposed || this.faulted || this.active || this.queue.length === 0) return;
+    if (Date.now() < this.guardUntil) return;
     this.active = this.queue.shift() ?? null;
     if (!this.active) return;
 
     this.buffer = "";
+    this.activeGeneration = this.generation;
     const { command } = this.active;
     command.status = "sent";
     command.sentAt = Date.now();
@@ -91,33 +107,52 @@ export class Elm327CommandQueue {
         command: command.command,
         sentAt: command.sentAt,
       });
-      await this.transport.write(`${command.command}\r`);
       this.timeout = setTimeout(() => this.handleTimeout(), command.timeoutMs);
+      await this.transport.write(`${command.command}\r`);
     } catch (error) {
-      this.failActive(error instanceof Error ? error : new Error("Failed to write command"));
+      if (this.active?.command.id === command.id) this.failActive(error instanceof Error ? error : new Error("Failed to write command"));
     }
   }
 
   private handleChunk(chunk: string) {
-    if (!this.active) return;
-    this.buffer += chunk;
+    if (!this.active || this.activeGeneration !== this.generation) {
+      if (chunk.replace(/\s+/g, "")) {
+        obdLogger.log("warn", "orphan_fragment", "جزء BLE بدون معاملة نشطة", {
+          bytes: chunk.length,
+          preview: chunk.slice(0, 48),
+        });
+      }
+      return;
+    }
 
+    this.buffer += chunk;
     if (this.buffer.length > ELM327_MAX_BUFFER_SIZE) {
-      this.failActive(new Error("ELM327 response buffer exceeded maximum size"));
+      this.failActive(new Error("BUFFER FULL"));
       return;
     }
 
     if (!hasElm327Prompt(this.buffer)) return;
 
+    const { complete, remainder } = takeCompletedElm327Frame(this.buffer);
+    if (!complete) return;
+
     const completed = this.active.command;
     completed.completedAt = Date.now();
-    completed.rawResponse = this.buffer;
-    completed.normalizedResponse = normalizeElm327Response(this.buffer, completed.command);
+    completed.rawResponse = complete;
+    completed.normalizedResponse = normalizeElm327Response(complete, completed.command);
     completed.status = "completed";
     this.clearTimer();
     const active = this.active;
     this.active = null;
     this.buffer = "";
+
+    if (remainder.replace(/\s+/g, "")) {
+      obdLogger.log("warn", "quarantined_remainder", "تم عزل باقي الرد بعد محرف الإكمال", {
+        bytes: remainder.length,
+        preview: remainder.slice(0, 48),
+      });
+    }
+
     obdLogger.log("debug", "command_response", "اكتمل رد ELM327", {
       command: completed.command,
       completedAt: completed.completedAt,
@@ -125,24 +160,20 @@ export class Elm327CommandQueue {
       rawResponse: completed.rawResponse,
       normalizedResponse: completed.normalizedResponse,
     });
+    this.guardUntil = Date.now() + ELM327_PROMPT_GUARD_MS;
     active.resolve(completed);
-    setTimeout(() => void this.pump(), ELM327_INTER_COMMAND_DELAY_MS);
+    setTimeout(() => void this.pump(), ELM327_PROMPT_GUARD_MS);
   }
 
   private handleTimeout() {
     if (!this.active) return;
+    this.generation += 1;
     const active = this.active;
-    if (active.command.retries > 0) {
-      active.command.retries -= 1;
-      active.command.status = "queued";
-      this.active = null;
-      this.buffer = "";
-      this.queue.unshift(active);
-      obdLogger.log("warn", "command_retry", "انتهت مهلة الأمر، إعادة محاولة", { command: active.command.command });
-      void this.pump();
-      return;
-    }
+    const partial = this.buffer;
+    this.buffer = "";
 
+    // There is no request ID on the wire: a blind retry can consume a late reply.
+    // Recovery rebuilds BLE, subscriptions and ELM before trying another command.
     active.command.status = "timeout";
     this.failActive(new Error(`Command timeout: ${active.command.command}`));
   }
@@ -150,14 +181,16 @@ export class Elm327CommandQueue {
   private failActive(error: Error) {
     if (!this.active) return;
     this.clearTimer();
+    this.generation += 1;
     const active = this.active;
     active.command.completedAt = Date.now();
     active.command.status = active.command.status === "timeout" ? "timeout" : "failed";
     active.command.error = error.message;
+    this.faulted = true;
     this.active = null;
     this.buffer = "";
     active.reject(error);
-    setTimeout(() => void this.pump(), ELM327_INTER_COMMAND_DELAY_MS);
+    this.queue.splice(0).forEach(item => item.reject(new Error(`Session requires reconnect: ${error.message}`)));
   }
 
   private clearTimer() {

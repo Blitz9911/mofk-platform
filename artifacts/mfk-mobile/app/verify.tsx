@@ -4,24 +4,28 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TextInputKeyPressEventData,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
+import { toAsciiDigits } from "@/components/PhoneNumberInput";
 import { authApi, useAuth } from "@/context/AuthContext";
-import { DEV_PHONE_OTP_CODE, isMockPhoneOtpEnabled } from "@/lib/supabase";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 import { smoothBack } from "@/lib/navigation";
+import { DEV_PHONE_OTP_CODE, isMockPhoneOtpEnabled } from "@/lib/supabase";
 
 const OTP_LENGTH = 6;
+
+function normalizeOtp(value: string) {
+  return toAsciiDigits(value).slice(0, OTP_LENGTH);
+}
 
 export default function VerifyScreen() {
   const colors = useColors();
@@ -29,19 +33,25 @@ export default function VerifyScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ phone?: string; mode?: string }>();
   const { login } = useAuth();
-  const inputs = useRef<Array<TextInput | null>>([]);
+  const hiddenInput = useRef<TextInput>(null);
+  const verifyingRef = useRef(false);
 
   const phone = typeof params.phone === "string" ? params.phone : "";
   const mode = params.mode === "register" ? "register" : "login";
   const isMockOtp = isMockPhoneOtpEnabled();
 
-  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
+  const [code, setCode] = useState("");
   const [seconds, setSeconds] = useState(45);
   const [error, setError] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [focused, setFocused] = useState(true);
 
-  const code = digits.join("");
+  const digits = useMemo(
+    () => Array.from({ length: OTP_LENGTH }, (_, index) => code[index] ?? ""),
+    [code],
+  );
+
   const maskedPhone = useMemo(() => {
     if (!phone) return "+966 5X XXX XXXX";
     return phone.length > 6 ? `${phone.slice(0, 5)} •••• ${phone.slice(-3)}` : phone;
@@ -54,34 +64,52 @@ export default function VerifyScreen() {
   }, [mode, phone, router]);
 
   useEffect(() => {
+    const timer = setTimeout(() => hiddenInput.current?.focus(), 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (seconds <= 0) return;
 
     const timer = setInterval(() => setSeconds((value) => value - 1), 1000);
     return () => clearInterval(timer);
   }, [seconds]);
 
-  const handleDigitChange = (value: string, index: number) => {
-    const nextValue = value.replace(/\D/g, "").slice(-1);
-    const nextDigits = [...digits];
-    nextDigits[index] = nextValue;
-    setDigits(nextDigits);
+  const handleVerify = async (nextCode = code) => {
+    if (verifyingRef.current) return;
+
     setError("");
 
-    if (nextValue && index < OTP_LENGTH - 1) {
-      inputs.current[index + 1]?.focus();
+    if (nextCode.length !== OTP_LENGTH || !phone) {
+      setError("أدخل رمز التحقق المكون من 6 أرقام.");
+      return;
+    }
+
+    verifyingRef.current = true;
+    setIsVerifying(true);
+    try {
+      const user = await authApi.verifyPhoneOtp(phone, nextCode, mode);
+      await login(user);
+      router.replace(mode === "register" ? "/complete-profile" : "/");
+    } catch (err: any) {
+      setError(err.message || "رمز التحقق غير صحيح أو انتهت صلاحيته.");
+      verifyingRef.current = false;
+      setIsVerifying(false);
     }
   };
 
-  const handleKeyPress = (
-    event: NativeSyntheticEvent<TextInputKeyPressEventData>,
-    index: number,
-  ) => {
-    if (event.nativeEvent.key !== "Backspace" || digits[index]) return;
-    inputs.current[index - 1]?.focus();
+  const handleCodeChange = (value: string) => {
+    const nextCode = normalizeOtp(value);
+    setCode(nextCode);
+    setError("");
+
+    if (nextCode.length === OTP_LENGTH) {
+      void handleVerify(nextCode);
+    }
   };
 
   const handleResend = async () => {
-    if (seconds > 0 || !phone) return;
+    if (seconds > 0 || !phone || isResending) return;
 
     setError("");
     setIsResending(true);
@@ -92,9 +120,10 @@ export default function VerifyScreen() {
         await authApi.startPhoneLogin(phone);
       }
 
-      setDigits(Array(OTP_LENGTH).fill(""));
+      setCode("");
       setSeconds(45);
-      inputs.current[0]?.focus();
+      verifyingRef.current = false;
+      setTimeout(() => hiddenInput.current?.focus(), 50);
     } catch (err: any) {
       setError(err.message || "تعذر إعادة إرسال الرمز. حاول مرة أخرى.");
     } finally {
@@ -102,73 +131,72 @@ export default function VerifyScreen() {
     }
   };
 
-  const handleVerify = async () => {
-    setError("");
-
-    if (code.length !== OTP_LENGTH || !phone) {
-      setError("أدخل رمز التحقق المكون من 6 أرقام.");
-      return;
-    }
-
-    setIsVerifying(true);
-    try {
-      const user = await authApi.verifyPhoneOtp(phone, code, mode);
-      await login(user);
-      router.replace(mode === "register" ? "/complete-profile" : "/");
-    } catch (err: any) {
-      setError(err.message || "رمز التحقق غير صحيح أو انتهت صلاحيته.");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
   return (
-    <KeyboardAvoidingView
+    <View
       style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 22 }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <LinearGradient colors={["#090A0B", "#070707", "#120B05"]} style={StyleSheet.absoluteFill} />
       <View style={styles.content}>
-        <View style={styles.topbar}>
-          <Pressable style={styles.iconButton} onPress={() => smoothBack(router, mode === "register" ? "/register" : "/login")}>
+        <View style={[styles.topbar, { flexDirection: rowDir }]}>
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => smoothBack(router, mode === "register" ? "/register" : "/login")}
+          >
             <Ionicons name="chevron-forward" size={18} color="#F5F5F5" />
           </Pressable>
-          <Text style={styles.topbarTitle}>تأكيد الجوال</Text>
-          <View style={styles.iconButtonGhost} />
+          <View style={styles.topbarTitleWrap}>
+            <Text style={styles.topbarTitle}>تأكيد الجوال</Text>
+          </View>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.title}>أدخل رمز التحقق</Text>
-          <Text style={styles.description}>
+          <ArabicText style={styles.title}>أدخل رمز التحقق</ArabicText>
+          <ArabicText style={styles.description}>
             {isMockOtp
-              ? `وضع الاختبار مفعل. استخدم الرمز ${DEV_PHONE_OTP_CODE} للمتابعة.\n${maskedPhone}`
-              : `أرسلنا رمزًا مكونًا من 6 أرقام إلى\n${maskedPhone}`}
-          </Text>
+              ? `وضع الاختبار مفعل. استخدم الرمز ${DEV_PHONE_OTP_CODE} للمتابعة.`
+              : "أرسلنا رمزًا مكونًا من 6 أرقام إلى"}
+          </ArabicText>
+          <Text style={styles.phoneLine}>{maskedPhone}</Text>
         </View>
 
-        <View style={styles.otpRow}>
-          {digits.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(input) => {
-                inputs.current[index] = input;
-              }}
-              style={[
-                styles.otpInput,
-                { borderColor: digit ? colors.primary : "#24262B" },
-              ]}
-              value={digit}
-              onChangeText={(value) => handleDigitChange(value, index)}
-              onKeyPress={(event) => handleKeyPress(event, index)}
-              keyboardType="number-pad"
-              maxLength={1}
-              textAlign="center"
-              selectTextOnFocus
-            />
-          ))}
-        </View>
+        <Pressable style={styles.otpWrap} onPress={() => hiddenInput.current?.focus()}>
+          <View pointerEvents="none" style={styles.otpRow}>
+            {digits.map((digit, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.otpBox,
+                  {
+                    borderColor:
+                      digit || (focused && index === code.length)
+                        ? colors.primary
+                        : "#24262B",
+                  },
+                ]}
+              >
+                <Text style={styles.otpDigit}>{digit}</Text>
+              </View>
+            ))}
+          </View>
+          <TextInput
+            ref={hiddenInput}
+            value={code}
+            onChangeText={handleCodeChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            keyboardType="number-pad"
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+            autoCorrect={false}
+            autoFocus
+            showSoftInputOnFocus
+            importantForAutofill="yes"
+            style={styles.otpInput}
+            {...(Platform.OS === "web" ? { inputMode: "numeric" as const } : null)}
+          />
+        </Pressable>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <ArabicText style={styles.errorText}>{error}</ArabicText> : null}
 
         <Pressable
           onPress={handleResend}
@@ -189,7 +217,7 @@ export default function VerifyScreen() {
             styles.primaryButton,
             { opacity: pressed || code.length !== OTP_LENGTH || isVerifying ? 0.72 : 1 },
           ]}
-          onPress={handleVerify}
+          onPress={() => void handleVerify()}
           disabled={code.length !== OTP_LENGTH || isVerifying}
         >
           {isVerifying ? (
@@ -199,7 +227,7 @@ export default function VerifyScreen() {
           )}
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -208,8 +236,7 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   topbar: {
     alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 10,
     marginBottom: 14,
   },
   iconButton: {
@@ -222,31 +249,75 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 36,
   },
-  iconButtonGhost: { height: 36, width: 36 },
-  topbarTitle: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 18 },
-  hero: { alignItems: "flex-end", marginTop: 54 },
-  title: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 24, marginBottom: 14, textAlign: "right" },
+  topbarTitleWrap: {
+    direction: "ltr",
+    flex: 1,
+  },
+  topbarTitle: {
+    color: "#F5F5F5",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  hero: { alignItems: "stretch", gap: 8, marginTop: 54 },
+  title: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 24, textAlign: "right", writingDirection: "rtl" },
   description: {
     color: "#8E949D",
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     lineHeight: 25,
     textAlign: "right",
+    writingDirection: "rtl",
   },
-  otpRow: { direction: "ltr", flexDirection: "row", gap: 8, justifyContent: "center", marginTop: 30 },
+  phoneLine: {
+    color: "#8E949D",
+    direction: "ltr",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    textAlign: "right",
+    writingDirection: "ltr",
+  },
+  otpWrap: {
+    marginTop: 30,
+    gap: 14,
+  },
   otpInput: {
+    height: 1,
+    opacity: 0,
+    position: "absolute",
+    width: 1,
+    color: "#F5F5F5",
+    direction: "ltr",
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    letterSpacing: 10,
+    textAlign: "center",
+  },
+  otpRow: {
+    direction: "ltr",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+  },
+  otpBox: {
+    alignItems: "center",
     backgroundColor: "#111214",
     borderRadius: 15,
     borderWidth: 1,
+    height: 54,
+    justifyContent: "center",
+    width: 46,
+  },
+  otpDigit: {
     color: "#F5F5F5",
     fontFamily: "Inter_700Bold",
     fontSize: 22,
-    height: 54,
-    width: 46,
+    textAlign: "center",
   },
-  errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 12, textAlign: "center" },
+  errorText: { color: "#EF4444", fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 12, textAlign: "right", writingDirection: "rtl" },
   resendButton: { alignItems: "center", minHeight: 36, justifyContent: "center", marginTop: 18, paddingVertical: 8 },
-  resendText: { fontFamily: "Inter_700Bold", fontSize: 14 },
+  resendText: { fontFamily: "Inter_700Bold", fontSize: 14, textAlign: "center", writingDirection: "rtl" },
   primaryButton: {
     alignItems: "center",
     backgroundColor: "#FF6A00",

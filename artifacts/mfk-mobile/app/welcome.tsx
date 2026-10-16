@@ -1,20 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  Animated,
+  Easing,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandLogo } from "@/components/BrandLogo";
 import { useColors } from "@/hooks/useColors";
 
 /* ── Slides — real marketing copy ───────────────────────── */
@@ -23,29 +22,29 @@ const SLIDES = [
     icon: "car-sport-outline" as const,
     color: "#FF6A00",
     badge: "ابدأ مجاناً",
-    title: "سيارتك، أذكى\nمما تتخيل",
-    desc: "سيارتك تعطيك إشارات كثيرة… بس قليل يفهمها صح. مع مفك تعرف وش فيها قبل أي أحد.",
+    title: "سيارتك أذكى\nمما تتخيل",
+    desc: "افهم سيارتك وتابع حالتها من مكان واحد.",
   },
   {
     icon: "alert-circle-outline" as const,
     color: "#EF4444",
     badge: "مشكلة حقيقية",
     title: "تعطل سيارتك\nفجأة كابوس",
-    desc: "لمبة المحرك تضيء بدون سبب واضح. الميكانيكي يطلب 150–300 ريال للفحص فقط. أنت تقود وأنت تأمل ألا يحدث شيء.",
+    desc: "مفك يساعدك تفهم المشكلة قبل ما تصير مفاجأة.",
   },
   {
     icon: "flash-outline" as const,
     color: "#3B82F6",
     badge: "الحل",
-    title: "تشخيص فوري\nبلغتك العربية",
-    desc: "نترجم الأعطال المعقدة إلى لغة تفهمها، مع درجة الخطورة وتكلفة الإصلاح التقريبية.",
+    title: "تشخيص فوري",
+    desc: "اكتشف الأعطال وافهم معناها خلال لحظات.",
   },
   {
     icon: "shield-checkmark-outline" as const,
     color: "#10B981",
     badge: "3 خطوات فقط",
     title: "ابدأ في\nأقل من دقيقة",
-    desc: "ركّب جهاز مفك في منفذ OBD، شغّل التطبيق، واحصل على تشخيص كامل فوراً.",
+    desc: "اربط قطعة مفك بسيارتك وابدأ.",
   },
 ];
 
@@ -94,33 +93,66 @@ export default function WelcomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const slidesRef = React.useRef<ScrollView>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const [showAbout, setShowAbout] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   const slide = SLIDES[activeIdx];
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 24 : insets.bottom + 16;
 
-  const goToSlide = (index: number, animated = true) => {
-    setActiveIdx(index);
-    requestAnimationFrame(() => {
-      slidesRef.current?.scrollTo({ x: width * index, animated });
+  const goToSlide = (index: number, direction: "next" | "prev" = "next") => {
+    if (animating || index === activeIdx || index < 0 || index >= SLIDES.length) return;
+
+    const outgoing = direction === "next" ? 48 : -48;
+    const incoming = direction === "next" ? -48 : 48;
+    setAnimating(true);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: outgoing,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setActiveIdx(index);
+      slideAnim.setValue(incoming);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setAnimating(false));
     });
+  };
+
+  const goPrev = () => {
+    if (activeIdx > 0) goToSlide(activeIdx - 1, "prev");
   };
 
   const goNext = () => {
     if (activeIdx < SLIDES.length - 1) {
-      goToSlide(activeIdx + 1);
-    } else {
-      setShowAbout(true);
+      goToSlide(activeIdx + 1, "next");
+      return;
     }
-  };
-
-  const handleSlideMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-    setActiveIdx(Math.max(0, Math.min(SLIDES.length - 1, nextIndex)));
+    setShowAbout(true);
   };
 
   /* ── About / Story page ─────────────────────────────────── */
@@ -146,7 +178,7 @@ export default function WelcomeScreen() {
             <View style={[s.chip, { backgroundColor: "#FF6A0018" }]}>
               <Text style={[s.chipTxt, { color: "#FF6A00" }]}>منصة سعودية أصيلة</Text>
             </View>
-            <Image source={require("@/assets/images/mfk-logo.png")} style={s.heroLogo} contentFit="contain" />
+            <BrandLogo style={s.heroLogo} />
             <Text style={[s.heroSlogan, { color: "#FF6A00" }]}>نُغيّر علاقتك بسيارتك</Text>
             <Text style={[s.heroBody, { color: colors.mutedForeground }]}>
               سوّينا مفك عشان ما تضيع بين التشخيصات المتضاربة — ومع مفك، سيارتك أذكى مما تتخيل.
@@ -178,10 +210,10 @@ export default function WelcomeScreen() {
               <Text style={[s.bodyTxt, { color: colors.mutedForeground }]}>
                 لأن بكل بساطة — كلنا مررنا بهذا الموقف. لمبة تشتغل فجأة، صوت غريب نتجاهله، وتشخيصات تعطي كلام مختلف… وأنت في النص ضايع.
               </Text>
-              <Text style={[s.bodyTxt, { color: colors.mutedForeground, marginTop: 10 }]}>
-                مع إن سيارتك فيها كل المعلومات — لكن ما أحد يشرحها لك بطريقة تفهمها.{"\n"}
-                <Text style={{ color: "#FF6A00", fontFamily: "Inter_600SemiBold" }}>هنا قلنا: لازم يتغير هذا الشي.</Text>
-              </Text>
+                <Text style={[s.bodyTxt, { color: colors.mutedForeground, marginTop: 10 }]}>
+                  مع إن سيارتك فيها كل المعلومات — لكن ما أحد يشرحها لك بطريقة تفهمها.{"\n"}
+                  <Text style={{ color: "#FF6A00", fontFamily: "Inter_600SemiBold", textAlign: "right", writingDirection: "rtl" }}>هنا قلنا: لازم يتغير هذا الشي.</Text>
+                </Text>
             </View>
           </View>
 
@@ -219,7 +251,7 @@ export default function WelcomeScreen() {
                   <View style={[s.featIcon, { backgroundColor: f.color + "18" }]}>
                     <Ionicons name={f.icon} size={17} color={f.color} />
                   </View>
-                  <View style={{ flex: 1, gap: 1 }}>
+                  <View style={{ flex: 1, gap: 1, alignItems: "stretch" }}>
                     <Text style={[s.featTitle, { color: colors.foreground }]}>{f.title}</Text>
                     <Text style={[s.featSubTxt, { color: colors.mutedForeground }]}>{f.text}</Text>
                   </View>
@@ -242,7 +274,7 @@ export default function WelcomeScreen() {
                 <View style={[s.stepIconWrap, { backgroundColor: "#FF6A0018" }]}>
                   <Ionicons name={st.icon} size={22} color="#FF6A00" />
                 </View>
-                <View style={{ flex: 1, gap: 3 }}>
+                <View style={{ flex: 1, gap: 3, alignItems: "stretch" }}>
                   <Text style={[s.stepTitle, { color: colors.foreground }]}>{st.title}</Text>
                   <Text style={[s.stepDesc, { color: colors.mutedForeground }]}>{st.desc}</Text>
                 </View>
@@ -348,75 +380,64 @@ export default function WelcomeScreen() {
 
   /* ── Onboarding Slides ──────────────────────────────────── */
   const isPain = activeIdx === 1;
+  const item = SLIDES[activeIdx];
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       {/* Top bar */}
       <View style={[s.topBar, { paddingTop: topPad + 6 }]}>
-        <Pressable onPress={() => router.push("/login")} hitSlop={12}>
-          <Text style={[s.topLink, { color: colors.mutedForeground }]}>تخطي</Text>
-        </Pressable>
-        <Image source={require("@/assets/images/mfk-logo.png")} style={s.topLogo} contentFit="contain" />
         <Pressable onPress={() => setShowAbout(true)} hitSlop={12}>
           <Text style={[s.topLink, { color: colors.mutedForeground }]}>عن مفك</Text>
         </Pressable>
+        <BrandLogo style={s.topLogo} />
+        <Pressable onPress={() => setShowAbout(true)} hitSlop={12}>
+          <Text style={[s.topLink, { color: colors.mutedForeground }]}>تخطي</Text>
+        </Pressable>
       </View>
 
-      <ScrollView
-        ref={slidesRef}
-        horizontal
-        pagingEnabled
-        bounces={false}
-        showsHorizontalScrollIndicator={false}
-        decelerationRate="fast"
-        snapToInterval={width}
-        snapToAlignment="center"
-        disableIntervalMomentum
-        onMomentumScrollEnd={handleSlideMomentumEnd}
-        contentContainerStyle={s.slidesTrack}
+      <Animated.View
+        style={[
+          s.slidePage,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
       >
-        {SLIDES.map((item, index) => {
-          const itemIsPain = index === 1;
-
-          return (
-            <View key={item.title} style={[s.slidePage, { width }]}>
-              <View style={s.illustArea}>
-                {itemIsPain ? (
-                  <View style={{ gap: 10, width: "100%", paddingHorizontal: 28 }}>
-                    {PAIN_POINTS.map((p, i) => (
-                      <View key={i} style={[s.painCard, { backgroundColor: colors.card, borderColor: "#EF444430" }]}>
-                        <Ionicons name={p.icon} size={18} color="#EF4444" />
-                        <Text style={[s.painTxt, { color: colors.foreground }]}>{p.text}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <>
-                    <View style={[s.ringOuter, { borderColor: item.color + "10" }]} />
-                    <View style={[s.ringMid, { borderColor: item.color + "1E" }]} />
-                    <View style={[s.ringInner, { backgroundColor: item.color + "18", borderColor: item.color + "35" }]}>
-                      <Ionicons name={item.icon} size={96} color={item.color} />
-                    </View>
-                    <View style={[s.floatBadge, { backgroundColor: item.color, shadowColor: item.color }]}>
-                      <Text style={s.floatBadgeTxt}>{item.badge}</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-              <View style={s.slideText}>
-                <Text style={[s.slideTitle, { color: colors.foreground }]}>{item.title}</Text>
-                <Text style={[s.slideDesc, { color: colors.mutedForeground }]}>{item.desc}</Text>
-              </View>
+        <View style={s.illustArea}>
+          {isPain ? (
+            <View style={{ gap: 10, width: "100%", paddingHorizontal: 28 }}>
+              {PAIN_POINTS.map((p, i) => (
+                <View key={i} style={[s.painCard, { backgroundColor: colors.card, borderColor: "#EF444430" }]}>
+                  <Ionicons name={p.icon} size={18} color="#EF4444" />
+                  <Text style={[s.painTxt, { color: colors.foreground }]}>{p.text}</Text>
+                </View>
+              ))}
             </View>
-          );
-        })}
-      </ScrollView>
+          ) : (
+            <>
+              <View style={[s.ringOuter, { borderColor: item.color + "10" }]} />
+              <View style={[s.ringMid, { borderColor: item.color + "1E" }]} />
+              <View style={[s.ringInner, { backgroundColor: item.color + "18", borderColor: item.color + "35" }]}>
+                <Ionicons name={item.icon} size={96} color={item.color} />
+              </View>
+              <View style={[s.floatBadge, { backgroundColor: item.color, shadowColor: item.color }]}>
+                <Text style={s.floatBadgeTxt}>{item.badge}</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        <View style={s.slideText}>
+          <Text style={[s.slideTitle, { color: colors.foreground }]}>{item.title}</Text>
+          <Text style={[s.slideDesc, { color: colors.mutedForeground }]}>{item.desc}</Text>
+        </View>
+      </Animated.View>
 
       {/* Dots */}
       <View style={s.dotsRow}>
         {SLIDES.map((sl, i) => (
-          <Pressable key={i} onPress={() => goToSlide(i)} hitSlop={8}>
+          <Pressable key={i} onPress={() => goToSlide(i, i > activeIdx ? "next" : "prev")} hitSlop={8}>
             <View style={[s.dot, { width: i === activeIdx ? 28 : 7, backgroundColor: i === activeIdx ? slide.color : colors.border }]} />
           </Pressable>
         ))}
@@ -424,13 +445,26 @@ export default function WelcomeScreen() {
 
       {/* CTA */}
       <View style={[s.ctaBar, { paddingBottom: botPad, borderTopWidth: 0, backgroundColor: "transparent" }]}>
-        <Pressable onPress={goNext} style={[s.primaryBtn, { backgroundColor: slide.color, shadowColor: slide.color }]}>
-          <Text style={s.primaryTxt}>{activeIdx < SLIDES.length - 1 ? "التالي" : "ابدأ الآن"}</Text>
-          <Ionicons name={activeIdx < SLIDES.length - 1 ? "arrow-forward" : "checkmark"} size={18} color="#fff" />
-        </Pressable>
-        <Pressable onPress={() => router.push("/login")} style={[s.ghostBtn, { borderColor: colors.border }]}>
-          <Text style={[s.ghostTxt, { color: colors.mutedForeground }]}>لدي حساب بالفعل</Text>
-        </Pressable>
+        <View style={s.navRow}>
+          {activeIdx > 0 ? (
+            <Pressable
+              onPress={goPrev}
+              disabled={animating}
+              style={[s.prevBtn, { borderColor: colors.border, backgroundColor: colors.card, opacity: animating ? 0.7 : 1 }]}
+            >
+              <Ionicons name="arrow-forward" size={18} color={colors.foreground} />
+              <Text style={[s.prevTxt, { color: colors.foreground }]}>السابق</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={goNext}
+            disabled={animating}
+            style={[s.primaryBtn, s.navPrimary, { backgroundColor: slide.color, shadowColor: slide.color, opacity: animating ? 0.85 : 1 }]}
+          >
+            <Text style={s.primaryTxt}>{activeIdx < SLIDES.length - 1 ? "التالي" : "ابدأ الآن"}</Text>
+            <Ionicons name={activeIdx < SLIDES.length - 1 ? "arrow-back" : "checkmark"} size={18} color="#fff" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -438,11 +472,11 @@ export default function WelcomeScreen() {
 
 /* ── Styles ──────────────────────────────────────────────── */
 const s = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, direction: "rtl" },
   slidesTrack: { alignItems: "stretch" },
 
   topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingBottom: 8 },
-  topLink: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  topLink: { fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "right", writingDirection: "rtl" },
   topLogo: { width: 88, height: 32 },
 
   slidePage: { flex: 1, justifyContent: "center" },
@@ -453,74 +487,89 @@ const s = StyleSheet.create({
   floatBadge: { position: "absolute", top: "18%", right: "14%", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   floatBadgeTxt: { color: "#fff", fontSize: 11, fontFamily: "Inter_700Bold" },
 
-  painCard: { flexDirection: "row-reverse", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
-  painTxt: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right" },
+  painCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  painTxt: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right", writingDirection: "rtl" },
 
-  slideText: { alignItems: "center", paddingHorizontal: 28, paddingBottom: 4, gap: 10 },
-  slideTitle: { fontSize: 24, fontFamily: "Inter_700Bold", textAlign: "center", lineHeight: 36 },
-  slideDesc: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 23 },
+  slideText: { alignItems: "center", paddingHorizontal: 32, paddingBottom: 8, gap: 14 },
+  slideTitle: { fontSize: 32, fontFamily: "Inter_700Bold", textAlign: "center", writingDirection: "rtl", lineHeight: 44, width: "100%" },
+  slideDesc: { fontSize: 16, fontFamily: "Inter_400Regular", textAlign: "center", writingDirection: "rtl", lineHeight: 26, width: "100%", maxWidth: 320 },
 
-  dotsRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6, paddingVertical: 18 },
+  dotsRow: { direction: "ltr", flexDirection: "row-reverse", justifyContent: "center", alignItems: "center", gap: 6, paddingVertical: 18 },
   dot: { height: 7, borderRadius: 4 },
 
   ctaBar: { paddingHorizontal: 20, paddingTop: 0, borderTopWidth: StyleSheet.hairlineWidth, gap: 10 },
+  navRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  navPrimary: { flex: 1 },
+  prevBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  prevTxt: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right", writingDirection: "rtl" },
+  authRow: { flexDirection: "row", gap: 10 },
+  authBtn: { flex: 1 },
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 16, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  primaryTxt: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
+  primaryTxt: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
   ghostBtn: { paddingVertical: 14, borderRadius: 16, alignItems: "center", borderWidth: StyleSheet.hairlineWidth },
-  ghostTxt: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  ghostTxt: { fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "center", writingDirection: "rtl" },
 
   /* About */
-  aboutBar: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 16 },
-  aboutBarTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  aboutBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 16 },
+  aboutBarTitle: { flex: 1, fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
   iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
 
-  heroCard: { marginHorizontal: 16, padding: 24, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", gap: 8 },
-  heroLogo: { width: 180, height: 64 },
-  heroSlogan: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "center" },
-  heroBody: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 21 },
+  heroCard: { marginHorizontal: 16, padding: 24, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: "stretch", gap: 8 },
+  heroLogo: { width: 180, height: 64, alignSelf: "center" },
+  heroSlogan: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
+  heroBody: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", lineHeight: 21 },
 
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  chipTxt: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  chip: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  chipTxt: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "right", writingDirection: "rtl" },
 
-  statsGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 10 },
-  statsGrid2: { flexDirection: "row-reverse", flexWrap: "wrap" },
-  statBox: { width: "47%", padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", gap: 4 },
-  statVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  statLbl: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statsGrid2: { flexDirection: "row", flexWrap: "wrap" },
+  statBox: { width: "47%", padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, alignItems: "stretch", gap: 4 },
+  statVal: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  statLbl: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "right", writingDirection: "rtl", width: "100%" },
 
   sec: { paddingHorizontal: 16, gap: 10 },
-  secHead: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  secHead: { flexDirection: "row", alignItems: "center", gap: 8 },
   secBar: { width: 4, height: 18, borderRadius: 2 },
-  secTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  secTitle: { flex: 1, fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
 
   card: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 16 },
-  bodyTxt: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 23 },
+  bodyTxt: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", lineHeight: 23 },
 
-  featRow: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 14, paddingVertical: 13 },
+  featRow: { flexDirection: "row", alignItems: "flex-start", gap: 14, paddingVertical: 13 },
   featIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", marginTop: 2 },
-  featTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
-  featTxt: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right" },
-  featSubTxt: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  featTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  featTxt: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  featSubTxt: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
 
-  stepRow: { flexDirection: "row-reverse", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
+  stepRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, marginBottom: 8 },
   stepNum: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   stepNumTxt: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" },
   stepIconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  stepTitle: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "right" },
-  stepDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 19 },
+  stepTitle: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  stepDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", lineHeight: 19, width: "100%" },
 
-  tlRow: { flexDirection: "row-reverse", gap: 12, marginBottom: 4 },
+  tlRow: { flexDirection: "row", gap: 12, marginBottom: 4 },
   tlLeft: { alignItems: "center", paddingTop: 4, width: 20 },
   tlDot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
   tlLine: { flex: 1, width: 2, marginTop: 4 },
   tlCard: { flex: 1, padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, marginBottom: 10, gap: 6 },
-  tlYearRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
-  tlTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  tlDesc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 20 },
+  tlYearRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  tlTitle: { flex: 1, fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
+  tlDesc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", lineHeight: 20, width: "100%" },
 
-  valGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 10 },
-  valCard: { width: "47%", padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 8 },
-  valIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  valTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
-  valDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", lineHeight: 18 },
+  valGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  valCard: { width: "47%", padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 8, alignItems: "stretch" },
+  valIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", alignSelf: "flex-start" },
+  valTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  valDesc: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", lineHeight: 18, width: "100%" },
 });

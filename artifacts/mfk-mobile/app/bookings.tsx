@@ -134,9 +134,9 @@ export default function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, direction: "rtl" },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15, fontFamily: "Inter_400Regular" },
   card: { padding: 16, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
-  cardTop: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
+  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   workshopName: { fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   cardInfo: { gap: 6 },
-  infoRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   infoText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1, textAlign: "right" },
 });

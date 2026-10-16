@@ -1,33 +1,44 @@
 {
   "expo": {
-    "name": "MFK",
+    "name": "مفك MFK",
     "slug": "mfk-mobile",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "mfk-mobile",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#060e1c"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mfk.diagnostics",
+      "icon": "./assets/images/icon.png",
+      "entitlements": {
+        "com.apple.developer.carplay-driving-task": true
+      },
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."
+        "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.mfk.diagnostics",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#000000"
+      },
       "permissions": [
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
     },
     "web": {
@@ -42,27 +53,28 @@
       ],
       "expo-font",
       "expo-web-browser",
-      [
-        "react-native-ble-plx",
-        {
-          "isBackgroundEnabled": false,
-          "modes": ["central"],
-          "bluetoothAlwaysPermission": "يستخدم تطبيق MFK البلوتوث للاتصال بجهاز V011 وقراءة بيانات مركبتك."
-        }
-      ]
+      "expo-document-picker",
+      "./plugins/with-notifications.js",
+      "./plugins/with-carplay.js"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "updates": {
-      "enabled": false,
-      "checkAutomatically": "NEVER"
-    },
     "extra": {
+      "supportsRTL": true,
+      "forcesRTL": true,
       "eas": {
         "projectId": "640f7d9f-6d0b-4f5b-8dba-babc7c5b8d48"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/640f7d9f-6d0b-4f5b-8dba-babc7c5b8d48",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

@@ -1,15 +1,16 @@
 export const V011_SERVICE_UUID_SHORT = "ffe0";
-export const V011_WRITE_CHARACTERISTIC_UUID_SHORT = "ffe1";
-export const V011_NOTIFY_CHARACTERISTIC_UUID_SHORT = "ffe2";
+export const V011_NOTIFY_CHARACTERISTIC_UUID_SHORT = "ffe1";
+export const V011_WRITE_CHARACTERISTIC_UUID_SHORT = "ffe2";
 
 export const V011_SERVICE_UUID_128 = "0000ffe0-0000-1000-8000-00805f9b34fb";
-export const V011_WRITE_CHARACTERISTIC_UUID_128 = "0000ffe1-0000-1000-8000-00805f9b34fb";
-export const V011_NOTIFY_CHARACTERISTIC_UUID_128 = "0000ffe2-0000-1000-8000-00805f9b34fb";
+export const V011_NOTIFY_CHARACTERISTIC_UUID_128 = "0000ffe1-0000-1000-8000-00805f9b34fb";
+export const V011_WRITE_CHARACTERISTIC_UUID_128 = "0000ffe2-0000-1000-8000-00805f9b34fb";
 
 export const ELM327_SCAN_TIMEOUT_MS = 9_000;
 export const ELM327_SERVICE_UUIDS_SHORT = ["ffe0", "fff0"] as const;
-export const ELM327_WRITE_CHARACTERISTIC_UUIDS_SHORT = ["ffe1", "fff1", "fff2"] as const;
-export const ELM327_NOTIFY_CHARACTERISTIC_UUIDS_SHORT = ["ffe2", "ffe1", "fff1", "fff4"] as const;
+export const ELM327_WRITE_CHARACTERISTIC_UUIDS_SHORT = ["ffe2", "fff2", "fff1"] as const;
+export const ELM327_NOTIFY_CHARACTERISTIC_UUIDS_SHORT = ["ffe1", "ffe2", "fff1", "fff4"] as const;
+export const V011_NOTIFY_SETTLING_MS = 900;
 
 const BLUETOOTH_BASE_UUID_SUFFIX = "-0000-1000-8000-00805f9b34fb";
 
@@ -47,7 +48,11 @@ export function isV011NameHint(name: string | null | undefined): boolean {
     normalized.includes("obd") ||
     normalized.includes("mofk") ||
     normalized.includes("mfk") ||
+    normalized.includes("drove") ||
+    normalized.includes("west") ||
+    normalized.includes("obdii") ||
     normalized.includes("vlink") ||
+    normalized.includes("ios-vlink") ||
     normalized.includes("veepeak") ||
     normalized.includes("car scanner")
   );

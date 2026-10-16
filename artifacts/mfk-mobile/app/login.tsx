@@ -1,43 +1,33 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandLogo } from "@/components/BrandLogo";
+import { PhoneNumberInput, isValidSaudiMobileDigits } from "@/components/PhoneNumberInput";
+import { ArabicText } from "@/components/ArabicText";
 import { authApi } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { smoothBack } from "@/lib/navigation";
-
-function cleanPhone(value: string) {
-  return value
-    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
-    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/\D/g, "")
-    .slice(0, 12);
-}
 
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [phone, setPhone] = useState("");
+  const [phoneDigits, setPhoneDigits] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [focused, setFocused] = useState(false);
 
-  const canSubmit = phone.replace(/\D/g, "").length >= 9 && !isLoading;
+  const canSubmit = isValidSaudiMobileDigits(phoneDigits) && !isLoading;
 
   const handleSendOtp = async () => {
     setError("");
@@ -49,7 +39,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const normalizedPhone = await authApi.startPhoneLogin(phone);
+      const normalizedPhone = await authApi.startPhoneLogin(phoneDigits);
       router.push({
         pathname: "/verify",
         params: {
@@ -65,16 +55,14 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 40 },
         ]}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="none"
         showsVerticalScrollIndicator={false}
       >
         <Pressable
@@ -86,49 +74,29 @@ export default function LoginScreen() {
         </Pressable>
 
         <View style={styles.logoSection}>
-          <Image source={require("@/assets/images/mfk-logo.png")} style={styles.logo} contentFit="contain" />
-          <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
+          <BrandLogo style={styles.logo} />
+          <ArabicText style={[styles.tagline, { color: colors.mutedForeground }]}>
             سيارتك أذكى من أي وقت مضى
-          </Text>
+          </ArabicText>
         </View>
 
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.foreground }]}>تسجيل الدخول</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+          <ArabicText style={[styles.title, { color: colors.foreground }]}>تسجيل الدخول</ArabicText>
+          <ArabicText style={[styles.subtitle, { color: colors.mutedForeground }]}>
             أدخل رقم جوالك ونرسل لك رمز تحقق لمرة واحدة.
-          </Text>
+          </ArabicText>
         </View>
 
         <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: colors.foreground }]}>رقم الجوال</Text>
-            <View
-              style={[
-                styles.inputRow,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: focused ? colors.primary : colors.border,
-                },
-                focused && styles.inputFocused,
-              ]}
-            >
-              <TextInput
-                style={[styles.input, { color: colors.foreground }]}
-                placeholder="5X XXX XXXX"
-                placeholderTextColor={colors.mutedForeground}
-                value={phone}
-                onChangeText={(value) => setPhone(cleanPhone(value))}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                keyboardType="phone-pad"
-                textContentType="telephoneNumber"
-                textAlign="left"
-              />
-              <View style={[styles.prefixWrap, { borderColor: colors.border }]}>
-                <Text style={[styles.prefixText, { color: colors.mutedForeground }]}>+966</Text>
-              </View>
-            </View>
-          </View>
+          <PhoneNumberInput
+            value={phoneDigits}
+            onChangeDigits={(digits) => {
+              setPhoneDigits(digits);
+              if (error) setError("");
+            }}
+            disabled={isLoading}
+            error={Boolean(error && !canSubmit)}
+          />
 
           {error ? (
             <View style={styles.errorBox}>
@@ -147,14 +115,14 @@ export default function LoginScreen() {
               },
             ]}
             onPress={handleSendOtp}
-            disabled={!canSubmit}
+            disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <>
                 <Text style={[styles.submitText, { color: canSubmit ? "#fff" : colors.mutedForeground }]}>
-                  إرسال رمز التحقق
+                  {"\u200F"}إرسال رمز التحقق
                 </Text>
                 {canSubmit ? <Ionicons name="arrow-back" size={18} color="#fff" /> : null}
               </>
@@ -162,16 +130,16 @@ export default function LoginScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.replace("/register")}
+            onPress={() => router.push("/register")}
             style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
           >
             <Text style={[styles.secondaryText, { color: colors.foreground }]}>
-              إنشاء حساب جديد
+              {"\u200F"}إنشاء حساب جديد
             </Text>
           </Pressable>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -190,43 +158,22 @@ const styles = StyleSheet.create({
   },
   logoSection: { alignItems: "center", gap: 8, marginBottom: 34 },
   logo: { height: 58, width: 172 },
-  tagline: { fontFamily: "Inter_400Regular", fontSize: 13 },
-  titleBlock: { alignItems: "flex-end", gap: 7, marginBottom: 30 },
-  title: { fontFamily: "Inter_700Bold", fontSize: 28 },
-  subtitle: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 24, textAlign: "right" },
+  tagline: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", writingDirection: "rtl" },
+  titleBlock: { alignItems: "stretch", gap: 7, marginBottom: 30 },
+  title: { fontFamily: "Inter_700Bold", fontSize: 28, textAlign: "right", writingDirection: "rtl", width: "100%" },
+  subtitle: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 24, textAlign: "right", writingDirection: "rtl", width: "100%" },
   form: { gap: 16 },
-  fieldGroup: { gap: 8 },
-  label: { fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "right" },
-  inputRow: {
-    alignItems: "center",
-    borderRadius: 15,
-    borderWidth: 1.5,
-    flexDirection: "row",
-    gap: 12,
-    height: 56,
-    paddingHorizontal: 14,
-  },
-  inputFocused: {
-    elevation: 3,
-    shadowColor: "#FF6A00",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  input: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 17, height: "100%" },
-  prefixWrap: { borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: 12 },
-  prefixText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   errorBox: {
     alignItems: "center",
     backgroundColor: "#ef444412",
     borderColor: "#ef444430",
     borderRadius: 12,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 8,
     padding: 12,
   },
-  errorText: { color: "#ef4444", flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "right" },
+  errorText: { color: "#ef4444", flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "right", writingDirection: "rtl" },
   submitBtn: {
     alignItems: "center",
     borderRadius: 16,
@@ -237,7 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 4,
   },
-  submitText: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  submitText: { fontFamily: "Inter_700Bold", fontSize: 16, textAlign: "center", writingDirection: "rtl" },
   secondaryBtn: {
     alignItems: "center",
     borderRadius: 16,
@@ -245,5 +192,5 @@ const styles = StyleSheet.create({
     height: 52,
     justifyContent: "center",
   },
-  secondaryText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  secondaryText: { fontFamily: "Inter_600SemiBold", fontSize: 15, textAlign: "center", writingDirection: "rtl" },
 });

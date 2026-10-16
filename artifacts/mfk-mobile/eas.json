@@ -9,10 +9,27 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
+      }
+      ,
       "ios": {
-        "simulator": false,
-        "credentialsSource": "local"
+        "simulator": false
+      }
+    },
+    "development-local": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "credentialsSource": "local",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "uat": {
+      "distribution": "internal",
+      "credentialsSource": "local",
+      "channel": "uat",
+      "environment": "preview",
+      "ios": {
+        "simulator": false
       }
     },
     "development-simulator": {

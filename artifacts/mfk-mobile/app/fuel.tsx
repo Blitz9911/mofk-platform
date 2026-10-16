@@ -1,8 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useListVehicles } from "@workspace/api-client-react";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useGetLiveTelemetry, useListVehicles } from "@workspace/api-client-react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +19,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
+import { ArabicDateField } from "@/components/ArabicDatePicker";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
+import { useObdConnection } from "@/src/obd";
 
 type FuelConsumption = {
   distanceKm: number;
@@ -95,13 +99,31 @@ function formatLiters(value: number | null | undefined) {
   return `${Number(value).toLocaleString("ar-SA", { maximumFractionDigits: 1 })} لتر`;
 }
 
+function localIsoDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function localDateToApiIso(isoDate: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  const now = new Date();
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), now.getHours(), now.getMinutes(), now.getSeconds())
+    : now;
+  return date.toISOString();
+}
+
 function formatDate(value: string) {
   try {
-    return new Intl.DateTimeFormat("ar-SA", {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return value?.slice(0, 10) ?? "—";
+    return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
       day: "numeric",
       month: "short",
       year: "numeric",
-    }).format(new Date(value));
+    }).format(date);
   } catch {
     return value?.slice(0, 10) ?? "—";
   }
@@ -116,47 +138,6 @@ function calculateLiters(totalCostSar: string, pricePerLiterSar: string) {
   }
 
   return (total / price).toFixed(2);
-}
-
-function StatCard({
-  icon,
-  materialIcon,
-  label,
-  value,
-  sub,
-  color,
-  loading,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  materialIcon?: keyof typeof MaterialCommunityIcons.glyphMap;
-  label: string;
-  value: string;
-  sub?: string;
-  color: string;
-  loading?: boolean;
-}) {
-  const colors = useColors();
-
-  return (
-    <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.statIcon, { backgroundColor: `${color}18` }]}>
-        {materialIcon ? (
-          <MaterialCommunityIcons name={materialIcon} size={21} color={color} />
-        ) : (
-          <Ionicons name={icon} size={20} color={color} />
-        )}
-      </View>
-      {loading ? (
-        <ActivityIndicator color={color} />
-      ) : (
-        <>
-          <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
-          <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
-          {sub ? <Text style={[styles.statSub, { color: colors.mutedForeground }]}>{sub}</Text> : null}
-        </>
-      )}
-    </View>
-  );
 }
 
 function AddFuelModal({
@@ -181,7 +162,7 @@ function AddFuelModal({
   const [fuelGrade, setFuelGrade] = useState<"91" | "95" | "diesel">("91");
   const [pricePerLiterSar, setPricePerLiterSar] = useState(FUEL_PRICES["91"]);
   const [stationNameAr, setStationNameAr] = useState("");
-  const [filledAt, setFilledAt] = useState(new Date().toISOString().slice(0, 16));
+  const [filledAt, setFilledAt] = useState(localIsoDate);
   const [notes, setNotes] = useState("");
 
   const reset = () => {
@@ -192,7 +173,7 @@ function AddFuelModal({
     setFuelGrade("91");
     setPricePerLiterSar(FUEL_PRICES["91"]);
     setStationNameAr("");
-    setFilledAt(new Date().toISOString().slice(0, 16));
+    setFilledAt(localIsoDate());
     setNotes("");
   };
 
@@ -207,7 +188,7 @@ function AddFuelModal({
           pricePerLiterSar: Number(pricePerLiterSar),
           fuelGrade,
           stationNameAr: stationNameAr.trim() || undefined,
-          filledAt: new Date(filledAt).toISOString(),
+          filledAt: localDateToApiIso(filledAt),
           notes: notes.trim() || undefined,
         }),
       }),
@@ -282,7 +263,7 @@ function AddFuelModal({
           ) : null}
 
           <View style={styles.twoCols}>
-            <Field label="تاريخ التعبئة" value={filledAt} onChangeText={setFilledAt} placeholder="YYYY-MM-DDTHH:mm" />
+            <ArabicDateField label="تاريخ التعبئة" value={filledAt} onChange={setFilledAt} />
             <Field label="قراءة العداد" value={odometerKm} onChangeText={setOdometerKm} placeholder="اختياري" keyboardType="number-pad" />
           </View>
 
@@ -395,6 +376,21 @@ export default function FuelScreen() {
 
   const activeVehicleId = selectedVehicleId ?? vehicles[0]?.id ?? null;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === activeVehicleId);
+  const obd = useObdConnection();
+  const storedTelemetry = useGetLiveTelemetry(activeVehicleId ?? "", {
+    query: { enabled: Boolean(activeVehicleId) } as never,
+  });
+  const storedFuelPct =
+    storedTelemetry.data?.recent?.length && storedTelemetry.data.latest.fuelLevelPct != null
+      ? storedTelemetry.data.latest.fuelLevelPct
+      : null;
+
+  useFocusEffect(
+    useCallback(() => {
+      obd.startLivePolling();
+      return () => obd.stopLivePolling();
+    }, [obd.startLivePolling, obd.stopLivePolling]),
+  );
 
   const logsQuery = useQuery({
     queryKey: ["fuel-logs", activeVehicleId],
@@ -421,6 +417,18 @@ export default function FuelScreen() {
   const logs = logsQuery.data?.logs ?? [];
   const stats = statsQuery.data;
   const latestLog = logs[0];
+  const visibleLogs = useMemo(() => {
+    if (period === "all") return logs;
+    const now = new Date();
+    return logs.filter((log) => {
+      const date = new Date(log.filledAt);
+      if (!Number.isFinite(date.getTime())) return false;
+      if (period === "week") return now.getTime() - date.getTime() <= 7 * 24 * 60 * 60 * 1000;
+      if (period === "month") return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+      if (period === "year") return date.getFullYear() === now.getFullYear();
+      return true;
+    });
+  }, [logs, period]);
   const isLoading = vehiclesLoading || logsQuery.isLoading || statsQuery.isLoading;
 
   const chartBars = useMemo(() => {
@@ -448,37 +456,44 @@ export default function FuelScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: rowDir }]}>
         <Pressable onPress={goBack} style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Ionicons name="chevron-forward" size={22} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>البنزين والصرفية</Text>
-          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>تعبئات الوقود واستهلاك البنزين</Text>
+          <ArabicText style={[styles.headerTitle, { color: colors.foreground }]}>البنزين والصرفية</ArabicText>
+          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>التعبئة والإنفاق والاستهلاك</ArabicText>
         </View>
-        <View style={styles.headerSpacer} />
+        <Pressable onPress={() => setModalVisible(true)} style={[styles.headerAdd, { backgroundColor: colors.primary }]}>
+          <Ionicons name="add" size={18} color="#fff" />
+        </Pressable>
       </View>
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === "web" ? 96 : 126, gap: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <View style={styles.heroText}>
-            <Text style={[styles.eyebrow, { color: colors.primary }]}>البنزين والصرفية</Text>
-            <Text style={[styles.title, { color: colors.foreground }]}>تتبع تعبئات الوقود</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              سجل التعبئات، راقب الإنفاق، واحسب صرفية المركبة بنفس طريقة الويب.
-            </Text>
+        {obd.state === "vehicle_connected" || storedFuelPct != null ? (
+          <View style={[styles.liveFuelCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
+            <View style={[styles.statIcon, { backgroundColor: "#22C55E16" }]}>
+              <MaterialCommunityIcons name="gas-station-outline" size={22} color="#22C55E" />
+            </View>
+            <View style={{ flex: 1, alignItems: "stretch" }}>
+              <ArabicText style={[styles.statLabel, { color: colors.foreground }]}>
+                {obd.state === "vehicle_connected" ? "مستوى الخزان من القطعة" : "آخر مستوى خزان محفوظ"}
+              </ArabicText>
+              <Text style={[styles.statValue, { color: colors.foreground, writingDirection: "ltr" }]}>
+                {obd.state === "vehicle_connected"
+                  ? obd.liveValues.fuelLevel?.status === "ok" && obd.liveValues.fuelLevel.value != null
+                    ? `${Math.round(Number(obd.liveValues.fuelLevel.value))}%`
+                    : obd.liveValues.fuelLevel?.status === "unsupported"
+                      ? "السيارة لا ترسل مستوى الوقود"
+                      : "جارٍ القراءة"
+                  : `${Math.round(Number(storedFuelPct))}%`}
+              </Text>
+            </View>
           </View>
-          <Pressable
-            onPress={() => setModalVisible(true)}
-            style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary, opacity: pressed ? 0.82 : 1 }]}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addBtnText}>تعبئة</Text>
-          </Pressable>
-        </View>
+        ) : null}
 
         {!vehicles.length && !vehiclesLoading ? (
           <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -516,49 +531,85 @@ export default function FuelScreen() {
               </ScrollView>
             ) : null}
 
-            {activeVehicle ? (
-              <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {activeVehicle && vehicles.length === 1 ? (
+              <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
                 <View style={[styles.vehicleIcon, { backgroundColor: `${colors.primary}18` }]}>
-                  <Ionicons name="car-sport-outline" size={24} color={colors.primary} />
+                  <Ionicons name="car-sport-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={styles.vehicleText}>
-                  <Text style={[styles.vehicleName, { color: colors.foreground }]}>{activeVehicle.nickname || `${activeVehicle.make} ${activeVehicle.model}`}</Text>
-                  <Text style={[styles.vehicleMeta, { color: colors.mutedForeground }]}>{activeVehicle.plateNumber || activeVehicle.year}</Text>
+                  <ArabicText style={[styles.vehicleName, { color: colors.foreground }]}>{activeVehicle.nickname || `${activeVehicle.make} ${activeVehicle.model}`}</ArabicText>
+                  <ArabicText style={[styles.vehicleMeta, { color: colors.mutedForeground }]}>{activeVehicle.plateNumber || activeVehicle.year}</ArabicText>
                 </View>
               </View>
             ) : null}
 
-            <View style={styles.periodRow}>
+            <View style={[styles.periodTrack, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {(Object.keys(PERIOD_LABELS) as Array<keyof typeof PERIOD_LABELS>).map((key) => (
                 <Pressable
                   key={key}
                   onPress={() => setPeriod(key)}
                   style={[
                     styles.periodChip,
-                    {
-                      backgroundColor: period === key ? colors.primary : colors.card,
-                      borderColor: period === key ? colors.primary : colors.border,
-                    },
+                    { backgroundColor: period === key ? colors.primary : "transparent" },
                   ]}
                 >
-                  <Text style={[styles.periodText, { color: period === key ? "#fff" : colors.foreground }]}>
+                  <Text style={[styles.periodText, { color: period === key ? "#fff" : colors.mutedForeground }]}>
                     {PERIOD_LABELS[key]}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
-            <View style={styles.statsGrid}>
-              <StatCard icon="water-outline" materialIcon="gas-station-outline" label="إجمالي اللترات" value={stats ? formatLiters(stats.totalLiters) : "—"} sub={`${stats?.fillCount ?? 0} تعبئة`} loading={isLoading} color="#22c55e" />
-              <StatCard icon="wallet-outline" label="إجمالي الإنفاق" value={stats ? formatSar(stats.totalCostSar) : "—"} sub={PERIOD_LABELS[period]} loading={isLoading} color="#f97316" />
-              <StatCard icon="speedometer-outline" label="متوسط الصرفية" value={stats?.avgConsumptionL100km ? `${stats.avgConsumptionL100km} L/100` : "—"} sub={stats?.avgKmPerLiter ? `${stats.avgKmPerLiter} كم/لتر` : undefined} loading={isLoading} color={colors.primary} />
-              <StatCard icon="car-outline" label="آخر قراءة عداد" value={latestLog ? `${latestLog.odometerKm.toLocaleString("ar-SA")} كم` : "—"} sub={activeVehicle ? activeVehicle.nickname || `${activeVehicle.make} ${activeVehicle.model}` : undefined} loading={isLoading} color="#22c55e" />
+            {period !== "all" && !isLoading && (stats?.fillCount ?? 0) === 0 && logs.length > 0 ? (
+              <Pressable
+                onPress={() => setPeriod("all")}
+                style={[styles.periodHint, { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}30`, flexDirection: rowDir }]}
+              >
+                <Ionicons name="chevron-back" size={16} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <ArabicText style={[styles.periodHintTitle, { color: colors.foreground }]}>لا توجد تعبئة في {PERIOD_LABELS[period]}</ArabicText>
+                  <ArabicText style={[styles.periodHintBody, { color: colors.mutedForeground }]}>
+                    آخر تعبئة {formatDate(latestLog?.filledAt || "")} — اضغط لعرض كل السجلات.
+                  </ArabicText>
+                </View>
+              </Pressable>
+            ) : null}
+
+            <View style={[styles.insightBar, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.primary }]}>
+                  {isLoading ? "…" : stats && (stats.fillCount ?? 0) > 0 ? formatSar(stats.totalCostSar) : "—"}
+                </ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>الإنفاق</ArabicText>
+              </View>
+              <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.foreground }]}>
+                  {isLoading ? "…" : stats && (stats.fillCount ?? 0) > 0 ? formatLiters(stats.totalLiters) : "—"}
+                </ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>اللترات</ArabicText>
+              </View>
+              <View style={[styles.insightDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.insightCell}>
+                <ArabicText style={[styles.insightValue, { color: colors.foreground }]}>
+                  {isLoading ? "…" : stats?.avgKmPerLiter ? `${stats.avgKmPerLiter}` : "—"}
+                </ArabicText>
+                <ArabicText style={[styles.insightLabel, { color: colors.mutedForeground }]}>كم / لتر</ArabicText>
+              </View>
             </View>
+            {latestLog ? (
+              <View style={[styles.odometerStrip, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: rowDir }]}>
+                <ArabicText style={[styles.odometerValue, { color: colors.foreground }]}>
+                  {latestLog.odometerKm.toLocaleString("ar-SA")} كم
+                </ArabicText>
+                <ArabicText style={[styles.odometerLabel, { color: colors.mutedForeground }]}>آخر قراءة عداد</ArabicText>
+              </View>
+            ) : null}
 
             <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>التطور الزمني</Text>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>آخر أيام فيها تعبئة</Text>
+              <View style={[styles.cardHeader, { flexDirection: rowDir }]}>
+                <ArabicText style={[styles.cardTitle, { color: colors.foreground }]}>التطور الزمني</ArabicText>
+                <ArabicText style={[styles.cardSub, { color: colors.mutedForeground }]}>آخر أيام فيها تعبئة</ArabicText>
               </View>
               {chartBars.length ? (
                 <View style={styles.chartBars}>
@@ -574,56 +625,83 @@ export default function FuelScreen() {
                 </View>
               ) : (
                 <View style={styles.emptyMini}>
-                  <Ionicons name="analytics-outline" size={34} color={colors.mutedForeground} />
-                  <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>لا توجد بيانات في هذه الفترة</Text>
+                  <Ionicons name="analytics-outline" size={28} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+                    {logs.length ? `لا يوجد إنفاق خلال ${PERIOD_LABELS[period]}` : "سجّل تعبئة ليظهر المنحنى هنا"}
+                  </Text>
                 </View>
               )}
             </View>
 
-            <View style={styles.cardHeader}>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{logs.length ? `${logs.length} سجل` : "لا يوجد سجلات"}</Text>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>سجل التعبئات</Text>
+            <View style={[styles.cardHeader, { flexDirection: rowDir }]}>
+              <ArabicText style={[styles.cardTitle, { color: colors.foreground }]}>سجل التعبئات</ArabicText>
+              <ArabicText style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                {visibleLogs.length ? `${visibleLogs.length} سجل` : "لا يوجد سجلات في الفترة"}
+              </ArabicText>
             </View>
 
-            {logs.length ? (
-              logs.map((log) => (
+            {visibleLogs.length ? (
+              visibleLogs.map((log) => (
                 <View key={log.id} style={[styles.logCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={styles.logDateBox}>
-                    <Text style={[styles.logDate, { color: colors.foreground }]}>{formatDate(log.filledAt)}</Text>
-                    <Text style={[styles.logGrade, { color: colors.primary }]}>{GRADE_LABELS[log.fuelGrade as "91" | "95" | "diesel"] || log.fuelGrade}</Text>
+                  <View style={[styles.logAccent, { backgroundColor: colors.primary }]} />
+                  <View style={styles.logBody}>
+                    <View style={[styles.logTop, { flexDirection: rowDir }]}>
+                      <Pressable
+                        onPress={() =>
+                          Alert.alert("حذف السجل؟", "لا يمكن التراجع عن الحذف.", [
+                            { text: "إلغاء", style: "cancel" },
+                            { text: "حذف", style: "destructive", onPress: () => deleteMutation.mutate(log.id) },
+                          ])
+                        }
+                        style={styles.deleteBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel="حذف التعبئة"
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                      </Pressable>
+                      <View style={[styles.gradeBadge, { backgroundColor: `${colors.primary}18` }]}>
+                        <ArabicText style={[styles.gradeBadgeText, { color: colors.primary }]}>
+                          {GRADE_LABELS[log.fuelGrade as "91" | "95" | "diesel"] || log.fuelGrade}
+                        </ArabicText>
+                      </View>
+                      <View style={styles.logText}>
+                        <ArabicText style={[styles.logTitle, { color: colors.foreground }]}>{formatSar(log.totalCostSar)}</ArabicText>
+                        <ArabicText style={[styles.logMeta, { color: colors.mutedForeground }]}>
+                          {formatDate(log.filledAt)}
+                          {log.stationNameAr ? ` • ${log.stationNameAr}` : ""}
+                        </ArabicText>
+                      </View>
+                    </View>
+                    <View style={[styles.metrics, { backgroundColor: colors.background, flexDirection: rowDir }]}>
+                      <View style={styles.metric}>
+                        <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>الكمية</ArabicText>
+                        <ArabicText style={[styles.metricValue, { color: colors.foreground }]}>{formatLiters(log.liters)}</ArabicText>
+                      </View>
+                      <View style={[styles.metricSplit, { backgroundColor: colors.border }]} />
+                      <View style={styles.metric}>
+                        <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>سعر اللتر</ArabicText>
+                        <ArabicText style={[styles.metricValue, { color: colors.foreground }]}>{formatSar(log.pricePerLiterSar)}</ArabicText>
+                      </View>
+                      <View style={[styles.metricSplit, { backgroundColor: colors.border }]} />
+                      <View style={styles.metric}>
+                        <ArabicText style={[styles.metricLabel, { color: colors.mutedForeground }]}>الصرفية</ArabicText>
+                        <ArabicText style={[styles.metricValue, { color: colors.foreground }]}>
+                          {log.consumption ? `${log.consumption.consumptionL100km} L/100` : "أول تعبئة"}
+                        </ArabicText>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.logText}>
-                    <Text style={[styles.logTitle, { color: colors.foreground }]}>{formatSar(log.totalCostSar)}</Text>
-                    <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>
-                      {formatLiters(log.liters)} × {formatSar(log.pricePerLiterSar)} / لتر
-                    </Text>
-                    {log.consumption ? (
-                      <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>
-                        {log.consumption.consumptionL100km} L/100 • {log.consumption.distanceKm} كم
-                      </Text>
-                    ) : (
-                      <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>أول تعبئة للحساب</Text>
-                    )}
-                    {log.stationNameAr ? <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>{log.stationNameAr}</Text> : null}
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert("حذف السجل؟", "لا يمكن التراجع عن الحذف.", [
-                        { text: "إلغاء", style: "cancel" },
-                        { text: "حذف", style: "destructive", onPress: () => deleteMutation.mutate(log.id) },
-                      ])
-                    }
-                    style={styles.deleteBtn}
-                  >
-                    <Ionicons name="trash-outline" size={17} color="#ef4444" />
-                  </Pressable>
                 </View>
               ))
             ) : (
               <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <MaterialCommunityIcons name="gas-station-outline" size={46} color={colors.primary} />
-                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>لا توجد تعبئات مسجلة</Text>
-                <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>سجل أول تعبئة لتبدأ بتتبع صرفية سيارتك.</Text>
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                  {logs.length ? `لا توجد تعبئات في ${PERIOD_LABELS[period]}` : "لا توجد تعبئات مسجلة"}
+                </Text>
+                <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+                  {logs.length ? "غيّر الفترة أو سجّل تعبئة جديدة." : "سجّل أول تعبئة لتبدأ بتتبع صرفية سيارتك."}
+                </Text>
               </View>
             )}
           </>
@@ -643,7 +721,6 @@ export default function FuelScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
@@ -658,36 +735,69 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
   },
-  headerText: { flex: 1, alignItems: "center", gap: 3 },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "center" },
-  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
-  headerSpacer: { width: 42 },
-  hero: { flexDirection: "row-reverse", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  heroText: { flex: 1, alignItems: "flex-end", gap: 4 },
-  eyebrow: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right" },
-  title: { fontSize: 27, fontFamily: "Inter_700Bold", textAlign: "right" },
-  subtitle: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right" },
-  addBtn: { minHeight: 42, paddingHorizontal: 14, borderRadius: 12, flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: 5 },
-  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  headerText: { flex: 1, direction: "ltr", alignItems: "stretch", gap: 3 },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
+  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
+  headerAdd: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  liveFuelCard: {
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   iconBtn: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-  vehicleChip: { flexDirection: "row-reverse", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
+  vehicleChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   vehicleChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  vehicleCard: { flexDirection: "row-reverse", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
-  vehicleIcon: { width: 46, height: 46, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  vehicleText: { flex: 1, alignItems: "flex-end", gap: 3 },
+  vehicleCard: { alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
+  vehicleIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  vehicleText: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 2 },
   vehicleName: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
   vehicleMeta: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  periodRow: { flexDirection: "row-reverse", gap: 8 },
-  periodChip: { flex: 1, minHeight: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  periodTrack: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 4,
+    gap: 4,
+  },
+  periodChip: { flex: 1, minHeight: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   periodText: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  statsGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 10 },
-  statCard: { width: "48%", minHeight: 132, padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, alignItems: "flex-end", gap: 5 },
+  periodHint: {
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  periodHintTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
+  periodHintBody: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", marginTop: 2 },
+  insightBar: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: "center",
+  },
+  insightCell: { flex: 1, alignItems: "center", gap: 4 },
+  insightValue: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "center" },
+  insightLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  insightDivider: { width: StyleSheet.hairlineWidth, height: 36 },
+  odometerStrip: {
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  odometerLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  odometerValue: { fontSize: 15, fontFamily: "Inter_700Bold" },
   statIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   statValue: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
   statLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "right" },
-  statSub: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "right" },
   chartCard: { padding: 14, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, gap: 14 },
-  cardHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  cardHeader: { alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
   cardTitle: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "right" },
   cardSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
   chartBars: { minHeight: 132, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
@@ -696,29 +806,36 @@ const styles = StyleSheet.create({
   barFill: { width: "100%", borderRadius: 999 },
   barValue: { fontSize: 9, fontFamily: "Inter_600SemiBold" },
   barDate: { fontSize: 9, fontFamily: "Inter_400Regular" },
-  emptyMini: { minHeight: 132, alignItems: "center", justifyContent: "center", gap: 8 },
-  logCard: { flexDirection: "row-reverse", alignItems: "center", gap: 10, padding: 13, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth },
-  logDateBox: { width: 74, alignItems: "center", gap: 4 },
-  logDate: { fontSize: 11, fontFamily: "Inter_700Bold", textAlign: "center" },
-  logGrade: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  logText: { flex: 1, alignItems: "flex-end", gap: 3 },
-  logTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
-  logMeta: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
+  emptyMini: { minHeight: 88, alignItems: "center", justifyContent: "center", gap: 8 },
+  logCard: { borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden", flexDirection: "row" },
+  logAccent: { width: 4 },
+  logBody: { flex: 1, padding: 14, gap: 12 },
+  logTop: { alignItems: "center", justifyContent: "space-between", gap: 10 },
+  logText: { flex: 1, minWidth: 0, alignItems: "stretch", gap: 3 },
+  logTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right" },
+  logMeta: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
+  gradeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  gradeBadgeText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  metrics: { borderRadius: 14, paddingVertical: 10, paddingHorizontal: 6, alignItems: "stretch" },
+  metric: { flex: 1, alignItems: "center", gap: 3, minWidth: 0 },
+  metricLabel: { fontSize: 10, fontFamily: "Inter_500Medium", textAlign: "center" },
+  metricValue: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  metricSplit: { width: StyleSheet.hairlineWidth, marginVertical: 2 },
   deleteBtn: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   emptyCard: { alignItems: "center", gap: 10, padding: 28, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth },
   emptyTitle: { fontSize: 17, fontFamily: "Inter_700Bold", textAlign: "center" },
   emptyDesc: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 20 },
-  primaryBtn: { minHeight: 50, borderRadius: 15, alignItems: "center", justifyContent: "center", flexDirection: "row-reverse", gap: 8, paddingHorizontal: 16 },
+  primaryBtn: { minHeight: 50, borderRadius: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, paddingHorizontal: 16 },
   primaryText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   modalRoot: { flex: 1 },
-  modalHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "center" },
   fieldWrap: { gap: 8, flex: 1 },
-  fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
-  input: { minHeight: 50, borderRadius: 13, borderWidth: 1, paddingHorizontal: 14, fontSize: 15, fontFamily: "Inter_400Regular" },
+  fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
+  input: { minHeight: 50, borderRadius: 13, borderWidth: 1, paddingHorizontal: 14, paddingStart: 14, fontSize: 15, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl" },
   textArea: { minHeight: 90, paddingTop: 12, textAlignVertical: "top" },
-  twoCols: { flexDirection: "row-reverse", gap: 10 },
-  gradeRow: { flexDirection: "row-reverse", gap: 8 },
+  twoCols: { flexDirection: "row", gap: 10 },
+  gradeRow: { flexDirection: "row", gap: 8 },
   gradeChip: { flex: 1, minHeight: 44, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   gradeText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   choiceChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },

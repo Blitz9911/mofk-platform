@@ -5,7 +5,7 @@ import {
   useCreateVehicle,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -20,8 +20,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 import { smoothBack } from "@/lib/navigation";
+import { useObdConnection } from "@/src/obd";
 
 /* ── Brand / Model data (identical to web) ───────────────── */
 const CAR_BRANDS: Record<string, { label: string; models: string[] }> = {
@@ -122,11 +125,11 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
       .join(" ")
       .trim();
 
-  const focusBox = (index: number) => {
-    if (index < 0 || index > 6) return;
+  const focusBox = (visualIndex: number) => {
+    if (visualIndex < 0 || visualIndex > 6) return;
     setTimeout(() => {
       const target =
-        index < 3 ? letterRefs.current[index] : digitRefs.current[index - 3];
+        visualIndex < 4 ? digitRefs.current[visualIndex] : letterRefs.current[visualIndex - 4];
       target?.focus();
     }, 80);
   };
@@ -155,7 +158,7 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
     if (!/[\u0600-\u06FFa-zA-Z]/.test(raw)) return;
 
     updateBox(idx, normalizeLetter(raw));
-    focusBox(idx < 2 ? idx + 1 : 3);
+    if (idx < 2) focusBox(5 + idx);
   };
 
   const handleDigit = (idx: number, char: string) => {
@@ -174,32 +177,34 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
     });
 
     onChange(buildValue(letters, nextDigits));
-    focusBox(Math.min(idx + incoming.length + 3, 6));
+    focusBox(Math.min(idx + incoming.length, 4));
   };
 
-  const handleKey = (globalIndex: number, key: string) => {
+  const handleKey = (visualIndex: number, key: string) => {
     if (key !== "Backspace") return;
 
     const currentValue =
-      globalIndex < 3 ? letters[globalIndex] : digits[globalIndex - 3];
+      visualIndex < 4 ? digits[visualIndex] : letters[visualIndex - 4];
 
     if (currentValue) {
-      updateBox(globalIndex, "");
-      focusBox(Math.max(globalIndex - 1, 0));
+      if (visualIndex < 4) updateBox(visualIndex + 3, "");
+      else updateBox(visualIndex - 4, "");
+      focusBox(Math.max(visualIndex - 1, 0));
       return;
     }
 
-    const previousIndex = globalIndex - 1;
-    if (previousIndex >= 0) {
-      updateBox(previousIndex, "");
-      focusBox(previousIndex);
+    if (visualIndex > 0) {
+      const previous = visualIndex - 1;
+      if (previous < 4) updateBox(previous + 3, "");
+      else updateBox(previous - 4, "");
+      focusBox(previous);
     }
   };
 
   const Box = ({
-    globalIndex, val, onInput, setRef, hint, isLetter,
+    visualIndex, val, onInput, setRef, hint, isLetter,
   }: {
-    globalIndex: number;
+    visualIndex: number;
     val: string;
     onInput: (v: string) => void;
     setRef: (input: TextInput | null) => void;
@@ -211,7 +216,7 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
       value={val}
       maxLength={isLetter ? 1 : 4}
       onChangeText={onInput}
-      onKeyPress={(event) => handleKey(globalIndex, event.nativeEvent.key)}
+      onKeyPress={(event) => handleKey(visualIndex, event.nativeEvent.key)}
       keyboardType={isLetter ? "default" : "number-pad"}
       blurOnSubmit={false}
       selectTextOnFocus
@@ -234,32 +239,31 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Input boxes — RTL: letters on right, divider, digits on left */}
       <View style={plateStyles.boxRow}>
+        {[0, 1, 2, 3].map((i) => (
+          <Box
+            key={`d${i}`}
+            val={digits[i] || ""}
+            visualIndex={i}
+            onInput={(v) => handleDigit(i, v)}
+            setRef={(input) => {
+              digitRefs.current[i] = input;
+            }}
+            hint={String(i + 1)}
+          />
+        ))}
+        <View style={[plateStyles.divider, { backgroundColor: colors.border }]} />
         {[0, 1, 2].map((i) => (
           <Box
             key={`l${i}`}
             val={letters[i] || ""}
-            globalIndex={i}
+            visualIndex={i + 4}
             onInput={(v) => handleLetter(i, v)}
             setRef={(input) => {
               letterRefs.current[i] = input;
             }}
             hint="أ"
             isLetter
-          />
-        ))}
-        <View style={[plateStyles.divider, { backgroundColor: colors.border }]} />
-        {[0, 1, 2, 3].map((i) => (
-          <Box
-            key={`d${i}`}
-            val={digits[i] || ""}
-            globalIndex={i + 3}
-            onInput={(v) => handleDigit(i, v)}
-            setRef={(input) => {
-              digitRefs.current[i] = input;
-            }}
-            hint={String(i + 1)}
           />
         ))}
       </View>
@@ -291,13 +295,13 @@ function PlateInput({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 const plateStyles = StyleSheet.create({
-  boxRow: { flexDirection: "row-reverse", alignItems: "center", gap: 6 },
+  boxRow: { flexDirection: "row", direction: "ltr", alignItems: "center", justifyContent: "center", gap: 6 },
   box: {
-    width: 40, height: 50, textAlign: "center",
-    fontSize: 22, fontFamily: "Inter_700Bold",
-    borderRadius: 10, borderWidth: 2,
+    width: 42, height: 52, textAlign: "center",
+    fontSize: 20, fontFamily: "Inter_700Bold",
+    borderRadius: 12, borderWidth: 1.5,
   },
-  divider: { width: 1, height: 32, marginHorizontal: 4 },
+  divider: { width: 1, height: 28, marginHorizontal: 6 },
   /* Plate visual */
   plate: {
     flexDirection: "row",          /* LTR: numbers | sep | letters | badge */
@@ -305,7 +309,7 @@ const plateStyles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 2,
     borderColor: "#d4d4d4",
-    alignSelf: "flex-start",
+    alignSelf: "center",
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -353,6 +357,7 @@ export default function AddVehicleScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const createVehicle = useCreateVehicle();
+  const obd = useObdConnection();
 
   const [makeKey, setMakeKey] = useState<string>("");
   const [makeOther, setMakeOther] = useState<string>("");
@@ -366,6 +371,11 @@ export default function AddVehicleScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [picker, setPicker] = useState<PickerCfg>(null);
+
+  useEffect(() => {
+    const liveVin = obd.vehicleInfo?.vin?.trim();
+    if (liveVin && !vin.trim()) setVin(liveVin);
+  }, [obd.vehicleInfo?.vin, vin]);
 
   const makeLabel = useMemo(() => {
     if (!makeKey) return "";
@@ -434,202 +444,205 @@ export default function AddVehicleScreen() {
     { backgroundColor: colors.card, borderColor: hasError ? "#ef4444" : colors.border },
   ];
 
+  const RequiredMark = () => <Text style={{ color: "#ef4444" }}> *</Text>;
+
   const renderSelectRow = (
     label: string, value: string, placeholder: string,
     onPress: () => void, required?: boolean, error?: string,
   ) => (
     <View style={styles.row}>
-      <Text style={[styles.label, { color: colors.foreground }]}>
-        {label} {required ? <Text style={{ color: "#ef4444" }}>*</Text> : null}
-      </Text>
-      <Pressable style={fieldStyle(!!error)} onPress={onPress}>
-        <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} />
-        <Text style={[styles.fieldText, { color: value ? colors.foreground : colors.mutedForeground }]}>
+      <ArabicText style={[styles.label, { color: colors.foreground }]}>
+        {label}{required ? <RequiredMark /> : null}
+      </ArabicText>
+      <Pressable style={[fieldStyle(!!error), { flexDirection: rowDir }]} onPress={onPress}>
+        <ArabicText fill style={[styles.fieldText, { color: value ? colors.foreground : colors.mutedForeground }]}>
           {value || placeholder}
-        </Text>
+        </ArabicText>
+        <Ionicons name="chevron-down" size={16} color={colors.mutedForeground} />
       </Pressable>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <ArabicText style={styles.errorText}>{error}</ArabicText> : null}
     </View>
   );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border, flexDirection: rowDir }]}>
+        <View style={styles.headerTitles}>
+          <ArabicText style={[styles.headerTitle, { color: colors.foreground }]}>إضافة مركبة</ArabicText>
+          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>بيانات أساسية لمراقبة المركبة</ArabicText>
+        </View>
         <Pressable onPress={() => smoothBack(router)} hitSlop={10} style={styles.backBtn}>
-          <Ionicons name="close" size={26} color={colors.foreground} />
+          <Ionicons name="close" size={24} color={colors.foreground} />
         </Pressable>
-        {false ? <View style={{ alignItems: "center" }}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>إضافة مركبة جديدة</Text>
-          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-            أدخل بيانات مركبتك للبدء في مراقبتها
-          </Text>
-        </View> : null}
-        <View style={{ width: 26 }} />
       </View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={20}
+        keyboardVerticalOffset={12}
       >
         <ScrollView
-          contentContainerStyle={{ padding: 20, paddingBottom: 120, gap: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 36, gap: 14 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Brand */}
-          {makeKey === "other" ? (
-            <View style={styles.row}>
-              <View style={styles.labelRow}>
-                <Pressable onPress={() => { setMakeKey(""); setMakeOther(""); setModel(""); setModelOther(false); }}>
-                  <Text style={[styles.changeText, { color: colors.primary }]}>تغيير</Text>
-                </Pressable>
-                <Text style={[styles.label, { color: colors.foreground }]}>
-                  الشركة المصنعة <Text style={{ color: "#ef4444" }}>*</Text>
-                </Text>
-              </View>
-              <View style={fieldStyle(!!errors.make)}>
-                <TextInput
-                  value={makeOther}
-                  onChangeText={setMakeOther}
-                  placeholder="اكتب اسم الشركة"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1, textAlign: "right" }]}
-                />
-              </View>
-              {errors.make ? <Text style={styles.errorText}>{errors.make}</Text> : null}
-            </View>
-          ) : (
-            renderSelectRow(
-              "الشركة المصنعة", makeLabel, "اختر الشركة",
-              () => setPicker({
-                title: "اختر الشركة",
-                options: Object.entries(CAR_BRANDS).map(([k, b]) => ({ value: k, label: b.label })),
-                onSelect: (v) => { setMakeKey(v); setMakeOther(""); setModel(""); setModelOther(false); setErrors((e) => ({ ...e, make: "" })); },
-              }),
-              true, errors.make,
-            )
-          )}
-
-          {/* Model */}
-          {modelOther || makeKey === "other" ? (
-            <View style={styles.row}>
-              <View style={styles.labelRow}>
-                {modelOther && (
-                  <Pressable onPress={() => { setModelOther(false); setModel(""); }}>
-                    <Text style={[styles.changeText, { color: colors.primary }]}>تغيير</Text>
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {makeKey === "other" ? (
+              <View style={styles.row}>
+                <View style={[styles.labelRow, { flexDirection: rowDir }]}>
+                  <ArabicText style={[styles.label, { color: colors.foreground }]}>
+                    الشركة المصنعة<RequiredMark />
+                  </ArabicText>
+                  <Pressable onPress={() => { setMakeKey(""); setMakeOther(""); setModel(""); setModelOther(false); }}>
+                    <ArabicText style={[styles.changeText, { color: colors.primary }]}>تغيير</ArabicText>
                   </Pressable>
-                )}
-                <Text style={[styles.label, { color: colors.foreground }]}>
-                  الموديل <Text style={{ color: "#ef4444" }}>*</Text>
-                </Text>
+                </View>
+                <View style={fieldStyle(!!errors.make)}>
+                  <TextInput
+                    value={makeOther}
+                    onChangeText={setMakeOther}
+                    placeholder="اكتب اسم الشركة"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1 }]}
+                  />
+                </View>
+                {errors.make ? <ArabicText style={styles.errorText}>{errors.make}</ArabicText> : null}
               </View>
-              <View style={fieldStyle(!!errors.model)}>
-                <TextInput
-                  value={model}
-                  onChangeText={(t) => { setModel(t); if (t) setErrors((e) => ({ ...e, model: "" })); }}
-                  placeholder="اكتب اسم الموديل"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1, textAlign: "right" }]}
-                />
-              </View>
-              {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
-            </View>
-          ) : (
-            renderSelectRow(
-              "الموديل", model,
-              makeKey ? "اختر الموديل" : "اختر الشركة أولاً",
-              () => {
-                if (!makeKey) return;
-                setPicker({
-                  title: "اختر الموديل",
-                  options: [
-                    ...availableModels.map((m) => ({ value: m, label: m })),
-                    { value: "__other__", label: "أخرى (اكتب يدوياً)" },
-                  ],
-                  onSelect: (v) => {
-                    if (v === "__other__") { setModelOther(true); setModel(""); }
-                    else { setModel(v); setErrors((e) => ({ ...e, model: "" })); }
-                  },
-                });
-              },
-              true, errors.model,
-            )
-          )}
+            ) : (
+              renderSelectRow(
+                "الشركة المصنعة", makeLabel, "اختر الشركة",
+                () => setPicker({
+                  title: "اختر الشركة",
+                  options: Object.entries(CAR_BRANDS).map(([k, b]) => ({ value: k, label: b.label })),
+                  onSelect: (v) => { setMakeKey(v); setMakeOther(""); setModel(""); setModelOther(false); setErrors((e) => ({ ...e, make: "" })); },
+                }),
+                true, errors.make,
+              )
+            )}
 
-          {/* Year + Fuel */}
-          <View style={styles.gridRow}>
-            <View style={{ flex: 1 }}>
-              {renderSelectRow(
-                "سنة الصنع", String(year), "",
-                () => setPicker({
-                  title: "اختر السنة",
-                  options: YEARS.map((y) => ({ value: String(y), label: String(y) })),
-                  onSelect: (v) => { setYear(Number(v)); setErrors((e) => ({ ...e, year: "" })); },
-                }),
-                true, errors.year,
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              {renderSelectRow(
-                "نوع الوقود",
-                FUEL_OPTIONS.find((f) => f.value === fuelType)?.label ?? "",
-                "",
-                () => setPicker({
-                  title: "نوع الوقود",
-                  options: FUEL_OPTIONS.map((f) => ({ value: f.value, label: f.label })),
-                  onSelect: (v) => setFuelType(v as any),
-                }),
-              )}
+            {modelOther || makeKey === "other" ? (
+              <View style={styles.row}>
+                <View style={[styles.labelRow, { flexDirection: rowDir }]}>
+                  <ArabicText style={[styles.label, { color: colors.foreground }]}>
+                    الموديل<RequiredMark />
+                  </ArabicText>
+                  {modelOther ? (
+                    <Pressable onPress={() => { setModelOther(false); setModel(""); }}>
+                      <ArabicText style={[styles.changeText, { color: colors.primary }]}>تغيير</ArabicText>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <View style={fieldStyle(!!errors.model)}>
+                  <TextInput
+                    value={model}
+                    onChangeText={(t) => { setModel(t); if (t) setErrors((e) => ({ ...e, model: "" })); }}
+                    placeholder="اكتب اسم الموديل"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1 }]}
+                  />
+                </View>
+                {errors.model ? <ArabicText style={styles.errorText}>{errors.model}</ArabicText> : null}
+              </View>
+            ) : (
+              renderSelectRow(
+                "الموديل", model,
+                makeKey ? "اختر الموديل" : "اختر الشركة أولاً",
+                () => {
+                  if (!makeKey) return;
+                  setPicker({
+                    title: "اختر الموديل",
+                    options: [
+                      ...availableModels.map((m) => ({ value: m, label: m })),
+                      { value: "__other__", label: "أخرى (اكتب يدوياً)" },
+                    ],
+                    onSelect: (v) => {
+                      if (v === "__other__") { setModelOther(true); setModel(""); }
+                      else { setModel(v); setErrors((e) => ({ ...e, model: "" })); }
+                    },
+                  });
+                },
+                true, errors.model,
+              )
+            )}
+
+            {renderSelectRow(
+              "سنة الصنع", String(year), "",
+              () => setPicker({
+                title: "اختر السنة",
+                options: YEARS.map((y) => ({ value: String(y), label: String(y) })),
+                onSelect: (v) => { setYear(Number(v)); setErrors((e) => ({ ...e, year: "" })); },
+              }),
+              true, errors.year,
+            )}
+
+            <View style={styles.row}>
+              <ArabicText style={[styles.label, { color: colors.foreground }]}>نوع الوقود</ArabicText>
+              <View style={[styles.chipRow, { flexDirection: rowDir }]}>
+                {FUEL_OPTIONS.map((opt) => {
+                  const active = fuelType === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => setFuelType(opt.value as typeof fuelType)}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: active ? colors.primary : colors.background,
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? "#fff" : colors.foreground }]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
           </View>
 
-          {/* Plate Number — KSA Box Style */}
-          <View style={styles.row}>
-            <Text style={[styles.label, { color: colors.foreground }]}>رقم اللوحة <Text style={{ color: "#ef4444" }}>*</Text></Text>
-            <PlateInput value={plateNumber} onChange={setPlateNumber} />
-            {errors.plateNumber ? <Text style={styles.errorText}>{errors.plateNumber}</Text> : null}
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.row}>
+              <ArabicText style={[styles.label, { color: colors.foreground }]}>رقم اللوحة<RequiredMark /></ArabicText>
+              <PlateInput value={plateNumber} onChange={setPlateNumber} />
+              {errors.plateNumber ? <ArabicText style={styles.errorText}>{errors.plateNumber}</ArabicText> : null}
+            </View>
           </View>
 
-          {/* Odometer + VIN */}
-          <View style={styles.gridRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.label, { color: colors.foreground, marginBottom: 8 }]}>قراءة العداد (كم)</Text>
-              <View style={fieldStyle(!!errors.odometerKm)}>
-                <TextInput
-                  value={odometerKm}
-                  onChangeText={(t) => { setOdometerKm(t); if (t) setErrors((e) => ({ ...e, odometerKm: "" })); }}
-                  placeholder="مثال: 45000"
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType="number-pad"
-                  style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1, textAlign: "right" }]}
-                />
-              </View>
-              {errors.odometerKm ? <Text style={styles.errorText}>{errors.odometerKm}</Text> : null}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.label, { color: colors.foreground, marginBottom: 8 }]}>رقم الهيكل VIN</Text>
+          <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.row}>
+              <ArabicText style={[styles.label, { color: colors.foreground }]}>رقم الهيكل VIN</ArabicText>
               <View style={fieldStyle()}>
                 <TextInput
                   value={vin}
                   onChangeText={setVin}
-                  placeholder="اختياري"
+                  placeholder="اختياري — يُملأ تلقائياً بعد التوصيل"
                   placeholderTextColor={colors.mutedForeground}
                   autoCapitalize="characters"
-                  style={[styles.fieldText, { color: colors.foreground, padding: 0, flex: 1, textAlign: "right" }]}
+                  autoCorrect={false}
+                  style={[styles.ltrInput, { color: colors.foreground }]}
                 />
               </View>
             </View>
+            <View style={styles.row}>
+              <ArabicText style={[styles.label, { color: colors.foreground }]}>قراءة العداد</ArabicText>
+              <View style={[fieldStyle(!!errors.odometerKm), { flexDirection: rowDir }]}>
+                <TextInput
+                  value={odometerKm}
+                  onChangeText={(t) => { setOdometerKm(t); if (t) setErrors((e) => ({ ...e, odometerKm: "" })); }}
+                  placeholder="45000"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  style={[styles.ltrInput, { color: colors.foreground, flex: 1 }]}
+                />
+                <ArabicText style={[styles.unit, { color: colors.mutedForeground }]}>كم</ArabicText>
+              </View>
+              {errors.odometerKm ? <ArabicText style={styles.errorText}>{errors.odometerKm}</ArabicText> : null}
+            </View>
           </View>
 
-          {/* Submit */}
-          <View style={styles.actions}>
-            <Pressable
-              onPress={() => smoothBack(router)}
-              style={[styles.cancelBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-            >
-              <Text style={[styles.cancelText, { color: colors.foreground }]}>إلغاء</Text>
-            </Pressable>
+          <View style={[styles.actions, { flexDirection: rowDir }]}>
             <Pressable
               onPress={handleSubmit}
               disabled={createVehicle.isPending}
@@ -639,11 +652,16 @@ export default function AddVehicleScreen() {
                 {createVehicle.isPending ? "جاري الإضافة..." : "إضافة المركبة"}
               </Text>
             </Pressable>
+            <Pressable
+              onPress={() => smoothBack(router)}
+              style={[styles.cancelBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+            >
+              <Text style={[styles.cancelText, { color: colors.foreground }]}>إلغاء</Text>
+            </Pressable>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Picker modal */}
       <Modal visible={!!picker} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPicker(null)}>
           <Pressable
@@ -651,12 +669,11 @@ export default function AddVehicleScreen() {
             style={[styles.modalSheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: insets.bottom + 16 }]}
           >
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { flexDirection: rowDir }]}>
+              <ArabicText style={[styles.modalTitle, { color: colors.foreground }]}>{picker?.title}</ArabicText>
               <Pressable onPress={() => setPicker(null)} hitSlop={10}>
                 <Ionicons name="close" size={22} color={colors.foreground} />
               </Pressable>
-              <Text style={[styles.modalTitle, { color: colors.foreground }]}>{picker?.title}</Text>
-              <View style={{ width: 22 }} />
             </View>
             <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
               {picker?.options.map((opt) => (
@@ -668,7 +685,7 @@ export default function AddVehicleScreen() {
                     { borderBottomColor: colors.border, backgroundColor: pressed ? colors.secondary : "transparent" },
                   ]}
                 >
-                  <Text style={[styles.modalOptionText, { color: colors.foreground }]}>{opt.label}</Text>
+                  <ArabicText style={[styles.modalOptionText, { color: colors.foreground }]}>{opt.label}</ArabicText>
                 </Pressable>
               ))}
             </ScrollView>
@@ -682,33 +699,46 @@ export default function AddVehicleScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  headerTitles: { flex: 1, gap: 2 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
 
+  section: { borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, padding: 14, gap: 14 },
   row: { gap: 8 },
-  labelRow: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
-  label: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right" },
-  changeText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  errorText: { fontSize: 12, color: "#ef4444", fontFamily: "Inter_500Medium", textAlign: "right" },
+  labelRow: { alignItems: "center", justifyContent: "space-between" },
+  label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  changeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  errorText: { fontSize: 12, color: "#ef4444", fontFamily: "Inter_500Medium" },
 
   field: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth, minHeight: 46,
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 50,
   },
-  fieldText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1, textAlign: "right" },
+  fieldText: { fontSize: 15, fontFamily: "Inter_500Medium", flex: 1 },
+  ltrInput: { fontSize: 15, fontFamily: "Inter_600SemiBold", flex: 1, writingDirection: "ltr", textAlign: "left" },
+  unit: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  chipRow: { flexWrap: "wrap", gap: 8 },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  chipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  gridRow: { flexDirection: "row-reverse", gap: 12 },
-
-  actions: { flexDirection: "row-reverse", gap: 10, marginTop: 16 },
-  cancelBtn: { paddingHorizontal: 20, paddingVertical: 14, borderRadius: 12, borderWidth: 1 },
+  actions: { gap: 10, marginTop: 4 },
+  cancelBtn: { paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14, borderWidth: 1, minWidth: 88, alignItems: "center" },
   cancelText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  submitBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
-  submitText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  submitBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: "center" },
+  submitText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "center" },
 
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalSheet: {
@@ -717,10 +747,10 @@ const styles = StyleSheet.create({
   },
   modalHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#666", marginBottom: 4 },
   modalHeader: {
-    flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 12, paddingVertical: 12,
+    alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 12, paddingVertical: 12, gap: 8,
   },
-  modalTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  modalTitle: { fontSize: 16, fontFamily: "Inter_700Bold", flex: 1 },
   modalOption: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  modalOptionText: { fontSize: 15, fontFamily: "Inter_500Medium", textAlign: "right" },
+  modalOptionText: { fontSize: 15, fontFamily: "Inter_500Medium" },
 });

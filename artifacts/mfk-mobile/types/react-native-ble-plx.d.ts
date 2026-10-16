@@ -44,6 +44,8 @@ declare module "react-native-ble-plx" {
       listener: (error: BleError | null, device: Device | null) => void,
       transactionId?: string,
     ): Subscription;
+    requestConnectionPriority?(priority: 0 | 1 | 2): Promise<number>;
+    requestMTU?(mtu: number): Promise<number>;
   };
 
   export type Service = {

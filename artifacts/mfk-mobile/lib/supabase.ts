@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const SESSION_STORAGE_KEY = "mfk-supabase-session";
+const SUPABASE_REQUEST_TIMEOUT_MS = 15_000;
+const SUPABASE_RETRY_DELAY_MS = 650;
 export const DEV_PHONE_OTP_CODE = process.env.EXPO_PUBLIC_DEV_OTP_CODE || "123456";
+let phoneOtpFallbackToMock = false;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -81,7 +84,17 @@ function buildSupabaseUrl(baseUrl: string, path: string): string {
 }
 
 export function isMockPhoneOtpEnabled(): boolean {
-  return process.env.EXPO_PUBLIC_AUTH_OTP_MODE !== "sms";
+  return process.env.EXPO_PUBLIC_AUTH_OTP_MODE !== "sms" || phoneOtpFallbackToMock;
+}
+
+function shouldUseMockOtpFallback(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return (
+    message.includes("Unsupported phone provider") ||
+    message.includes("unsupported phone provider") ||
+    message.includes("SMS provider")
+  );
 }
 
 function getErrorMessage(data: unknown, fallback: string): string {
@@ -111,6 +124,52 @@ function getErrorMessage(data: unknown, fallback: string): string {
   return fallback;
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function isTransientNetworkError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+
+  return (
+    isAbortError(error) ||
+    message.includes("Network request failed") ||
+    message.includes("Failed to fetch") ||
+    message.includes("Load failed") ||
+    message.includes("The Internet connection appears to be offline") ||
+    message.includes("timed out")
+  );
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function userFriendlyNetworkMessage(error: unknown) {
+  if (isAbortError(error)) {
+    return "استغرق الاتصال بخدمة مفك وقتًا أطول من المتوقع. تحقق من الإنترنت وحاول مرة أخرى.";
+  }
+
+  return "تعذر الوصول لخدمة مفك. تأكد من اتصال الإنترنت ثم حاول مرة أخرى.";
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SUPABASE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal ?? controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function supabaseRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -127,10 +186,27 @@ export async function supabaseRequest<T>(
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(buildSupabaseUrl(url, path), {
+  let response: Response;
+  const requestUrl = buildSupabaseUrl(url, path);
+  const requestOptions = {
     ...options,
     headers,
-  });
+  };
+  try {
+    response = await fetchWithTimeout(requestUrl, requestOptions);
+  } catch (error) {
+    if (!options.signal && isTransientNetworkError(error)) {
+      await wait(SUPABASE_RETRY_DELAY_MS);
+
+      try {
+        response = await fetchWithTimeout(requestUrl, requestOptions);
+      } catch (retryError) {
+        throw new Error(userFriendlyNetworkMessage(retryError), { cause: retryError });
+      }
+    } else {
+      throw new Error(userFriendlyNetworkMessage(error), { cause: error });
+    }
+  }
 
   const raw = await response.text();
 
@@ -271,21 +347,28 @@ function metadataValue(
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isInternalEmail(value: string) {
+  return /mofk\.local$|iphone\.mofk\.local$|anonymous/i.test(value);
+}
+
+function isPlaceholderName(value: string) {
+  return !value || /^user$/i.test(value) || /^user[-_]?\d+$/i.test(value) || isInternalEmail(value);
+}
+
 function fallbackName(user: SupabaseAuthUser): string {
-  return (
-    metadataValue(user, "name") ||
-    metadataValue(user, "full_name") ||
-    user.email?.split("@")[0] ||
-    "مستخدم مفك"
-  );
+  const fromMeta = metadataValue(user, "name") || metadataValue(user, "full_name");
+  if (fromMeta && !isPlaceholderName(fromMeta)) return fromMeta;
+  if (user.email && !isInternalEmail(user.email)) {
+    const local = user.email.split("@")[0]?.trim() ?? "";
+    if (local && !isPlaceholderName(local)) return local;
+  }
+  return "مستخدم مفك";
 }
 
 function fallbackPhone(user: SupabaseAuthUser): string {
-  return (
-    user.phone ||
-    metadataValue(user, "phone") ||
-    `user-${user.id.slice(0, 12)}`
-  );
+  const phone = user.phone || metadataValue(user, "phone");
+  if (!phone || /mofk\.local|^user-/i.test(phone)) return "";
+  return phone;
 }
 
 export function normalizeSaudiPhone(phone: string): string {
@@ -326,7 +409,7 @@ function toAuthUser(
     email: row?.email || user.email || undefined,
     phone: row?.phone || fallbackPhone(user),
     role: row?.role || "user",
-    subscriptionTier: row?.subscription_tier || "free",
+    subscriptionTier: row?.subscription_tier ?? "free",
     subscriptionStartedAt: row?.subscription_started_at ?? null,
     subscriptionEndsAt: row?.subscription_ends_at ?? null,
     subscriptionAutoRenew: row?.subscription_auto_renew ?? true,
@@ -435,19 +518,27 @@ export const authApi = {
       return normalizedPhone;
     }
 
-    await supabaseRequest(
-      "/auth/v1/otp",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    try {
+      await supabaseRequest(
+        "/auth/v1/otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone: normalizedPhone,
+            create_user: false,
+          }),
         },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          create_user: false,
-        }),
-      },
-    );
+      );
+    } catch (error) {
+      if (!shouldUseMockOtpFallback(error)) {
+        throw error;
+      }
+
+      phoneOtpFallbackToMock = true;
+    }
 
     return normalizedPhone;
   },
@@ -459,19 +550,27 @@ export const authApi = {
       return normalizedPhone;
     }
 
-    await supabaseRequest(
-      "/auth/v1/otp",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    try {
+      await supabaseRequest(
+        "/auth/v1/otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone: normalizedPhone,
+            create_user: true,
+          }),
         },
-        body: JSON.stringify({
-          phone: normalizedPhone,
-          create_user: true,
-        }),
-      },
-    );
+      );
+    } catch (error) {
+      if (!shouldUseMockOtpFallback(error)) {
+        throw error;
+      }
+
+      phoneOtpFallbackToMock = true;
+    }
 
     return normalizedPhone;
   },
@@ -504,10 +603,6 @@ export const authApi = {
           },
         );
       } catch {
-        if (mode === "login") {
-          throw new Error("هذا الرقم غير مسجل. أنشئ حساب جديد أولاً.");
-        }
-
         payload = await supabaseRequest<SupabaseAuthResponse>(
           "/auth/v1/signup",
           {

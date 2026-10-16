@@ -3,7 +3,9 @@ import React from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AccountInfoScreen } from "@/components/AccountInfoScreen";
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 
 function SupportFooter() {
   const colors = useColors();
@@ -11,8 +13,8 @@ function SupportFooter() {
   return (
     <View style={[styles.supportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.supportText}>
-        <Text style={[styles.supportTitle, { color: colors.foreground }]}>تحتاج مساعدة مباشرة؟</Text>
-        <Text style={[styles.supportSub, { color: colors.mutedForeground }]}>فريق الدعم يساعدك في الحساب، الباقات، وطلب القطعة.</Text>
+        <ArabicText style={[styles.supportTitle, { color: colors.foreground }]}>تحتاج مساعدة مباشرة؟</ArabicText>
+        <ArabicText style={[styles.supportSub, { color: colors.mutedForeground }]}>فريق الدعم يساعدك في الحساب، الباقات، وطلب القطعة.</ArabicText>
       </View>
       <Pressable
         onPress={() => Alert.alert("الدعم", "راسلنا على support@mofk.com")}
@@ -64,13 +66,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  supportText: { alignItems: "flex-end", gap: 4 },
-  supportTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
-  supportSub: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right" },
+  supportText: { alignItems: "stretch", gap: 4 },
+  supportTitle: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  supportSub: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   supportButton: {
     minHeight: 48,
     borderRadius: 14,
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     justifyContent: "center",
     gap: 7,

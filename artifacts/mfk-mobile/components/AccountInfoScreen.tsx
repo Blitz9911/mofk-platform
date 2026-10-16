@@ -6,12 +6,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 
 export type AccountInfoSection = {
   title: string;
@@ -42,10 +43,9 @@ export function AccountInfoScreen({
           <Ionicons name="chevron-forward" size={22} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerText}>
-          <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
+          <ArabicText style={[styles.title, { color: colors.foreground }]}>{title}</ArabicText>
+          <ArabicText style={[styles.subtitle, { color: colors.mutedForeground }]}>{subtitle}</ArabicText>
         </View>
-        <View style={{ width: 38 }} />
       </View>
 
       <ScrollView
@@ -61,8 +61,8 @@ export function AccountInfoScreen({
               <Ionicons name={section.icon ?? "information-circle-outline"} size={20} color={colors.primary} />
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>{section.title}</Text>
-              <Text style={[styles.cardBody, { color: colors.mutedForeground }]}>{section.body}</Text>
+              <ArabicText style={[styles.cardTitle, { color: colors.foreground }]}>{section.title}</ArabicText>
+              <ArabicText style={[styles.cardBody, { color: colors.mutedForeground }]}>{section.body}</ArabicText>
             </View>
           </View>
         ))}
@@ -75,19 +75,19 @@ export function AccountInfoScreen({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
-  headerText: { flex: 1, alignItems: "center", gap: 2 },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "center" },
-  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
+  headerText: { flex: 1, alignItems: "stretch", gap: 2 },
+  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular" },
   card: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "flex-start",
     gap: 12,
     padding: 15,
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cardText: { flex: 1, alignItems: "flex-end", gap: 5 },
-  cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right" },
-  cardBody: { fontSize: 13, lineHeight: 21, fontFamily: "Inter_400Regular", textAlign: "right" },
+  cardText: { flex: 1, alignItems: "stretch", gap: 5 },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  cardBody: { fontSize: 15, lineHeight: 26, fontFamily: "Inter_400Regular" },
 });

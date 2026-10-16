@@ -5,7 +5,6 @@ import {
   useGetUpcomingMaintenance,
   useListVehicles,
 } from "@workspace/api-client-react";
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -22,7 +21,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
+import { BrandLogo } from "@/components/BrandLogo";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useObdConnection } from "@/src/obd/hooks/use-obd-connection";
 
 type AppNotification = {
   id: string;
@@ -46,15 +49,8 @@ type HomeCard = {
 
 const HOME_CARDS: HomeCard[] = [
   {
-    title: "مركباتي",
-    description: "إدارة المركبات واللوحات وبيانات كل سيارة",
-    icon: "car-sport-outline",
-    color: "#3B72FF",
-    route: "/vehicles",
-  },
-  {
     title: "التشخيص",
-    description: "قراءة أكواد الأعطال والاستعداد لربط OBD",
+    description: "قراءة أكواد الأعطال وبيانات OBD",
     icon: "hardware-chip-outline",
     color: "#FF6A00",
     route: "/diagnostics",
@@ -63,8 +59,15 @@ const HOME_CARDS: HomeCard[] = [
     title: "البنزين",
     description: "تعبئات الوقود والصرفية والتكاليف",
     icon: "speedometer-outline",
-    color: "#22c55e",
+    color: "#22C55E",
     route: "/fuel",
+  },
+  {
+    title: "مركباتي",
+    description: "سياراتك وحالة كل مركبة من مكان واحد",
+    icon: "car-sport-outline",
+    color: "#38bdf8",
+    route: "/vehicles",
   },
   {
     title: "الصيانة",
@@ -77,7 +80,7 @@ const HOME_CARDS: HomeCard[] = [
     title: "التوصيات",
     description: "توصيات مخصصة مبنية على بيانات سيارتك",
     icon: "bulb-outline",
-    color: "#F8C313",
+    color: "#8B5CF6",
     route: "/recommendations",
   },
   {
@@ -87,11 +90,6 @@ const HOME_CARDS: HomeCard[] = [
     color: "#C044FF",
     route: "/dtc",
   },
-];
-
-const QUICK_ACTIONS = [
-  { title: "طلب الجهاز", icon: "cube-outline", route: "/order-device" },
-  { title: "الباقات", icon: "card-outline", route: "/subscription-tab" },
 ];
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -135,6 +133,18 @@ function planName(tier?: string | null) {
   if (tier === "premium" || tier === "pro" || tier === "family") return "باقة العائلة";
   if (tier === "fleet") return "باقة الاسطول";
   return "باقة مجانية";
+}
+
+function enDigits(value: number) {
+  return String(Math.round(value));
+}
+
+function greetName(name?: string | null) {
+  const value = (name ?? "").trim();
+  if (!value || /^user$/i.test(value) || /^user[-_]?\d+$/i.test(value) || /mofk\.local/i.test(value)) {
+    return "";
+  }
+  return value.split(/\s+/)[0];
 }
 
 function toMobileRoute(actionUrl?: string | null) {
@@ -250,7 +260,9 @@ export default function DashboardScreen() {
   const isDark = colors.mode === "dark";
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const obd = useObdConnection();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
 
@@ -315,9 +327,12 @@ export default function DashboardScreen() {
     month: "long",
   });
 
-  const healthTone = healthScore >= 80 ? "#22c55e" : healthScore >= 60 ? "#f59e0b" : "#ef4444";
+  const healthTone = healthScore >= 80 ? "#38BDF8" : healthScore >= 60 ? "#F59E0B" : "#EF4444";
+  const firstName = greetName(user?.name);
+  const planActive = subscription?.status === "active";
+  const planTone = planActive ? "#FBBF24" : "#FB923C";
   const garageTitle = vehicles.length
-    ? `${vehicles.length.toLocaleString("ar-SA")} مركبة في حسابك`
+    ? `${enDigits(vehicles.length)} مركبة في حسابك`
     : "ابدأ بإضافة مركبتك الأولى";
 
   const garageSubtitle = vehicles.length
@@ -360,7 +375,7 @@ export default function DashboardScreen() {
 
   return (
     <LinearGradient
-      colors={isDark ? ["#050607", "#0B0B0B", "#11100E", "#090909"] : ["#FFFFFF", "#F5F5F5", "#EFEFEF", "#F7F7F7"]}
+      colors={isDark ? ["#050607", "#0B0B0B", "#11100E", "#090909"] : ["#FFFFFF", "#FFF8F1", "#FFFFFF", "#FFF6EC"]}
       locations={[0, 0.42, 0.78, 1]}
       style={styles.container}
     >
@@ -379,6 +394,8 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.topBar}>
+          <BrandLogo style={styles.logo} />
+
           <Pressable
             onPress={openNotifications}
             style={[
@@ -396,18 +413,6 @@ export default function DashboardScreen() {
               </View>
             ) : null}
           </Pressable>
-
-          <View
-            style={[
-              styles.logoPill,
-              {
-                backgroundColor: isDark ? "rgba(255,255,255,0.075)" : "#FFFFFF",
-                borderColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(18,18,18,0.08)",
-              },
-            ]}
-          >
-            <Image source={require("@/assets/images/mfk-logo.png")} style={styles.logo} contentFit="contain" />
-          </View>
         </View>
 
         <View style={styles.heroBannerShell}>
@@ -417,16 +422,20 @@ export default function DashboardScreen() {
             end={{ x: 0, y: 1 }}
             style={styles.heroBanner}
           >
-            <View style={styles.heroBadge}>
-              <Ionicons name="sparkles-outline" size={10} color="#FFFFFF" />
-              <Text style={styles.heroBadgeText}>لوحة مفك</Text>
+            <View style={styles.heroBadgeWrap}>
+              <View style={styles.heroBadge}>
+                <Ionicons name="sparkles-outline" size={10} color="#FFFFFF" />
+                <Text style={styles.heroBadgeText}>لوحة مفك</Text>
+              </View>
             </View>
 
-            <Text style={styles.heroTitle}>مرحباً بك في مفك</Text>
-            <Text style={styles.heroDate}>{today}</Text>
-            <Text style={styles.heroSubtitle}>
-              تابع صحة مركباتك، الصيانة، البنزين، والتنبيهات من مكان واحد.
-            </Text>
+            <ArabicText style={styles.heroTitle}>
+              {firstName ? `مرحباً ${firstName}` : "مرحباً بك في مفك"}
+            </ArabicText>
+            <ArabicText style={styles.heroDate}>{today}</ArabicText>
+            <ArabicText style={styles.heroSubtitle}>
+              تابع الصيانة، البنزين، التنبيهات وقراءات مفك من مكان واحد.
+            </ArabicText>
 
             <View style={styles.heroActions}>
               <Pressable
@@ -438,82 +447,83 @@ export default function DashboardScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => router.push("/add-vehicle" as never)}
-                style={({ pressed }) => [styles.heroSecondaryButton, pressed && styles.pressed]}
+                onPress={() => router.push("/pair-device" as never)}
+                style={({ pressed }) => [styles.heroPairButton, pressed && styles.pressed]}
               >
-                <Ionicons name="add" size={16} color="#FFFFFF" />
-                <Text style={styles.heroSecondaryText}>إضافة مركبة</Text>
+                <Ionicons name="bluetooth-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.heroPairText}>اقتران الجهاز</Text>
               </Pressable>
             </View>
 
             <View style={styles.heroStatsRow}>
-              <Pressable onPress={openGarage} style={({ pressed }) => [styles.heroStatCard, pressed && styles.pressed]}>
-                <Text style={styles.heroStatLabel}>حالة المركبة</Text>
+              <Pressable
+                onPress={() => router.push("/diagnostics" as never)}
+                style={({ pressed }) => [
+                  styles.heroStatCard,
+                  {
+                    backgroundColor: `${healthTone}33`,
+                    borderColor: `${healthTone}99`,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.heroStatIcon, { backgroundColor: `${healthTone}55` }]}>
+                  <Ionicons name="pulse-outline" size={14} color="#FFFFFF" />
+                </View>
+                <ArabicText style={styles.heroStatLabel}>حالة النظام</ArabicText>
                 {vehiclesLoading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.heroStatValue}>{vehicles.length ? `${healthScore}%` : "--"}</Text>
+                  <Text style={styles.heroStatValue}>
+                    {vehicles.length ? `${enDigits(healthScore)}%` : "--"}
+                  </Text>
                 )}
-                <Text style={styles.heroStatSub}>
-                  {vehicles.length ? (healthScore >= 80 ? "ممتازة" : healthScore >= 60 ? "تحتاج متابعة" : "تحتاج فحص") : "أضف مركبة"}
-                </Text>
+                <ArabicText style={styles.heroStatSub}>
+                  {vehicles.length ? (healthScore >= 80 ? "مستقر" : healthScore >= 60 ? "يحتاج متابعة" : "يحتاج فحص") : "بانتظار البيانات"}
+                </ArabicText>
               </Pressable>
 
-              <Pressable onPress={openGarage} style={({ pressed }) => [styles.heroStatCard, pressed && styles.pressed]}>
-                <Text style={styles.heroStatLabel}>المركبة النشطة</Text>
-                <Text style={styles.heroVehicleName} numberOfLines={1}>
-                  {primaryVehicle?.nickname || [primaryVehicle?.make, primaryVehicle?.model].filter(Boolean).join(" ") || "لا توجد مركبة"}
-                </Text>
-                <Text style={styles.heroStatSub} numberOfLines={1}>
-                  {primaryVehicle?.plateNumber || "ابدأ بإضافة مركبة"}
-                </Text>
+              <Pressable
+                onPress={() => router.navigate("/(tabs)/subscription-tab" as never)}
+                style={({ pressed }) => [
+                  styles.heroStatCard,
+                  {
+                    backgroundColor: `${planTone}2E`,
+                    borderColor: `${planTone}99`,
+                  },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <View style={[styles.heroStatIcon, { backgroundColor: `${planTone}55` }]}>
+                  <Ionicons name="diamond-outline" size={14} color="#FFFFFF" />
+                </View>
+                <ArabicText style={styles.heroStatLabel}>الباقة الحالية</ArabicText>
+                <ArabicText style={styles.heroVehicleName} numberOfLines={1}>
+                  {planName(subscription?.tier)}
+                </ArabicText>
+                <ArabicText style={styles.heroStatSub} numberOfLines={1}>
+                  {planActive ? "نشطة" : "جاهزة للتفعيل"}
+                </ArabicText>
               </Pressable>
             </View>
 
             <View style={styles.heroMetricsRow}>
               <View style={styles.heroMetricItem}>
-                <Text style={styles.heroMetricValue}>{overdueCount.toLocaleString("ar-SA")}</Text>
+                <Text style={styles.heroMetricValue}>{enDigits(overdueCount)}</Text>
                 <Text style={styles.heroMetricLabel}>متأخرة</Text>
               </View>
               <View style={styles.heroMetricDivider} />
               <View style={styles.heroMetricItem}>
-                <Text style={styles.heroMetricValue}>{upcomingCount.toLocaleString("ar-SA")}</Text>
+                <Text style={styles.heroMetricValue}>{enDigits(upcomingCount)}</Text>
                 <Text style={styles.heroMetricLabel}>قريبة</Text>
               </View>
               <View style={styles.heroMetricDivider} />
               <View style={styles.heroMetricItem}>
-                <Text style={styles.heroMetricValue}>{unreadCount.toLocaleString("ar-SA")}</Text>
+                <Text style={styles.heroMetricValue}>{enDigits(unreadCount)}</Text>
                 <Text style={styles.heroMetricLabel}>تنبيه</Text>
               </View>
             </View>
           </LinearGradient>
-        </View>
-
-        <View style={styles.quickRow}>
-          {QUICK_ACTIONS.map((action) => (
-            <Pressable
-              key={action.title}
-              onPress={() => {
-                if (action.route === "/subscription-tab") {
-                  router.navigate("/(tabs)/subscription-tab" as never);
-                  return;
-                }
-
-                router.push(action.route as never);
-              }}
-              style={({ pressed }) => [
-                styles.quickAction,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: isDark ? "rgba(255,106,0,0.18)" : "rgba(255,106,0,0.22)",
-                },
-                pressed && styles.pressed,
-              ]}
-            >
-              <Ionicons name={action.icon as keyof typeof Ionicons.glyphMap} size={19} color={colors.primary} />
-              <Text style={[styles.quickText, { color: colors.foreground }]}>{action.title}</Text>
-            </Pressable>
-          ))}
         </View>
 
         {overdueCount > 0 ? (
@@ -525,23 +535,25 @@ export default function DashboardScreen() {
               <Ionicons name="warning-outline" size={21} color="#ef4444" />
             </View>
             <View style={styles.warningCopy}>
-              <Text style={styles.warningTitle}>عندك صيانة تحتاج متابعة</Text>
-              <Text style={styles.warningText}>راجع بنود الصيانة المتأخرة قبل ما تزيد التكلفة.</Text>
+              <ArabicText style={styles.warningTitle}>عندك صيانة تحتاج متابعة</ArabicText>
+              <ArabicText style={styles.warningText}>راجع بنود الصيانة المتأخرة قبل ما تزيد التكلفة.</ArabicText>
             </View>
             <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.58)" />
           </Pressable>
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHint}>خدماتك اليومية</Text>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>تابع سيارتك</Text>
+          <ArabicText style={styles.sectionHint}>خدماتك اليومية</ArabicText>
+          <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>تابع سيارتك</ArabicText>
         </View>
 
         <View style={styles.cardsGrid}>
           {HOME_CARDS.map((card) => (
             <Pressable
               key={card.title}
-              onPress={() => router.push(card.route as never)}
+              onPress={() =>
+                router.push((card.route === "/vehicles" && !vehicles.length ? "/add-vehicle" : card.route) as never)
+              }
               style={({ pressed }) => [
                 styles.homeCard,
                 {
@@ -565,12 +577,12 @@ export default function DashboardScreen() {
                       <Ionicons name={card.icon} size={25} color={card.color} />
                     )}
                   </View>
-                  <Ionicons name="chevron-back" size={19} color={colors.mutedForeground} />
+                  <Ionicons name="chevron-back" size={19} color={isDark ? "#D6C4B2" : "#8B5A2B"} />
                 </View>
 
                 <View style={styles.cardTextBlock}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>{card.title}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.mutedForeground }]}>{card.description}</Text>
+                  <ArabicText style={[styles.cardTitle, { color: colors.foreground }]}>{card.title}</ArabicText>
+                  <ArabicText style={[styles.cardDescription, { color: isDark ? "#D6C4B2" : "#8B5A2B" }]}>{card.description}</ArabicText>
                 </View>
               </LinearGradient>
             </Pressable>
@@ -592,10 +604,16 @@ export default function DashboardScreen() {
             <Ionicons name="bluetooth-outline" size={24} color="#3B72FF" />
           </View>
           <View style={styles.deviceText}>
-            <Text style={[styles.deviceTitle, { color: colors.foreground }]}>جهز جهاز مفك للربط</Text>
-            <Text style={[styles.deviceSub, { color: colors.mutedForeground }]}>عند وصول القطعة، اربطها من هنا وابدأ قراءة البيانات.</Text>
+            <ArabicText style={[styles.deviceTitle, { color: colors.foreground }]}>
+              {obd.state === "vehicle_connected" ? "مفك متصل" : "جهز جهاز مفك للربط"}
+            </ArabicText>
+            <ArabicText style={[styles.deviceSub, { color: isDark ? "#D6C4B2" : "#8B5A2B" }]}>
+              {obd.state === "vehicle_connected"
+                ? "سيارتك جاهزة للفحص والقراءات الحية."
+                : "عند وصول القطعة، اربطها من هنا وابدأ قراءة البيانات."}
+            </ArabicText>
           </View>
-          <Ionicons name="chevron-back" size={20} color={colors.mutedForeground} />
+          <Ionicons name="chevron-back" size={20} color={isDark ? "#D6C4B2" : "#8B5A2B"} />
         </Pressable>
       </ScrollView>
 
@@ -615,6 +633,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#0B0B0B",
+    direction: "rtl",
   },
   glowTop: {
     position: "absolute",
@@ -636,6 +655,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 18,
+    direction: "rtl",
   },
   topBar: {
     flexDirection: "row",
@@ -671,20 +691,9 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontFamily: "Inter_700Bold",
   },
-  logoPill: {
-    width: 116,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.075)",
-  },
   logo: {
-    width: 96,
-    height: 34,
+    width: 132,
+    height: 42,
   },
   heroBannerShell: {
     paddingTop: 0,
@@ -695,10 +704,17 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
+    alignItems: "stretch",
+    direction: "rtl",
+  },
+  heroBadgeWrap: {
+    width: "100%",
+    direction: "ltr",
+    alignItems: "flex-end",
   },
   heroBadge: {
-    alignSelf: "flex-end",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
+    alignSelf: "flex-start",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
@@ -717,11 +733,12 @@ const styles = StyleSheet.create({
   },
   heroDate: {
     marginTop: 3,
-    color: "rgba(255,255,255,0.82)",
+    color: "#FFFFFF",
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     textAlign: "right",
     writingDirection: "rtl",
+    width: "100%",
   },
   heroTitle: {
     marginTop: 9,
@@ -731,6 +748,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textAlign: "right",
     writingDirection: "rtl",
+    width: "100%",
   },
   heroSubtitle: {
     marginTop: 6,
@@ -740,17 +758,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     textAlign: "right",
     writingDirection: "rtl",
+    width: "100%",
   },
   heroActions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 8,
     paddingTop: 12,
+    direction: "rtl",
   },
   heroPrimaryButton: {
     flex: 1,
     minHeight: 42,
     borderRadius: 999,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
@@ -761,44 +781,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
+    writingDirection: "rtl",
   },
-  heroSecondaryButton: {
+  heroPairButton: {
     flex: 1,
     minHeight: 42,
     borderRadius: 999,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.48)",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(147,197,253,0.65)",
+    backgroundColor: "#2563EB",
   },
-  heroSecondaryText: {
+  heroPairText: {
     color: "#FFFFFF",
     fontSize: 12,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
+    writingDirection: "rtl",
   },
   heroStatsRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 8,
     paddingTop: 10,
+    direction: "rtl",
   },
   heroStatCard: {
     flex: 1,
-    minHeight: 78,
+    minHeight: 92,
     alignItems: "flex-end",
     justifyContent: "center",
     gap: 3,
     padding: 10,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.28)",
-    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  heroStatIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
   },
   heroStatLabel: {
-    color: "rgba(255,255,255,0.78)",
+    color: "#FFFFFF",
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
     textAlign: "right",
@@ -810,6 +839,9 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "ltr",
+    width: "100%",
+    fontVariant: ["tabular-nums"],
   },
   heroVehicleName: {
     color: "#FFFFFF",
@@ -831,26 +863,38 @@ const styles = StyleSheet.create({
   },
   heroMetricsRow: {
     marginTop: 8,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
+    direction: "rtl",
     borderRadius: 15,
-    backgroundColor: "rgba(0,0,0,0.14)",
-    paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    paddingVertical: 10,
   },
   heroMetricItem: {
     flex: 1,
     alignItems: "center",
-    gap: 3,
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 6,
   },
   heroMetricValue: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 20,
+    lineHeight: 24,
     fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    writingDirection: "ltr",
+    width: "100%",
+    fontVariant: ["tabular-nums"],
   },
   heroMetricLabel: {
-    color: "rgba(255,255,255,0.76)",
-    fontSize: 9,
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 16,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+    writingDirection: "rtl",
+    width: "100%",
   },
   heroMetricDivider: {
     width: StyleSheet.hairlineWidth,
@@ -879,7 +923,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusBadge: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 10,
@@ -931,7 +975,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   insightRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     borderRadius: 18,
     backgroundColor: "rgba(0,0,0,0.22)",
@@ -958,7 +1002,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
   },
   quickRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 8,
     paddingTop: 10,
   },
@@ -971,7 +1015,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 6,
     paddingHorizontal: 8,
   },
@@ -980,10 +1024,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
+    writingDirection: "rtl",
   },
   warningCard: {
     marginTop: 14,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 11,
     padding: 13,
@@ -1002,7 +1047,7 @@ const styles = StyleSheet.create({
   },
   warningCopy: {
     flex: 1,
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: 3,
   },
   warningTitle: {
@@ -1010,6 +1055,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   warningText: {
     color: "rgba(255,255,255,0.62)",
@@ -1017,30 +1064,39 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   sectionHeader: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     paddingTop: 16,
     paddingBottom: 8,
     gap: 2,
+    width: "100%",
+    direction: "rtl",
   },
   sectionHint: {
     color: "#FF6A00",
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   sectionTitle: {
     color: "#F7F7F7",
     fontSize: 20,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   cardsGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     rowGap: 10,
+    direction: "rtl",
   },
   homeCard: {
     width: "48.3%",
@@ -1050,6 +1106,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.11)",
     backgroundColor: "rgba(255,255,255,0.045)",
+    direction: "rtl",
   },
   homeCardPressed: {
     opacity: 0.82,
@@ -1063,9 +1120,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 13,
     justifyContent: "space-between",
+    direction: "rtl",
+    alignItems: "stretch",
   },
   cardTop: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
@@ -1078,7 +1137,8 @@ const styles = StyleSheet.create({
   },
   cardTextBlock: {
     gap: 5,
-    alignItems: "flex-end",
+    alignItems: "stretch",
+    width: "100%",
   },
   cardTitle: {
     color: "#F7F7F7",
@@ -1087,6 +1147,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textAlign: "right",
     writingDirection: "rtl",
+    width: "100%",
   },
   cardDescription: {
     color: "rgba(255,255,255,0.62)",
@@ -1095,10 +1156,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     textAlign: "right",
     writingDirection: "rtl",
+    width: "100%",
   },
   deviceCard: {
     marginTop: 14,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 14,
@@ -1117,7 +1179,7 @@ const styles = StyleSheet.create({
   },
   deviceText: {
     flex: 1,
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: 3,
   },
   deviceTitle: {
@@ -1125,6 +1187,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   deviceSub: {
     color: "rgba(255,255,255,0.62)",
@@ -1132,6 +1196,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   sheetBackdrop: {
     flex: 1,
@@ -1146,6 +1212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 22,
+    direction: "rtl",
   },
   sheetHandle: {
     alignSelf: "center",
@@ -1155,7 +1222,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   notifHeader: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 12,
     marginBottom: 14,
@@ -1164,12 +1231,16 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   notifSubtitle: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+    writingDirection: "rtl",
     marginTop: 2,
+    width: "100%",
   },
   markAllBtn: {
     paddingHorizontal: 12,
@@ -1180,9 +1251,11 @@ const styles = StyleSheet.create({
   markAllText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+    writingDirection: "rtl",
+    textAlign: "right",
   },
   notificationRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
     borderRadius: 14,
@@ -1198,10 +1271,11 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     flex: 1,
+    alignItems: "stretch",
     gap: 4,
   },
   notificationTopLine: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 7,
   },
@@ -1210,17 +1284,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    writingDirection: "rtl",
   },
   notificationBody: {
     fontSize: 12,
     lineHeight: 18,
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   notificationMeta: {
     fontSize: 10,
     fontFamily: "Inter_400Regular",
     textAlign: "right",
+    writingDirection: "rtl",
+    width: "100%",
   },
   unreadDot: {
     width: 8,
@@ -1245,11 +1324,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
+    writingDirection: "rtl",
   },
   notifEmptyText: {
     fontSize: 12,
     lineHeight: 18,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+    writingDirection: "rtl",
   },
 });

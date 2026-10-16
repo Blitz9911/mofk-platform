@@ -1,180 +1,363 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
-  FlatList,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  Animated,
+  Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BrandLogo } from "@/components/BrandLogo";
+import { useColors } from "@/hooks/useColors";
+
 type Slide = {
   icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  badge: string;
   title: string;
   description: string;
 };
 
 const SLIDES: Slide[] = [
   {
-    icon: "document-text-outline",
-    title: "افهم سيارتك بلغة بسيطة",
-    description: "بدل رموز الأعطال المعقدة، مفك يشرح لك كل شيء بعربي واضح مع خطوة عملية توصي بها.",
+    icon: "language-outline",
+    color: "#FF6A00",
+    badge: "فهم أوضح",
+    title: "سيارتك أذكى مما تتخيل",
+    description: "افهم سيارتك وتابع حالتها من مكان واحد.",
   },
   {
     icon: "car-sport-outline",
-    title: "تحكم كامل بسيارتك",
-    description: "الأعطال، الوقود، الصيانة، والموقع في تجربة واحدة مرتبطة بحالة مركبتك.",
+    color: "#3B82F6",
+    badge: "لوحة واحدة",
+    title: "تعطل سيارتك فجأة كابوس",
+    description: "مفك يساعدك تفهم المشكلة قبل ما تصير مفاجأة.",
   },
   {
     icon: "sparkles-outline",
-    title: "مساعد ذكي قبل المشكلة",
-    description: "مفك يلاحظ المؤشرات المهمة ويقترح عليك التصرف المناسب في الوقت المناسب.",
+    color: "#10B981",
+    badge: "قبل المشكلة",
+    title: "تشخيص فوري",
+    description: "اكتشف الأعطال وافهم معناها خلال لحظات.",
+  },
+  {
+    icon: "hardware-chip-outline",
+    color: "#8B5CF6",
+    badge: "خطوة واحدة",
+    title: "ابدأ في أقل من دقيقة",
+    description: "اربط قطعة مفك بسيارتك وابدأ.",
   },
 ];
 
-function StatusBarMock() {
-  return (
-    <View style={styles.status}>
-      <Text style={styles.statusText}>٩:٤١</Text>
-      <Text style={styles.statusText}>◉ WiFi ▰</Text>
-    </View>
-  );
-}
-
 export default function OnboardingScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const listRef = useRef<FlatList<Slide>>(null);
   const [index, setIndex] = useState(0);
+  const [animating, setAnimating] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const item = SLIDES[index];
   const isLast = index === SLIDES.length - 1;
+  const topPad = Platform.OS === "web" ? 28 : insets.top;
+  const botPad = Platform.OS === "web" ? 24 : insets.bottom + 16;
 
-  const handleScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-    setIndex(Math.min(Math.max(nextIndex, 0), SLIDES.length - 1));
+  const goToIndex = (nextIndex: number) => {
+    if (animating || nextIndex === index || nextIndex < 0 || nextIndex >= SLIDES.length) return;
+
+    const goingNext = nextIndex > index;
+    const outgoing = goingNext ? 48 : -48;
+    const incoming = goingNext ? -48 : 48;
+    setAnimating(true);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: outgoing,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIndex(nextIndex);
+      slideAnim.setValue(incoming);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start(() => setAnimating(false));
+    });
   };
 
-  const goNext = () => {
-    if (isLast) {
-      router.replace("/order-device");
-      return;
-    }
-
-    listRef.current?.scrollToIndex({ index: index + 1, animated: true });
-    setIndex((value) => Math.min(value + 1, SLIDES.length - 1));
-  };
+  const finish = () => router.replace("/");
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 18 }]}>
-      <LinearGradient colors={["#090A0B", "#070707"]} style={StyleSheet.absoluteFill} />
-      <StatusBarMock />
+    <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: botPad }]}>
+      <View style={[styles.topBar, { paddingTop: topPad + 6 }]}>
+        <Pressable onPress={finish} hitSlop={12}>
+          <Text style={[styles.topLink, { color: colors.mutedForeground }]}>تخطي</Text>
+        </Pressable>
+        <BrandLogo style={styles.topLogo} />
+        <Text style={[styles.stepCount, { color: colors.mutedForeground }]}>
+          {`${index + 1} / ${SLIDES.length}`}
+        </Text>
+      </View>
 
-      <Pressable onPress={() => router.replace("/order-device")} style={styles.skipButton}>
-        <Text style={styles.skipText}>تخطي</Text>
-      </Pressable>
-
-      <FlatList
-        ref={listRef}
-        data={SLIDES}
-        keyExtractor={(slide) => slide.title}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScrollEnd}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            <View style={styles.iconFrame}>
-              <View style={styles.iconLines}>
-                <View style={styles.iconLine} />
-                <View style={styles.iconLine} />
-                <View style={[styles.iconLine, styles.shortLine]} />
-              </View>
-              <View style={styles.checkBubble}>
-                <Ionicons name={item.icon === "document-text-outline" ? "checkmark" : item.icon} size={22} color="#FF6A00" />
-              </View>
+      <Animated.View
+        style={[
+          styles.slidePage,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
+      >
+        <View style={styles.illustArea}>
+          <View style={styles.illustWrap}>
+            <View style={[styles.ringOuter, { borderColor: `${item.color}14` }]} />
+            <View style={[styles.ringMid, { borderColor: `${item.color}22` }]} />
+            <View style={[styles.ringInner, { backgroundColor: `${item.color}18`, borderColor: `${item.color}38` }]}>
+              <Ionicons name={item.icon} size={88} color={item.color} />
             </View>
-
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.description}>{item.description}</Text>
-            <View style={styles.indicators}>
-              {SLIDES.map((slide, slideIndex) => (
-                <View key={slide.title} style={[styles.dot, slideIndex === index ? styles.activeDot : null]} />
-              ))}
+            <View style={[styles.floatBadge, { backgroundColor: item.color, shadowColor: item.color }]}>
+              <Text style={styles.floatBadgeTxt}>{item.badge}</Text>
             </View>
           </View>
-        )}
-      />
+        </View>
 
-      <Pressable style={({ pressed }) => [styles.primaryButton, { opacity: pressed ? 0.86 : 1 }]} onPress={goNext}>
-        <Text style={styles.primaryText}>{isLast ? "ابدأ" : "التالي"}</Text>
-      </Pressable>
+        <View style={styles.slideText}>
+          <Text style={[styles.title, { color: colors.foreground }]}>{item.title}</Text>
+          <Text style={[styles.description, { color: colors.mutedForeground }]}>{item.description}</Text>
+        </View>
+      </Animated.View>
+
+      <View style={styles.dotsRow}>
+        {SLIDES.map((slide, slideIndex) => (
+          <Pressable key={slide.title} onPress={() => goToIndex(slideIndex)} hitSlop={8}>
+            <View
+              style={[
+                styles.dot,
+                {
+                  width: slideIndex === index ? 28 : 7,
+                  backgroundColor: slideIndex === index ? item.color : colors.border,
+                },
+              ]}
+            />
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.navRow}>
+        {index > 0 ? (
+          <Pressable
+            onPress={() => goToIndex(index - 1)}
+            disabled={animating}
+            style={[
+              styles.prevBtn,
+              {
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+                opacity: animating ? 0.7 : 1,
+              },
+            ]}
+          >
+            <Ionicons name="arrow-forward" size={18} color={colors.foreground} />
+            <Text style={[styles.prevTxt, { color: colors.foreground }]}>السابق</Text>
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          disabled={animating}
+          onPress={() => (isLast ? finish() : goToIndex(index + 1))}
+          style={[
+            styles.primaryBtn,
+            {
+              backgroundColor: item.color,
+              shadowColor: item.color,
+              opacity: animating ? 0.85 : 1,
+            },
+          ]}
+        >
+          <Text style={styles.primaryTxt}>{isLast ? "ابدأ" : "التالي"}</Text>
+          <Ionicons name={isLast ? "checkmark" : "arrow-back"} size={18} color="#fff" />
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: "#050505", flex: 1, paddingHorizontal: 22 },
-  status: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
-  statusText: { color: "#F5F5F5", fontFamily: "Inter_700Bold", fontSize: 12 },
-  skipButton: { alignSelf: "flex-start", paddingHorizontal: 6, paddingVertical: 8 },
-  skipText: { color: "#FF6A00", fontFamily: "Inter_700Bold", fontSize: 13 },
-  slide: { alignItems: "center", justifyContent: "center", paddingHorizontal: 34 },
-  iconFrame: {
-    borderColor: "#858A92",
-    borderRadius: 14,
-    borderWidth: 3,
-    height: 74,
-    marginBottom: 48,
-    position: "relative",
-    width: 104,
+  root: {
+    direction: "rtl",
+    flex: 1,
   },
-  iconLines: { gap: 8, paddingHorizontal: 14, paddingTop: 16 },
-  iconLine: { backgroundColor: "#34373D", borderRadius: 999, height: 3, width: "100%" },
-  shortLine: { width: "64%" },
-  checkBubble: {
+  topBar: {
     alignItems: "center",
-    backgroundColor: "#17181B",
-    borderColor: "#FF6A00",
-    borderRadius: 999,
-    borderWidth: 3,
-    bottom: -16,
-    height: 42,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingBottom: 8,
+    paddingHorizontal: 20,
+  },
+  topLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    minWidth: 52,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  stepCount: {
+    direction: "ltr",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    minWidth: 52,
+    textAlign: "left",
+  },
+  topLogo: {
+    height: 32,
+    width: 88,
+  },
+  slidePage: {
+    flex: 1,
     justifyContent: "center",
+  },
+  illustArea: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  illustWrap: {
+    alignItems: "center",
+    height: 280,
+    justifyContent: "center",
+    width: 280,
+  },
+  ringOuter: {
+    borderRadius: 140,
+    borderWidth: 1,
+    height: 280,
     position: "absolute",
-    right: -14,
-    width: 42,
+    width: 280,
+  },
+  ringMid: {
+    borderRadius: 115,
+    borderWidth: 1.5,
+    height: 230,
+    position: "absolute",
+    width: 230,
+  },
+  ringInner: {
+    alignItems: "center",
+    borderRadius: 88,
+    borderWidth: 2,
+    height: 176,
+    justifyContent: "center",
+    width: 176,
+  },
+  floatBadge: {
+    borderRadius: 20,
+    elevation: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    position: "absolute",
+    right: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    top: 28,
+  },
+  floatBadgeTxt: {
+    color: "#fff",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  slideText: {
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 4,
+    paddingHorizontal: 28,
   },
   title: {
-    color: "#F5F5F5",
     fontFamily: "Inter_700Bold",
-    fontSize: 23,
-    lineHeight: 32,
-    marginBottom: 14,
+    fontSize: 30,
+    lineHeight: 42,
     textAlign: "center",
+    writingDirection: "rtl",
   },
   description: {
-    color: "#8E949D",
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 27,
-    maxWidth: 285,
+    fontSize: 16,
+    lineHeight: 28,
+    maxWidth: 300,
     textAlign: "center",
+    writingDirection: "rtl",
   },
-  indicators: { flexDirection: "row-reverse", gap: 8, marginTop: 24 },
-  dot: { backgroundColor: "#303238", borderRadius: 999, height: 7, width: 7 },
-  activeDot: { backgroundColor: "#FF6A00", width: 22 },
-  primaryButton: {
+  dotsRow: {
     alignItems: "center",
-    backgroundColor: "#FF6A00",
-    borderRadius: 16,
-    height: 56,
+    direction: "ltr",
+    flexDirection: "row-reverse",
+    gap: 6,
     justifyContent: "center",
+    paddingVertical: 18,
   },
-  primaryText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 16 },
+  dot: {
+    borderRadius: 4,
+    height: 7,
+  },
+  navRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  prevBtn: {
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+    minHeight: 54,
+    paddingHorizontal: 16,
+  },
+  prevTxt: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  primaryBtn: {
+    alignItems: "center",
+    borderRadius: 16,
+    elevation: 6,
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 54,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  primaryTxt: {
+    color: "#fff",
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+  },
 });

@@ -18,8 +18,6 @@ android/
 *.p12
 *.key
 *.mobileprovision
-credentials.json
-credentials/
 
 # Metro
 .metro-health-check*
@@ -41,3 +39,8 @@ yarn-error.*
 .vercel
 
 .env
+
+# Local signing credentials
+credentials.json
+credentials/
+eas-ios-fail.bin

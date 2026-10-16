@@ -76,7 +76,7 @@ export function formatSar(value: unknown) {
 export function formatDate(value: unknown) {
   if (!value || typeof value !== "string") return "-";
   try {
-    return new Intl.DateTimeFormat("ar-SA", {
+    return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -89,7 +89,7 @@ export function formatDate(value: unknown) {
 export function formatDateLong(value: unknown) {
   if (!value || typeof value !== "string") return "-";
   try {
-    return new Intl.DateTimeFormat("ar-SA", {
+    return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -104,7 +104,7 @@ export function monthHeading(value: unknown) {
   if (!value || typeof value !== "string") return "بدون تاريخ";
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "بدون تاريخ";
-  return new Intl.DateTimeFormat("ar-SA", { year: "numeric", month: "long" }).format(date);
+  return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", { year: "numeric", month: "long" }).format(date);
 }
 
 export function isThisMonth(value: unknown) {

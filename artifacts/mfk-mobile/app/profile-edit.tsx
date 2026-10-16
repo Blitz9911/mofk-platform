@@ -108,9 +108,9 @@ export default function ProfileEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, direction: "rtl" },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
@@ -118,11 +118,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backButton: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
-  headerText: { flex: 1, alignItems: "center", gap: 2 },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  headerText: { flex: 1, alignItems: "flex-end", gap: 2 },
+  title: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   field: { gap: 7 },
-  label: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
+  label: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
   input: {
     minHeight: 50,
     borderRadius: 14,
@@ -130,7 +130,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   saveButton: { minHeight: 52, borderRadius: 15, alignItems: "center", justifyContent: "center", marginTop: 8 },
-  saveText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  saveText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold", writingDirection: "rtl" },
 });

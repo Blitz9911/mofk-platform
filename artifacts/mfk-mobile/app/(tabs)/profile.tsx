@@ -21,9 +21,20 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { ArabicText } from "@/components/ArabicText";
+import { rowDir } from "@/lib/layout";
+import {
+  disableAppNotifications,
+  enableAppNotifications,
+  getNotificationPermission,
+  getNotificationsEnabled,
+  osNotificationsAvailable,
+} from "@/lib/app-notifications";
+import { isDeviceBindingEnabled } from "@/src/obd/binding/feature-flags";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "باقة مجانية",
@@ -34,6 +45,38 @@ const PLAN_LABELS: Record<string, string> = {
   premium: "باقة العائلة",
   fleet: "باقة الأسطول",
 };
+
+function isPlaceholderName(value?: string | null) {
+  const name = (value ?? "").trim();
+  return !name || /^user$/i.test(name) || /^user[-_]?\d+$/i.test(name) || /mofk\.local/i.test(name);
+}
+
+function displayName(name?: string | null) {
+  const value = (name ?? "").trim();
+  if (isPlaceholderName(value)) return "مستخدم مفك";
+  return value;
+}
+
+function formatDisplayPhone(phone?: string | null) {
+  if (!phone || /mofk\.local|@|^user-/i.test(phone)) return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("966") && digits.length >= 9) {
+    const local = digits.slice(-9);
+    return `+966 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`;
+  }
+  return phone;
+}
+
+function formatDisplayEmail(email?: string | null) {
+  const value = (email ?? "").trim();
+  if (!value || /mofk\.local$/i.test(value)) return "";
+  return value;
+}
+
+function initialsFor(name?: string | null) {
+  const value = displayName(name);
+  return value.slice(0, 1);
+}
 
 type InfoSheet =
   | null
@@ -91,21 +134,21 @@ function MenuItem({
         />
       </View>
       <View style={styles.menuTextWrap}>
-        <Text
+        <ArabicText
           style={[
             styles.menuLabel,
             { color: danger ? "#ef4444" : colors.foreground },
           ]}
         >
           {label}
-        </Text>
+        </ArabicText>
         {description ? (
-          <Text
+          <ArabicText
             numberOfLines={1}
             style={[styles.menuDesc, { color: colors.mutedForeground }]}
           >
             {description}
-          </Text>
+          </ArabicText>
         ) : null}
       </View>
       <Ionicons
@@ -114,6 +157,98 @@ function MenuItem({
         color={colors.mutedForeground}
       />
     </Pressable>
+  );
+}
+
+function NotificationsToggleRow() {
+  const colors = useColors();
+  const queryClient = useQueryClient();
+  const accent = "#EC4899";
+  const { data: enabled = true } = useQuery({
+    queryKey: ["notification-pref"],
+    queryFn: getNotificationsEnabled,
+  });
+  const { data: permission } = useQuery({
+    queryKey: ["notification-permission"],
+    queryFn: getNotificationPermission,
+  });
+  const [saving, setSaving] = useState(false);
+  const osReady = osNotificationsAvailable();
+  const description = !enabled
+    ? "التنبيهات موقوفة"
+    : osReady && permission?.granted
+      ? "تنبيهات النظام مفعلة"
+      : osReady && permission?.status === "denied"
+        ? "مرفوضة من إعدادات الجهاز — فعّلها من إعدادات الآيفون"
+        : "التنبيهات داخل التطبيق مفعلة";
+
+  const toggle = async (next: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (!next) {
+        await disableAppNotifications();
+        queryClient.setQueryData(["notification-pref"], false);
+        return;
+      }
+
+      const result = await enableAppNotifications();
+      queryClient.setQueryData(["notification-pref"], true);
+      await queryClient.invalidateQueries({ queryKey: ["notification-permission"] });
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+      if (!osReady) {
+        Alert.alert(
+          "تم تفعيل التنبيهات",
+          "التنبيهات داخل التطبيق شغّالة. تنبيهات شاشة القفل تحتاج بناء أصلي فيه صلاحية الإشعارات.",
+        );
+        return;
+      }
+
+      if (!result.granted) {
+        Alert.alert(
+          "صلاحية التنبيهات",
+          "اسمح لتطبيق مفك بإرسال التنبيهات من إعدادات الجهاز حتى توصلك على شاشة القفل.",
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View
+      style={[
+        styles.themeToggle,
+        {
+          backgroundColor: colors.card,
+          borderColor: `${accent}32`,
+          borderRightColor: accent,
+        },
+      ]}
+    >
+      <View style={[styles.iconBox, { backgroundColor: `${accent}18` }]}>
+        <Ionicons name={enabled ? "notifications" : "notifications-off"} size={19} color={accent} />
+      </View>
+      <View style={styles.menuTextWrap}>
+        <ArabicText style={[styles.menuLabel, { color: colors.foreground }]}>
+          التنبيهات
+        </ArabicText>
+        <ArabicText numberOfLines={2} style={[styles.menuDesc, { color: colors.mutedForeground }]}>
+          {description}
+        </ArabicText>
+      </View>
+      <Switch
+        value={enabled}
+        disabled={saving}
+        onValueChange={(value) => {
+          void toggle(value);
+        }}
+        trackColor={{ false: "#3A3A3A", true: "#FFD2B0" }}
+        thumbColor={enabled ? colors.primary : "#F4F4F4"}
+        ios_backgroundColor="#3A3A3A"
+      />
+    </View>
   );
 }
 
@@ -137,12 +272,12 @@ function ThemeToggleRow() {
         <Ionicons name={isDark ? "moon" : "sunny"} size={19} color={accent} />
       </View>
       <View style={styles.menuTextWrap}>
-        <Text style={[styles.menuLabel, { color: colors.foreground }]}>
+        <ArabicText style={[styles.menuLabel, { color: colors.foreground }]}>
           المظهر
-        </Text>
-        <Text numberOfLines={1} style={[styles.menuDesc, { color: colors.mutedForeground }]}>
+        </ArabicText>
+        <ArabicText numberOfLines={1} style={[styles.menuDesc, { color: colors.mutedForeground }]}>
           {isDark ? "الوضع الداكن مفعل" : "الوضع الفاتح مفعل"}
-        </Text>
+        </ArabicText>
       </View>
       <Switch
         value={!isDark}
@@ -194,9 +329,9 @@ function Sheet({
             <Pressable onPress={onClose} hitSlop={12}>
               <Ionicons name="close" size={22} color={colors.foreground} />
             </Pressable>
-            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
+            <ArabicText style={[styles.sheetTitle, { color: colors.foreground }]}>
               {title}
-            </Text>
+            </ArabicText>
             <View style={{ width: 22 }} />
           </View>
           {children}
@@ -223,9 +358,9 @@ function Field({
 
   return (
     <View style={styles.fieldWrap}>
-      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
+      <ArabicText style={[styles.fieldLabel, { color: colors.foreground }]}>
         {label}
-      </Text>
+      </ArabicText>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -266,6 +401,7 @@ export default function ProfileScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutVisible, setLogoutVisible] = useState(false);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const currentPlan = plans?.find((p) => p.tier === sub?.tier);
@@ -352,23 +488,24 @@ export default function ProfileScreen() {
     });
   };
 
+  const performLogout = async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    try {
+      await logout();
+      setLogoutVisible(false);
+      router.replace("/login");
+    } catch {
+      setLogoutVisible(false);
+      router.replace("/login");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   const handleLogout = () => {
-    Alert.alert("تسجيل الخروج", "هل تريد تسجيل الخروج من حسابك؟", [
-      { text: "إلغاء", style: "cancel" },
-      {
-        text: "تسجيل الخروج",
-        style: "destructive",
-        onPress: async () => {
-          setLoggingOut(true);
-          try {
-            await logout();
-            router.replace("/login");
-          } finally {
-            setLoggingOut(false);
-          }
-        },
-      },
-    ]);
+    setLogoutVisible(true);
   };
 
   return (
@@ -381,18 +518,19 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={{
           padding: 16,
-          paddingBottom: Platform.OS === "web" ? 100 : 126,
+          paddingBottom: Platform.OS === "web" ? 160 : 148,
           gap: 16,
+          alignItems: "stretch",
         }}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.titleRow}>
-          <Text style={[styles.screenTitle, { color: colors.foreground }]}>
+          <ArabicText style={[styles.screenTitle, { color: colors.foreground }]}>
             حسابي
-          </Text>
-          <Text style={[styles.screenSub, { color: colors.mutedForeground }]}>
+          </ArabicText>
+          <ArabicText style={[styles.screenSub, { color: colors.mutedForeground }]}>
             الملف الشخصي والإعدادات والدعم
-          </Text>
+          </ArabicText>
         </View>
 
         <View
@@ -401,15 +539,20 @@ export default function ProfileScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={styles.avatarText}>{initialsFor(user?.name)}</Text>
+          </View>
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: colors.foreground }]}>
-              {user?.name ?? "مستخدم مفك"}
-            </Text>
-            <Text
-              style={[styles.profileMeta, { color: colors.mutedForeground }]}
-            >
-              {user?.phone || "لا يوجد رقم"}{user?.email ? `  •  ${user.email}` : ""}
-            </Text>
+            <ArabicText style={[styles.profileName, { color: colors.foreground }]}>
+              {displayName(user?.name)}
+            </ArabicText>
+            {formatDisplayPhone(user?.phone) || formatDisplayEmail(user?.email) ? (
+              <ArabicText
+                style={[styles.profileMeta, { color: colors.mutedForeground }]}
+              >
+                {[formatDisplayPhone(user?.phone), formatDisplayEmail(user?.email)].filter(Boolean).join("\n")}
+              </ArabicText>
+            ) : null}
           </View>
         </View>
 
@@ -424,17 +567,17 @@ export default function ProfileScreen() {
         >
           <View style={styles.planTop}>
             <View style={styles.planText}>
-              <Text style={[styles.planEyebrow, { color: colors.primary }]}>
+              <ArabicText style={[styles.planEyebrow, { color: colors.primary }]}>
                 اشتراكك الحالي
-              </Text>
-              <Text style={[styles.planTitle, { color: colors.foreground }]}>
+              </ArabicText>
+              <ArabicText style={[styles.planTitle, { color: colors.foreground }]}>
                 {planLabel}
-              </Text>
-              <Text
+              </ArabicText>
+              <ArabicText
                 style={[styles.planDesc, { color: colors.mutedForeground }]}
               >
                 {currentPlan?.descriptionAr ?? "تابع مركبتك وخدمات مفك من مكان واحد."}
-              </Text>
+              </ArabicText>
             </View>
             <Ionicons name="shield-checkmark" size={30} color={colors.primary} />
           </View>
@@ -448,7 +591,7 @@ export default function ProfileScreen() {
                 ]}
               >
                 <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                <Text style={[styles.featureText, { color: colors.foreground }]}>
+                <Text style={[styles.featureText, { color: colors.foreground, textAlign: "right" }]}>
                   {feature}
                 </Text>
               </View>
@@ -477,10 +620,11 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+          <ArabicText style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
             الإعدادات
-          </Text>
+          </ArabicText>
           <View style={styles.menuGroup}>
+            <NotificationsToggleRow />
             <ThemeToggleRow />
             <MenuItem
               icon="person-circle-outline"
@@ -492,24 +636,17 @@ export default function ProfileScreen() {
             <MenuItem
               icon="language-outline"
               label="تغيير اللغة"
-              description="العربية حاليا، الإنجليزية جاهزة للتفعيل"
+              description="العربية"
               tone="#38BDF8"
               onPress={() => router.push("/language")}
-            />
-            <MenuItem
-              icon="lock-closed-outline"
-              label="الأمان والخصوصية"
-              description="الجلسات، البيانات، وصلاحيات الحساب"
-              tone="#22C55E"
-              onPress={() => router.push("/security-privacy")}
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+          <ArabicText style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
             الخدمة والدعم
-          </Text>
+          </ArabicText>
           <View style={styles.menuGroup}>
             {false ? <MenuItem
               icon="water-outline"
@@ -532,6 +669,15 @@ export default function ProfileScreen() {
               tone="#A855F7"
               onPress={() => router.push("/order-device")}
             />
+            {isDeviceBindingEnabled() ? (
+            <MenuItem
+              icon="link-outline"
+              label="إدارة الأجهزة"
+              description="ربط القطعة بالمركبة (تجريبي)"
+              tone="#22C55E"
+              onPress={() => router.push("/device-binding")}
+            />
+            ) : null}
             <MenuItem
               icon="share-social-outline"
               label="مشاركة التطبيق"
@@ -543,10 +689,17 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+          <ArabicText style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
             معلومات قانونية
-          </Text>
+          </ArabicText>
           <View style={styles.menuGroup}>
+            <MenuItem
+              icon="lock-closed-outline"
+              label="الأمان والخصوصية"
+              description="الجلسات، البيانات، وصلاحيات الحساب"
+              tone="#22C55E"
+              onPress={() => router.push("/security-privacy")}
+            />
             <MenuItem
               icon="document-text-outline"
               label="الشروط والأحكام"
@@ -556,7 +709,7 @@ export default function ProfileScreen() {
             />
             <MenuItem
               icon="information-circle-outline"
-              label="عن التطبيق"
+              label="عن تطبيق مفك"
               description="إصدار مفك ومعلومات المنتج"
               tone="#14B8A6"
               onPress={() => router.push("/about")}
@@ -714,6 +867,38 @@ export default function ProfileScreen() {
       </Sheet>
 
       <Sheet
+        visible={logoutVisible}
+        title="تسجيل الخروج"
+        onClose={() => {
+          if (!loggingOut) setLogoutVisible(false);
+        }}
+      >
+        <View style={styles.sheetContent}>
+          <Text style={[styles.sheetParagraph, { color: colors.mutedForeground }]}>
+            هل تريد تسجيل الخروج من حسابك؟
+          </Text>
+          <Pressable
+            onPress={() => void performLogout()}
+            disabled={loggingOut}
+            style={[styles.sheetAction, { backgroundColor: "#ef4444", opacity: loggingOut ? 0.7 : 1 }]}
+          >
+            {loggingOut ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.sheetActionText}>تسجيل الخروج</Text>
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => setLogoutVisible(false)}
+            disabled={loggingOut}
+            style={[styles.outlineAction, { borderColor: colors.border }]}
+          >
+            <Text style={[styles.outlineActionText, { color: colors.foreground }]}>إلغاء</Text>
+          </Pressable>
+        </View>
+      </Sheet>
+
+      <Sheet
         visible={sheet === "language"}
         title="تغيير اللغة"
         onClose={() => setSheet(null)}
@@ -744,23 +929,23 @@ function InfoLine({ title, body }: { title: string; body: string }) {
 
   return (
     <View style={[styles.infoLine, { borderColor: colors.border }]}>
-      <Text style={[styles.infoTitle, { color: colors.foreground }]}>
+      <ArabicText style={[styles.infoTitle, { color: colors.foreground }]}>
         {title}
-      </Text>
-      <Text style={[styles.infoBody, { color: colors.mutedForeground }]}>
+      </ArabicText>
+      <ArabicText style={[styles.infoBody, { color: colors.mutedForeground }]}>
         {body}
-      </Text>
+      </ArabicText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  titleRow: { alignItems: "flex-end", gap: 3 },
-  screenTitle: { fontSize: 26, fontFamily: "Inter_700Bold" },
-  screenSub: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  titleRow: { alignItems: "flex-end", gap: 3, width: "100%" },
+  screenTitle: { fontSize: 26, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  screenSub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   profileCard: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     gap: 12,
     padding: 18,
@@ -776,9 +961,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: "#fff", fontSize: 24, fontFamily: "Inter_700Bold" },
-  profileInfo: { flex: 1, alignItems: "flex-end", gap: 6 },
-  profileName: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right" },
-  profileMeta: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right" },
+  profileInfo: { flex: 1, alignItems: "stretch", gap: 6 },
+  profileName: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  profileMeta: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   editBtn: {
     width: 38,
     height: 38,
@@ -787,14 +972,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   planCard: { padding: 16, borderRadius: 18, borderWidth: 1, gap: 14 },
-  planTop: { flexDirection: "row-reverse", gap: 12, alignItems: "flex-start" },
-  planText: { flex: 1, alignItems: "flex-end", gap: 3 },
-  planEyebrow: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  planTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right" },
-  planDesc: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right" },
-  featureChips: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 },
+  planTop: { flexDirection: rowDir, gap: 12, alignItems: "flex-start" },
+  planText: { flex: 1, alignItems: "stretch", gap: 3 },
+  planEyebrow: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  planTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  planDesc: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  featureChips: { flexDirection: rowDir, flexWrap: "wrap", gap: 8, justifyContent: "flex-start" },
   featureChip: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 10,
@@ -802,8 +987,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  featureText: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  planActions: { flexDirection: "row-reverse", gap: 10 },
+  featureText: { fontSize: 12, fontFamily: "Inter_500Medium", writingDirection: "rtl" },
+  planActions: { flexDirection: rowDir, gap: 10 },
   primarySmallBtn: {
     flex: 1,
     minHeight: 44,
@@ -811,35 +996,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  primarySmallText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  primarySmallText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold", writingDirection: "rtl" },
   secondarySmallBtn: {
     flex: 1,
     minHeight: 44,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     gap: 7,
     alignItems: "center",
     justifyContent: "center",
   },
-  secondarySmallText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  quickGrid: { flexDirection: "row-reverse", gap: 10 },
+  secondarySmallText: { fontSize: 13, fontFamily: "Inter_600SemiBold", writingDirection: "rtl" },
+  quickGrid: { flexDirection: rowDir, gap: 10 },
   quickCard: {
     flex: 1,
     minHeight: 104,
     padding: 14,
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "flex-end",
+    alignItems: "stretch",
     justifyContent: "space-between",
   },
-  quickTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right" },
-  quickSub: { fontSize: 11, lineHeight: 16, fontFamily: "Inter_400Regular", textAlign: "right" },
-  section: { gap: 8 },
-  sectionLabel: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right" },
+  quickTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
+  quickSub: { fontSize: 11, lineHeight: 16, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl" },
+  section: { gap: 8, width: "100%" },
+  sectionLabel: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
   menuGroup: { gap: 7 },
   menuItem: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     gap: 12,
     padding: 13,
@@ -848,7 +1033,7 @@ const styles = StyleSheet.create({
     borderRightWidth: 3,
   },
   themeToggle: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     gap: 12,
     padding: 13,
@@ -863,9 +1048,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  menuTextWrap: { flex: 1, alignItems: "flex-end", gap: 2 },
-  menuLabel: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "right" },
-  menuDesc: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
+  menuTextWrap: { flex: 1, alignItems: "stretch", gap: 2 },
+  menuLabel: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  menuDesc: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   sheetBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.64)",
@@ -887,16 +1072,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sheetHeader: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 14,
   },
-  sheetTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  sheetTitle: { fontSize: 18, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl" },
   sheetContent: { gap: 12 },
-  sheetParagraph: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right" },
+  sheetParagraph: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   fieldWrap: { gap: 7 },
-  fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right" },
+  fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
   input: {
     minHeight: 48,
     borderRadius: 12,
@@ -904,6 +1089,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   sheetAction: {
     minHeight: 50,
@@ -912,7 +1099,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 4,
   },
-  sheetActionText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  sheetActionText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold", writingDirection: "rtl" },
   outlineAction: {
     minHeight: 46,
     borderRadius: 12,
@@ -920,24 +1107,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  outlineActionText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  outlineActionText: { fontSize: 14, fontFamily: "Inter_700Bold", writingDirection: "rtl" },
   infoLine: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: 5,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  infoTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right" },
-  infoBody: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right" },
+  infoTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  infoBody: { fontSize: 13, lineHeight: 20, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
   languageCard: {
-    flexDirection: "row-reverse",
+    flexDirection: rowDir,
     gap: 10,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
   },
-  languageText: { flex: 1, alignItems: "flex-end", gap: 2 },
-  languageTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  languageSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  languageText: { flex: 1, alignItems: "stretch", gap: 2 },
+  languageTitle: { fontSize: 15, fontFamily: "Inter_700Bold", textAlign: "right", writingDirection: "rtl", width: "100%" },
+  languageSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right", writingDirection: "rtl", width: "100%" },
 });

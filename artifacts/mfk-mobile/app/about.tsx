@@ -3,23 +3,23 @@ import { AccountInfoScreen } from "@/components/AccountInfoScreen";
 export default function AboutScreen() {
   return (
     <AccountInfoScreen
-      title="عن التطبيق"
-      subtitle="معلومات مفك وإصدار التطبيق"
+      title="عن تطبيق مفك"
+      subtitle="سيارتك أذكى مما تتخيل"
       sections={[
         {
-          title: "مفك",
-          body: "تطبيق سعودي لمتابعة المركبات والصيانة والباقات وقراءات OBD عند توفر قطعة مفك.",
-          icon: "information-circle-outline",
+          title: "ما هو مفك؟",
+          body: "افهم سيارتك وتابع حالتها من مكان واحد. مفك يشرح التنبيهات بلغة واضحة ويربط القطعة بسيارتك للتشخيص والصيانة والوقود.",
+          icon: "car-sport-outline",
+        },
+        {
+          title: "تعطل السيارة فجأة كابوس",
+          body: "تشخيص فوري تبدأه في أقل من دقيقة بعد ربط قطعة مفك، قبل ما تصير المشكلة مفاجأة على الطريق.",
+          icon: "flash-outline",
         },
         {
           title: "الإصدار",
-          body: "MFK Mobile 1.0.0",
+          body: "MFK 1.0.0",
           icon: "phone-portrait-outline",
-        },
-        {
-          title: "الباقات",
-          body: "باقة مجانية، باقة مفك، باقة العائلة، وباقة الأسطول.",
-          icon: "diamond-outline",
         },
       ]}
     />

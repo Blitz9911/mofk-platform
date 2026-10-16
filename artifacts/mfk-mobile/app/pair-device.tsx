@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import React, { useMemo, useRef, useEffect } from "react";
+import { useRouter, useSegments } from "expo-router";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -14,7 +14,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 import { useObdConnection } from "../src/obd/hooks/use-obd-connection";
 import type { ObdConnectionState, ObdDevice } from "../src/obd/types/obd.types";
 
@@ -24,7 +26,14 @@ const STEPS = [
   "فعل البلوتوث والموقع من إعدادات الجوال",
 ];
 
-const BUSY_STATES: ObdConnectionState[] = ["scanning", "connecting", "discovering_services", "initializing_elm327"];
+const BUSY_STATES: ObdConnectionState[] = [
+  "scanning",
+  "connecting",
+  "discovering_services",
+  "initializing_elm327",
+  "vehicle_searching",
+  "recovering",
+];
 
 function stateTone(state: ObdConnectionState) {
   if (state === "vehicle_connected") return "success";
@@ -34,8 +43,10 @@ function stateTone(state: ObdConnectionState) {
   return "idle";
 }
 
-function sortDevices(devices: ObdDevice[]) {
+function sortDevices(devices: ObdDevice[], lastSuccessfulId?: string | null) {
   return [...devices].sort((a, b) => {
+    if (lastSuccessfulId && a.id === lastSuccessfulId && b.id !== lastSuccessfulId) return -1;
+    if (lastSuccessfulId && b.id === lastSuccessfulId && a.id !== lastSuccessfulId) return 1;
     if (a.isV011Candidate !== b.isV011Candidate) return a.isV011Candidate ? -1 : 1;
     return (b.rssi ?? -999) - (a.rssi ?? -999);
   });
@@ -48,8 +59,12 @@ export default function PairDeviceScreen() {
   const obd = useObdConnection();
   const pulse = useRef(new Animated.Value(0)).current;
   const float = useRef(new Animated.Value(0)).current;
+  const [showTechnical, setShowTechnical] = useState(false);
 
-  const devices = useMemo(() => sortDevices(obd.devices), [obd.devices]);
+  const devices = useMemo(
+    () => sortDevices(obd.devices, obd.lastSuccessfulDevice?.id),
+    [obd.devices, obd.lastSuccessfulDevice?.id],
+  );
   const busy = BUSY_STATES.includes(obd.state);
   const tone = stateTone(obd.state);
   const connected = obd.state === "vehicle_connected";
@@ -100,9 +115,13 @@ export default function PairDeviceScreen() {
     };
   }, [busy, float, pulse]);
 
+  const segments = useSegments();
+  const inTabs = (segments as string[]).includes("(tabs)");
+  const tabBarReserve = inTabs ? 118 : 0;
+
   const pulseScale = pulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.72, busy ? 1.55 : 1.24],
+    outputRange: [0.78, busy ? 1.18 : 1.08],
   });
 
   const pulseOpacity = pulse.interpolate({
@@ -126,11 +145,12 @@ export default function PairDeviceScreen() {
 
   const primaryAction = async () => {
     if (connected || adapterReady) {
-      router.replace("/");
+      router.push("/diagnostics");
       return;
     }
     if (devices[0]) {
       await obd.connect(devices[0]);
+      router.push("/obd-connect");
       return;
     }
     await obd.scan();
@@ -163,11 +183,11 @@ export default function PairDeviceScreen() {
       ? "تم الاتصال بالقطعة والسيارة. تقدر الآن تبدأ قراءة بيانات المركبة."
       : adapterReady
         ? "القطعة متصلة، شغل السيارة أو ضع المفتاح على وضع ACC ثم أعد المحاولة."
-        : "يستخدم مفك اتصال BLE ويرسل أوامر ELM327 المنتهية بمحرف الرجوع حسب دليل المزود.";
+        : "ركّب قطعة مفك، شغّل السويتش، ثم ابحث. إذا أغلقت التطبيق نعيد الربط تلقائيًا عند فتحه.";
 
   const primaryLabel =
     connected || adapterReady
-      ? "الانتقال للرئيسية"
+      ? "التشخيص"
       : busy
         ? "جاري البحث"
         : devices.length > 0
@@ -175,21 +195,26 @@ export default function PairDeviceScreen() {
           : "البحث عن جهاز مفك";
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 16, backgroundColor: colors.background }]}>
+    <View style={[styles.root, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 12 + tabBarReserve, backgroundColor: colors.background }]}>
       <LinearGradient colors={pageGradient} style={StyleSheet.absoluteFill} />
       <View pointerEvents="none" style={styles.glowTop} />
 
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { flexDirection: rowDir }]}>
         <Pressable style={({ pressed }) => [styles.iconButton, !isDark && styles.lightIconShadow, { backgroundColor: colors.card, borderColor: subtleBorder }, pressed && styles.pressed]} onPress={goBack}>
           <Ionicons name="chevron-forward" size={20} color={colors.foreground} />
         </Pressable>
         <View style={styles.topbarCopy}>
-          <Text style={[styles.topbarTitle, { color: colors.foreground }]}>اقتران الجهاز</Text>
-          <Text style={[styles.topbarSubtitle, { color: colors.mutedForeground }]}>جهاز مفك OBD-II</Text>
+          <ArabicText style={[styles.topbarTitle, { color: colors.foreground }]}>اقتران الجهاز</ArabicText>
+          <ArabicText style={[styles.topbarSubtitle, { color: colors.mutedForeground }]}>جهاز مفك OBD-II</ArabicText>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <LinearGradient colors={heroColors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.heroCard}>
           <View pointerEvents="none" style={styles.heroGlowOne} />
           <View pointerEvents="none" style={styles.heroGlowTwo} />
@@ -207,22 +232,35 @@ export default function PairDeviceScreen() {
             </Animated.View>
           </View>
 
-          <Text style={styles.heroTitle}>{title}</Text>
-          <Text style={styles.heroSubtitle}>{subtitle}</Text>
+          <ArabicText style={styles.heroTitle}>{title}</ArabicText>
+          <ArabicText style={styles.heroSubtitle}>{subtitle}</ArabicText>
 
-          <View style={styles.statusPill}>
+          <View style={[styles.statusPill, { flexDirection: rowDir }]}>
             <Ionicons
               name={connected ? "checkmark-circle" : busy ? "radio-outline" : tone === "danger" ? "alert-circle-outline" : "information-circle-outline"}
               size={16}
               color="#FFFFFF"
             />
-            <Text style={styles.statusPillText}>{obd.userMessage ?? "جاهز للبدء"}</Text>
+            <ArabicText fill style={styles.statusPillText}>
+              {connected
+                ? obd.vehicleInfo?.vin
+                  ? "الجهاز جاهز للقراءة"
+                  : obd.vehicleInfo?.status === "complete"
+                    ? "متصل — تعذر قراءة VIN"
+                    : "جارٍ قراءة رقم الهيكل"
+                : adapterReady
+                  ? "القطعة متصلة، بانتظار السيارة"
+                  : obd.userMessage ?? "جاهز للبدء"}
+            </ArabicText>
           </View>
+          {connected && obd.vehicleInfo?.vin ? (
+            <Text style={styles.vinText}>{obd.vehicleInfo.vin}</Text>
+          ) : null}
         </LinearGradient>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHint}>قبل البدء</Text>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>تأكد من هذه الخطوات</Text>
+          <ArabicText style={styles.sectionHint}>قبل البدء</ArabicText>
+          <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>تأكد من هذه الخطوات</ArabicText>
         </View>
 
         <View style={[styles.stepsCard, !isDark && styles.lightCardShadow, { backgroundColor: cardBg, borderColor: subtleBorder }]}>
@@ -231,7 +269,7 @@ export default function PairDeviceScreen() {
             const active = !connected && !adapterReady && index === (busy ? 1 : 0);
 
             return (
-              <View key={step} style={styles.stepRow}>
+              <View key={step} style={[styles.stepRow, { flexDirection: rowDir }]}>
                 <View style={[styles.stepIcon, { backgroundColor: isDark ? "rgba(255,255,255,0.07)" : "#F8FAFC", borderColor: subtleBorder }, done ? styles.stepDone : active ? styles.stepActive : null]}>
                   {done ? (
                     <Ionicons name="checkmark" size={14} color="#FFFFFF" />
@@ -239,15 +277,15 @@ export default function PairDeviceScreen() {
                     <Text style={[styles.stepNumber, { color: colors.mutedForeground }]}>{(index + 1).toLocaleString("ar-SA")}</Text>
                   )}
                 </View>
-                <Text style={[styles.stepText, active && styles.stepTextActive, { color: active ? colors.foreground : colors.mutedForeground }]}>{step}</Text>
+                <ArabicText fill style={[styles.stepText, active && styles.stepTextActive, { color: active ? colors.foreground : colors.mutedForeground }]}>{step}</ArabicText>
               </View>
             );
           })}
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHint}>الأجهزة القريبة</Text>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{devices.length ? "اختر القطعة للاتصال" : "ابدأ البحث لعرض جهاز مفك"}</Text>
+          <ArabicText style={styles.sectionHint}>الأجهزة القريبة</ArabicText>
+          <ArabicText style={[styles.sectionTitle, { color: colors.foreground }]}>{devices.length ? "اختر القطعة للاتصال" : "ابدأ البحث لعرض جهاز مفك"}</ArabicText>
         </View>
 
         <View style={[styles.devicesCard, !isDark && styles.lightCardShadow, { backgroundColor: cardBg, borderColor: subtleBorder }]}>
@@ -257,48 +295,63 @@ export default function PairDeviceScreen() {
                 key={device.id}
                 onPress={() => void obd.connect(device)}
                 disabled={busy}
-                style={({ pressed }) => [styles.deviceRow, { backgroundColor: rowBg, borderColor: subtleBorder }, pressed && styles.pressed, busy && styles.disabled]}
+                style={({ pressed }) => [styles.deviceRow, { backgroundColor: rowBg, borderColor: subtleBorder, flexDirection: rowDir }, pressed && styles.pressed, busy && styles.disabled]}
               >
                 <View style={styles.deviceIcon}>
                   <Ionicons name="hardware-chip-outline" size={21} color="#FF6A00" />
                 </View>
                 <View style={styles.deviceCopy}>
-                  <Text style={[styles.deviceName, { color: colors.foreground }]}>{device.name}</Text>
-                  <Text style={[styles.deviceMeta, { color: colors.mutedForeground }]}>
-                    قوة الإشارة {device.rssi ?? "--"} dBm · {device.isV011Candidate ? "متوافق مع ELM327" : "BLE"}
-                  </Text>
+                  <ArabicText style={[styles.deviceName, { color: colors.foreground }]}>
+                    {!device.name || device.name === "جهاز BLE بدون اسم" ? "قطعة مفك" : device.name}
+                  </ArabicText>
+                  <ArabicText style={[styles.deviceMeta, { color: colors.mutedForeground }]}>
+                    تم العثور عليه بالقرب منك
+                    {obd.lastSuccessfulDevice?.id === device.id ? " · آخر اتصال ناجح" : ""}
+                  </ArabicText>
                 </View>
                 <Ionicons name="chevron-back" size={18} color={colors.mutedForeground} />
               </Pressable>
             ))
           ) : (
             <View style={styles.emptyDevice}>
-              <Ionicons name="bluetooth-outline" size={24} color="#FF6A00" />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>ما ظهرت أجهزة بعد</Text>
-              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>قرب الجوال من القطعة وتأكد أن البلوتوث مفعل، ثم اضغط البحث.</Text>
+              <Ionicons name="bluetooth-outline" size={24} color="#FF6A00" style={{ alignSelf: "flex-end" }} />
+              <ArabicText style={[styles.emptyTitle, { color: colors.foreground }]}>ما ظهرت أجهزة بعد</ArabicText>
+              <ArabicText style={[styles.emptyText, { color: colors.mutedForeground }]}>قرب الجوال من القطعة وتأكد أن البلوتوث مفعل، ثم اضغط البحث.</ArabicText>
             </View>
           )}
         </View>
 
-        {obd.technicalError ? (
-          <View style={[styles.errorCard, { backgroundColor: isDark ? "rgba(239,68,68,0.12)" : "#FEF2F2", borderColor: "rgba(239,68,68,0.28)" }]}>
+        {obd.userMessage && (obd.state === "error" || obd.technicalError) ? (
+          <View style={[styles.errorCard, { backgroundColor: isDark ? "rgba(239,68,68,0.12)" : "#FEF2F2", borderColor: "rgba(239,68,68,0.28)", flexDirection: rowDir }]}>
             <Ionicons name="alert-circle-outline" size={21} color="#FCA5A5" />
-            <Text style={[styles.errorText, { color: isDark ? "#FECACA" : "#991B1B" }]}>{obd.technicalError}</Text>
+            <ArabicText fill style={[styles.errorText, { color: isDark ? "#FECACA" : "#991B1B" }]}>
+              {obd.userMessage}
+            </ArabicText>
           </View>
+        ) : null}
+        {obd.technicalError ? (
+          <Pressable onPress={() => setShowTechnical((value) => !value)}>
+            <ArabicText style={[styles.deviceMeta, { color: colors.mutedForeground, marginTop: 8 }]}>
+              {showTechnical ? "إخفاء التفاصيل التقنية" : "تفاصيل تقنية"}
+            </ArabicText>
+          </Pressable>
+        ) : null}
+        {obd.technicalError && showTechnical ? (
+          <Text style={[styles.deviceMeta, { color: colors.mutedForeground, marginTop: 6 }]}>{obd.technicalError}</Text>
         ) : null}
       </ScrollView>
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, { backgroundColor: colors.background }]}>
         <Pressable
           style={({ pressed }) => [styles.primaryButtonFrame, pressed && styles.primaryPressed, busy && styles.disabled]}
           onPress={() => void primaryAction()}
           disabled={busy}
         >
-          <LinearGradient colors={heroColors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={styles.primaryButtonGradient}>
+          <LinearGradient colors={heroColors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={[styles.primaryButtonGradient, { flexDirection: rowDir }]}>
             {busy ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Ionicons name={connected || adapterReady ? "home-outline" : devices.length ? "link-outline" : "search-outline"} size={18} color="#FFFFFF" />
+              <Ionicons name={connected || adapterReady ? "pulse-outline" : devices.length ? "link-outline" : "search-outline"} size={18} color="#FFFFFF" />
             )}
             <Text style={styles.primaryText}>{primaryLabel}</Text>
           </LinearGradient>
@@ -307,6 +360,10 @@ export default function PairDeviceScreen() {
         {busy ? (
           <Pressable onPress={() => void obd.stopScan()} style={({ pressed }) => [styles.secondaryButton, !isDark && styles.lightIconShadow, { backgroundColor: colors.card, borderColor: subtleBorder }, pressed && styles.pressed]}>
             <Text style={[styles.secondaryText, { color: colors.foreground }]}>إيقاف البحث</Text>
+          </Pressable>
+        ) : obd.state === "error" || obd.state === "disconnected" || obd.state === "vehicle_not_ready" ? (
+          <Pressable onPress={() => void obd.reconnect()} style={({ pressed }) => [styles.secondaryButton, !isDark && styles.lightIconShadow, { backgroundColor: colors.card, borderColor: subtleBorder }, pressed && styles.pressed]}>
+            <Text style={[styles.secondaryText, { color: colors.foreground }]}>إعادة بناء الجلسة</Text>
           </Pressable>
         ) : devices.length > 0 && !connected ? (
           <Pressable onPress={() => void obd.scan()} style={({ pressed }) => [styles.secondaryButton, !isDark && styles.lightIconShadow, { backgroundColor: colors.card, borderColor: subtleBorder }, pressed && styles.pressed]}>
@@ -319,8 +376,7 @@ export default function PairDeviceScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
+  root: { flex: 1,
     paddingHorizontal: 18,
     backgroundColor: "#0B0B0B",
   },
@@ -334,7 +390,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,106,0,0.10)",
   },
   topbar: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 12,
     paddingBottom: 14,
@@ -358,7 +413,8 @@ const styles = StyleSheet.create({
   },
   topbarCopy: {
     flex: 1,
-    alignItems: "flex-end",
+    direction: "ltr",
+    alignItems: "stretch",
   },
   topbarTitle: {
     color: "#F7F7F7",
@@ -375,14 +431,20 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
   content: {
-    paddingBottom: 18,
+    gap: 4,
+    paddingBottom: 20,
   },
   heroCard: {
     borderRadius: 28,
     padding: 20,
-    alignItems: "flex-end",
+    alignItems: "stretch",
     overflow: "hidden",
+    marginBottom: 4,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
   },
@@ -411,6 +473,7 @@ const styles = StyleSheet.create({
     borderRadius: 59,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.32)",
     backgroundColor: "rgba(255,255,255,0.13)",
@@ -456,7 +519,7 @@ const styles = StyleSheet.create({
   },
   statusPill: {
     marginTop: 16,
-    flexDirection: "row-reverse",
+    alignSelf: "stretch",
     alignItems: "center",
     gap: 7,
     paddingHorizontal: 12,
@@ -467,15 +530,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.14)",
   },
   statusPillText: {
-    flexShrink: 1,
+    flex: 1,
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
     textAlign: "right",
     writingDirection: "rtl",
   },
+  vinText: {
+    marginTop: 10,
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    letterSpacing: 1,
+    textAlign: "left",
+    writingDirection: "ltr",
+  },
   sectionHeader: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     paddingTop: 22,
     paddingBottom: 10,
     gap: 2,
@@ -485,6 +557,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 12,
     textAlign: "right",
+    writingDirection: "rtl",
   },
   sectionTitle: {
     color: "#F7F7F7",
@@ -509,7 +582,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   stepRow: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 11,
     minHeight: 44,
@@ -558,7 +630,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.055)",
   },
   deviceRow: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 11,
     minHeight: 68,
@@ -578,7 +649,8 @@ const styles = StyleSheet.create({
   },
   deviceCopy: {
     flex: 1,
-    alignItems: "flex-end",
+    minWidth: 0,
+    alignItems: "stretch",
     gap: 4,
   },
   deviceName: {
@@ -596,7 +668,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   emptyDevice: {
-    alignItems: "center",
+    alignItems: "stretch",
     gap: 8,
     paddingVertical: 18,
   },
@@ -604,21 +676,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     fontSize: 15,
-    textAlign: "center",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   emptyText: {
-    maxWidth: 260,
     color: "rgba(255,255,255,0.58)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 19,
-    textAlign: "center",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   errorCard: {
     marginTop: 14,
-    flexDirection: "row-reverse",
     alignItems: "center",
     gap: 10,
     padding: 13,
@@ -637,7 +707,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
-    paddingTop: 10,
+    paddingTop: 12,
+    zIndex: 2,
   },
   primaryButtonFrame: {
     borderRadius: 18,
@@ -645,7 +716,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonGradient: {
     minHeight: 56,
-    flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,

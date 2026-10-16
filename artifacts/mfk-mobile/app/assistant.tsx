@@ -195,9 +195,9 @@ export default function AssistantScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, direction: "rtl" },
   header: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingBottom: 14,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   aiIcon: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   welcomeTitle: { fontSize: 22, fontFamily: "Inter_700Bold", textAlign: "center" },
   welcomeSub: { fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
-  quickWrap: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 4 },
+  quickWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 4 },
   quickChip: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -230,11 +230,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   userBubble: { alignSelf: "flex-start", borderBottomLeftRadius: 6 },
-  assistantBubble: { alignSelf: "flex-end", borderBottomRightRadius: 6, flexDirection: "row-reverse", gap: 8 },
+  assistantBubble: { alignSelf: "flex-end", borderBottomRightRadius: 6, flexDirection: "row", gap: 8 },
   assistantAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", marginTop: 2 },
   bubbleText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22, flexShrink: 1 },
   inputBar: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,

@@ -1,11 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +11,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
+import { BrandLogo } from "@/components/BrandLogo";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -26,6 +25,7 @@ export default function CompleteProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, updateProfile } = useAuth();
+  const nameInputRef = useRef<TextInput>(null);
 
   const [name, setName] = useState("");
   const [focused, setFocused] = useState(false);
@@ -54,7 +54,7 @@ export default function CompleteProfileScreen() {
         name: cleanName,
         phone: user.phone,
       });
-      router.replace("/onboarding");
+      router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر حفظ الاسم. حاول مرة أخرى.");
     } finally {
@@ -62,32 +62,33 @@ export default function CompleteProfileScreen() {
     }
   };
 
-  const skip = () => router.replace("/onboarding");
+  const skip = () => router.replace("/");
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: insets.top + 30, paddingBottom: insets.bottom + 26 }]}>
         <View style={styles.logoSection}>
-          <Image source={require("@/assets/images/mfk-logo.png")} style={styles.logo} contentFit="contain" />
-          <View style={[styles.iconBubble, { backgroundColor: `${colors.primary}20` }]}>
-            <Ionicons name="person-outline" size={28} color={colors.primary} />
+          <BrandLogo style={styles.logo} />
+          <View style={styles.illust}>
+            <View style={[styles.ringOuter, { borderColor: `${colors.primary}14` }]} />
+            <View style={[styles.ringInner, { backgroundColor: `${colors.primary}18`, borderColor: `${colors.primary}38` }]}>
+              <Ionicons name="person-outline" size={36} color={colors.primary} />
+            </View>
           </View>
         </View>
 
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.foreground }]}>وش نسمّيك؟</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+          <ArabicText style={[styles.title, { color: colors.foreground }]}>وش نسمّيك؟</ArabicText>
+          <ArabicText style={[styles.subtitle, { color: colors.mutedForeground }]}>
             بنستخدم اسمك في لوحة التحكم، الطلبات، وتنبيهات مفك داخل التطبيق.
-          </Text>
+          </ArabicText>
         </View>
 
         <View style={styles.form}>
           <View style={styles.fieldGroup}>
-            <Text style={[styles.label, { color: colors.foreground }]}>الاسم</Text>
-            <View
+            <ArabicText style={[styles.label, { color: colors.foreground }]}>الاسم</ArabicText>
+            <Pressable
+              onPress={() => nameInputRef.current?.focus()}
               style={[
                 styles.inputWrap,
                 {
@@ -98,6 +99,7 @@ export default function CompleteProfileScreen() {
               ]}
             >
               <TextInput
+                ref={nameInputRef}
                 value={name}
                 onChangeText={(value) => {
                   setName(normalizeName(value));
@@ -114,7 +116,7 @@ export default function CompleteProfileScreen() {
                 onSubmitEditing={() => void saveName()}
                 style={[styles.input, { color: colors.foreground }]}
               />
-            </View>
+            </Pressable>
           </View>
 
           {error ? (
@@ -155,7 +157,7 @@ export default function CompleteProfileScreen() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -170,22 +172,36 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: "center",
-    gap: 20,
-    marginBottom: 34,
+    gap: 18,
+    marginBottom: 28,
   },
   logo: {
-    height: 58,
-    width: 172,
+    height: 48,
+    width: 148,
   },
-  iconBubble: {
+  illust: {
     alignItems: "center",
-    borderRadius: 24,
-    height: 72,
+    height: 108,
     justifyContent: "center",
-    width: 72,
+    width: 108,
+  },
+  ringOuter: {
+    borderRadius: 54,
+    borderWidth: 1,
+    height: 108,
+    position: "absolute",
+    width: 108,
+  },
+  ringInner: {
+    alignItems: "center",
+    borderRadius: 38,
+    borderWidth: 1.5,
+    height: 76,
+    justifyContent: "center",
+    width: 76,
   },
   titleBlock: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: 8,
     marginBottom: 28,
   },
@@ -212,6 +228,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     textAlign: "right",
+    writingDirection: "rtl",
   },
   inputWrap: {
     borderRadius: 16,
@@ -230,6 +247,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 18,
     height: 58,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   errorBox: {
@@ -238,7 +256,7 @@ const styles = StyleSheet.create({
     borderColor: "#ef444430",
     borderRadius: 12,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 8,
     padding: 12,
   },

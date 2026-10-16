@@ -14,7 +14,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArabicText } from "@/components/ArabicText";
 import { useColors } from "@/hooks/useColors";
+import { rowDir } from "@/lib/layout";
 import { smoothBack } from "@/lib/navigation";
 import { exportPdf } from "@/lib/pdf-export";
 
@@ -22,14 +24,14 @@ const SEVERITY: Record<string, { color: string; label: string; icon: string }> =
   critical: { color: "#ef4444", label: "حرج", icon: "alert-circle" },
   high:     { color: "#f97316", label: "عالي", icon: "warning" },
   medium:   { color: "#f59e0b", label: "متوسط", icon: "warning-outline" },
-  low:      { color: "#22c55e", label: "منخفض", icon: "checkmark-circle-outline" },
+  low:      { color: "#38BDF8", label: "منخفض", icon: "checkmark-circle-outline" },
 };
 
 const ACTION_LABEL: Record<string, { label: string; color: string }> = {
   critical: { label: "توقف فوراً", color: "#ef4444" },
   high:     { label: "افحص قريباً", color: "#f97316" },
   medium:   { label: "افحص قريباً", color: "#f59e0b" },
-  low:      { label: "راقب الوضع", color: "#22c55e" },
+  low:      { label: "راقب الوضع", color: "#38BDF8" },
 };
 
 export default function DtcScreen() {
@@ -69,8 +71,8 @@ export default function DtcScreen() {
               : item.possibleCauses;
 
             return {
-              title: item.code,
-              subtitle: item.descriptionAr ?? item.descriptionEn ?? "بدون وصف",
+              title: item.descriptionAr ?? item.descriptionEn ?? item.code,
+              subtitle: item.code,
               badge: severity.label,
               fields: [
                 { label: "المركبة", value: vehicle || "-" },
@@ -89,13 +91,13 @@ export default function DtcScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, flexDirection: rowDir }]}>
         <Pressable onPress={() => smoothBack(router)} style={styles.backBtn}>
           <Ionicons name="chevron-forward" size={24} color={colors.foreground} />
         </Pressable>
         <View style={styles.headerCenter}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>سجل الأعطال (DTC)</Text>
-          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>تتبع وإدارة أعطال مركباتك</Text>
+          <ArabicText style={[styles.headerTitle, { color: colors.foreground }]}>سجل الأعطال (DTC)</ArabicText>
+          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>تتبع وإدارة أعطال مركباتك</ArabicText>
         </View>
         {!isLoading && dtcs && dtcs.length > 0 ? (
           <Pressable onPress={exportDtcPdf} style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -106,6 +108,17 @@ export default function DtcScreen() {
         )}
       </View>
 
+      <Pressable
+        onPress={() => router.push("/obd-diagnostics" as never)}
+        style={[styles.summaryRow, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 8 }]}
+      >
+        <View style={[styles.summaryItem, { flex: 1, alignItems: "flex-end" }]}>
+          <ArabicText style={[styles.headerTitle, { color: colors.foreground, fontSize: 15 }]}>فحص مباشر من القطعة</ArabicText>
+          <ArabicText style={[styles.headerSub, { color: colors.mutedForeground }]}>Stored / Pending / Permanent — السجل أدناه من الخادم</ArabicText>
+        </View>
+        <Ionicons name="bluetooth-outline" size={20} color={colors.primary} />
+      </Pressable>
+
       {/* Severity summary row */}
       {!isLoading && dtcs && dtcs.length > 0 && (
         <View style={[styles.summaryRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -113,11 +126,11 @@ export default function DtcScreen() {
             const s = SEVERITY[sev];
             return (
               <View key={sev} style={styles.summaryItem}>
-                <View style={[styles.summaryBadge, { backgroundColor: s.color + "20" }]}>
+                <View style={[styles.summaryBadge, { backgroundColor: s.color + "20", flexDirection: rowDir }]}>
                   <Ionicons name={s.icon as any} size={14} color={s.color} />
                   <Text style={[styles.summaryCount, { color: s.color }]}>{counts[sev]}</Text>
                 </View>
-                <Text style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                <ArabicText style={[styles.summaryLabel, { color: colors.mutedForeground }]}>{s.label}</ArabicText>
               </View>
             );
           })}
@@ -169,7 +182,7 @@ export default function DtcScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Ionicons name="checkmark-circle" size={40} color="#22c55e" />
+                <Ionicons name="checkmark-circle" size={40} color="#38BDF8" />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
                 {status === "active" ? "لا توجد أعطال نشطة" : "لا توجد أعطال مُزالة"}
@@ -184,28 +197,25 @@ export default function DtcScreen() {
             const action = ACTION_LABEL[item.severity];
             return (
               <View style={[styles.dtcCard, { backgroundColor: colors.card, borderColor: colors.border, borderRightColor: s.color }]}>
-                {/* Top row */}
-                <View style={styles.dtcTop}>
-                  <View style={[styles.severityBadge, { backgroundColor: s.color + "20" }]}>
+                <View style={[styles.dtcTop, { flexDirection: rowDir }]}>
+                  <View style={[styles.severityBadge, { backgroundColor: s.color + "20", flexDirection: rowDir }]}>
                     <Ionicons name={s.icon as any} size={12} color={s.color} />
                     <Text style={[styles.severityText, { color: s.color }]}>{s.label}</Text>
                   </View>
-                  <Text style={[styles.dtcCode, { color: colors.foreground }]}>{item.code}</Text>
+                  <Text style={[styles.dtcCode, { color: colors.mutedForeground }]}>{item.code}</Text>
                 </View>
 
-                {/* Description */}
-                <Text style={[styles.dtcDesc, { color: colors.foreground }]}>
-                  {item.descriptionAr ?? item.descriptionEn}
-                </Text>
+                <ArabicText style={[styles.dtcDesc, { color: colors.foreground }]}>
+                  {item.descriptionAr ?? item.descriptionEn ?? item.code}
+                </ArabicText>
 
                 {item.possibleCauses && (
-                  <Text style={[styles.dtcCauses, { color: colors.mutedForeground }]}>
+                  <ArabicText style={[styles.dtcCauses, { color: colors.mutedForeground }]}>
                     🔧 {item.possibleCauses}
-                  </Text>
+                  </ArabicText>
                 )}
 
-                {/* Footer */}
-                <View style={styles.dtcFooter}>
+                <View style={[styles.dtcFooter, { flexDirection: rowDir }]}>
                   {action && (
                     <Pressable style={[styles.actionBtn, { backgroundColor: s.color }]}>
                       <Text style={styles.actionBtnText}>{action.label}</Text>
@@ -213,13 +223,13 @@ export default function DtcScreen() {
                   )}
                   <View style={styles.dtcMeta}>
                     {item.vehicleMake && (
-                      <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                      <ArabicText style={[styles.metaText, { color: colors.mutedForeground }]}>
                         {item.vehicleMake} {item.vehicleModel}
-                      </Text>
+                      </ArabicText>
                     )}
-                    <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                    <ArabicText style={[styles.metaText, { color: colors.mutedForeground }]}>
                       {item.detectedAt ? new Date(item.detectedAt).toLocaleDateString("ar-SA") : "—"}
-                    </Text>
+                    </ArabicText>
                   </View>
                 </View>
               </View>
@@ -234,7 +244,6 @@ export default function DtcScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    flexDirection: "row-reverse",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -242,9 +251,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backBtn: { padding: 4 },
-  headerCenter: { flex: 1, alignItems: "flex-end", gap: 2 },
-  headerTitle: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerCenter: { flex: 1, direction: "ltr", alignItems: "stretch", gap: 2 },
+  headerTitle: { fontSize: 20, fontFamily: "Inter_700Bold", textAlign: "right" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
   headerGhost: { width: 36 },
   exportBtn: {
     alignItems: "center",
@@ -255,7 +264,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   summaryRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-around",
     paddingVertical: 12,
     marginHorizontal: 16,
@@ -264,12 +273,12 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   summaryItem: { alignItems: "center", gap: 5 },
-  summaryBadge: { flexDirection: "row-reverse", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  summaryBadge: { alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   summaryCount: { fontSize: 14, fontFamily: "Inter_700Bold" },
   summaryLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
   filters: {},
   chip: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 5,
     paddingHorizontal: 14,
@@ -290,15 +299,15 @@ const styles = StyleSheet.create({
     borderRightWidth: 4,
     gap: 8,
   },
-  dtcTop: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
-  dtcCode: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  severityBadge: { flexDirection: "row-reverse", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  dtcTop: { alignItems: "center", justifyContent: "space-between" },
+  dtcCode: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  severityBadge: { alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   severityText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  dtcDesc: { fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "right" },
+  dtcDesc: { fontSize: 16, fontFamily: "Inter_700Bold", textAlign: "right" },
   dtcCauses: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "right" },
-  dtcFooter: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
+  dtcFooter: { alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   actionBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
   actionBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  dtcMeta: { gap: 2, alignItems: "flex-start" },
-  metaText: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  dtcMeta: { gap: 2, alignItems: "stretch", flex: 1 },
+  metaText: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "right" },
 });
