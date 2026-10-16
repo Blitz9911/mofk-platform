@@ -1,0 +1,47 @@
+name: AI Workforce Config Validate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "agents/**"
+      - "policies/**"
+      - "templates/**"
+      - "docs/ARCHITECTURE.md"
+      - "docs/IMPLEMENTATION_ROADMAP.md"
+      - "docs/github-controls.md"
+      - "docs/FAIL_CLOSED_APPROVALS.md"
+      - "docs/AI_WORKFORCE_PHASE01_VALIDATION.md"
+      - ".github/CODEOWNERS"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
+      - ".github/scripts/validate-ai-workforce.mjs"
+      - ".github/workflows/ai-workforce-config-validate.yml"
+      - ".github/workflows/mfk-ai-pr-checks.yml"
+      - ".github/workflows/mobile-typecheck.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-workforce-config-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-config:
+    name: Validate agent registry and GitHub templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Validate AI workforce files
+        run: node .github/scripts/validate-ai-workforce.mjs

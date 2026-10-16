@@ -1,0 +1,22 @@
+# Previously ran a full-repo compile on ubuntu-latest.
+# That job is disabled: it conflicted with mobile-typecheck.yml and the
+# Windows-oriented lockfile. Config validation lives in
+# ai-workforce-config-validate.yml (no workspace install, no app compile).
+name: MFK AI PR Checks (disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Point to isolated validator
+        run: |
+          echo "This workflow is disabled."
+          echo "Use .github/workflows/ai-workforce-config-validate.yml"
+          echo "Do not restore ubuntu pnpm typecheck here."
