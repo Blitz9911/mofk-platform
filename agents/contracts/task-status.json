@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "description": "Task lifecycle for MFK agent work. Transitions marked actor=human can only be recorded from a human GitHub identity; the orchestrator must reject them from any agent or bot.",
+  "initial": "draft",
+  "terminal": ["done", "rejected", "cancelled"],
+  "statuses": {
+    "draft": "Issue exists but is missing acceptance criteria, risk tier, or a named human approver.",
+    "ready": "Triaged by a human. Acceptance criteria, risk tier, sensitive operations, and approver are set.",
+    "in_progress": "One agent holds the task on branch agent/<agentId>/<taskId>.",
+    "blocked": "Waiting on a dependency, missing access, or a question for a human.",
+    "escalated": "Stopped because of a security concern, prompt injection, unclear privileges, or a sensitive operation. Only a human can move it on.",
+    "in_review": "Implementer submitted a handoff report with evidence. Waiting for independent QA.",
+    "changes_requested": "QA, security, or a human found a problem. Goes back to the implementer.",
+    "qa_verified": "An agent other than the implementer ran the test matrix and attached logs.",
+    "security_reviewed": "An agent other than the implementer and QA attached a security assessment.",
+    "awaiting_human_approval": "All evidence is attached. Nothing else can happen until a human decides.",
+    "approved": "A human approved the PR at a specific head SHA. Any new commit returns the task to in_review.",
+    "done": "A human merged the PR. Release, if any, is a separate L4 task.",
+    "rejected": "A human rejected the change.",
+    "cancelled": "A human cancelled the task."
+  },
+  "transitions": [
+    { "from": "draft", "to": "ready", "actor": "human" },
+    { "from": "draft", "to": "cancelled", "actor": "human" },
+    { "from": "ready", "to": "in_progress", "actor": "orchestrator" },
+    { "from": "in_progress", "to": "in_review", "actor": "agent", "requires": ["handoffReport", "testsRun"] },
+    { "from": "in_progress", "to": "blocked", "actor": "agent" },
+    { "from": "in_progress", "to": "escalated", "actor": "agent" },
+    { "from": "blocked", "to": "in_progress", "actor": "orchestrator" },
+    { "from": "escalated", "to": "in_progress", "actor": "human" },
+    { "from": "escalated", "to": "cancelled", "actor": "human" },
+    { "from": "in_review", "to": "qa_verified", "actor": "agent", "requires": ["independentOfImplementer", "testsRun"] },
+    { "from": "in_review", "to": "changes_requested", "actor": "agent" },
+    { "from": "qa_verified", "to": "security_reviewed", "actor": "agent", "requires": ["independentOfImplementer", "securityAssessment"] },
+    { "from": "qa_verified", "to": "changes_requested", "actor": "agent" },
+    { "from": "security_reviewed", "to": "awaiting_human_approval", "actor": "orchestrator", "requires": ["allEvidencePresent"] },
+    { "from": "security_reviewed", "to": "changes_requested", "actor": "agent" },
+    { "from": "security_reviewed", "to": "escalated", "actor": "agent" },
+    { "from": "changes_requested", "to": "in_progress", "actor": "orchestrator" },
+    { "from": "awaiting_human_approval", "to": "approved", "actor": "human", "requires": ["approvalRecord"] },
+    { "from": "awaiting_human_approval", "to": "changes_requested", "actor": "human" },
+    { "from": "awaiting_human_approval", "to": "rejected", "actor": "human" },
+    { "from": "approved", "to": "in_review", "actor": "system", "on": "new commit on the PR head" },
+    { "from": "approved", "to": "done", "actor": "human", "on": "human merges the PR" }
+  ],
+  "rules": [
+    "Any status not reachable through this table is an error. The orchestrator fails closed and moves the task to escalated.",
+    "An agent may never set approved, done, rejected, or cancelled.",
+    "qa_verified and security_reviewed must come from agent runs whose agentId and runId differ from the implementer's.",
+    "Sensitive operations listed in the task need an approvalRecord per operation before approved."
+  ]
+}

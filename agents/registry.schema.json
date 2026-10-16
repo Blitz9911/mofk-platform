@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofk.local/agents/registry.schema.json",
+  "title": "MFK AI workforce agent registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "operational",
+    "policyFile",
+    "instructionBase",
+    "humanOwner",
+    "permissionModel",
+    "handoffContract",
+    "globalForbiddenActions",
+    "sensitiveOperations",
+    "protectedPaths",
+    "obdCommandPolicy",
+    "agents"
+  ],
+  "properties": {
+    "version": {
+      "const": 2
+    },
+    "operational": {
+      "type": "boolean"
+    },
+    "policyFile": {
+      "type": "string"
+    },
+    "instructionBase": {
+      "type": "string"
+    },
+    "humanOwner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "handoffContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiredInputs",
+        "requiredOutputs",
+        "cannotSelfApprove",
+        "failClosedIfMissingEvidence"
+      ],
+      "properties": {
+        "requiredInputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "requiredOutputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "cannotSelfApprove": {
+          "const": true
+        },
+        "failClosedIfMissingEvidence": {
+          "const": true
+        },
+        "schemas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "globalForbiddenActions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "sensitiveOperations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "minLevel",
+          "requiredHumanApprovals",
+          "failClosed"
+        ],
+        "properties": {
+          "minLevel": {
+            "enum": [
+              "L0",
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ]
+          },
+          "requiredHumanApprovals": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "failClosed": {
+            "const": true
+          },
+          "default": {
+            "type": "string"
+          },
+          "requiresApprovedPr": {
+            "type": "boolean"
+          },
+          "separateFromPrApprover": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "instructionFile",
+          "maxLevel",
+          "responsibilities",
+          "allowedPaths",
+          "writablePaths",
+          "forbiddenActions",
+          "handoff"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "instructionFile": {
+            "type": "string"
+          },
+          "maxLevel": {
+            "enum": [
+              "L0",
+              "L1",
+              "L2"
+            ]
+          },
+          "responsibilities": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowedPaths": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "forbiddenActions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "handoff": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "nextAgentIds",
+              "requiresHumanDecision"
+            ],
+            "properties": {
+              "nextAgentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requiresHumanDecision": {
+                "type": "boolean"
+              }
+            }
+          },
+          "writablePaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "maxLevel": {
+                  "const": "L0"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "writablePaths": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "permissionModel": {
+      "type": "object",
+      "required": [
+        "readScope",
+        "writeScope",
+        "branchPattern",
+        "enforcement"
+      ],
+      "properties": {
+        "readScope": {
+          "type": "string"
+        },
+        "writeScope": {
+          "type": "string"
+        },
+        "branchPattern": {
+          "const": "agent/<agentId>/<taskId>"
+        },
+        "enforcement": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "protectedPaths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pattern",
+          "operation",
+          "reason"
+        ],
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operation": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "obdCommandPolicy": {
+      "type": "object",
+      "required": [
+        "default",
+        "readOnlyObdModes",
+        "deniedObdModes",
+        "deniedUdsServices"
+      ],
+      "properties": {
+        "default": {
+          "const": "deny"
+        },
+        "agentRuntime": {
+          "type": "string"
+        },
+        "readOnlyObdModes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deniedObdModes": {
+          "type": "array",
+          "contains": {
+            "const": "04"
+          },
+          "items": {
+            "type": "string"
+          }
+        },
+        "deniedUdsServices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

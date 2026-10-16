@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofk.local/agents/contracts/approval-record.schema.json",
+  "title": "MFK human approval record",
+  "description": "Built by the orchestrator from a GitHub review or PR comment. The orchestrator checks the identity against the GitHub API; agents never write this record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["taskId", "prNumber", "headSha", "operation", "approverLogin", "approverType", "source", "sourceUrl", "recordedAt"],
+  "properties": {
+    "taskId": { "type": "string", "minLength": 1 },
+    "prNumber": { "type": "integer", "minimum": 1 },
+    "headSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Approval only covers this commit. A new push voids it."
+    },
+    "operation": {
+      "type": "string",
+      "pattern": "^approve:(merge|database_migration|auth_policy|pricing_billing|customer_data_processing|device_binding|live_obd_or_vehicle_write|supply_chain_config|control_plane_change|production_release)$",
+      "description": "Matches the founder comment, for example approve:device_binding. A thumbs-up or generic LGTM is not an approval."
+    },
+    "approverLogin": { "type": "string", "minLength": 1 },
+    "approverType": {
+      "const": "User",
+      "description": "GitHub account type from the API. Bot and app accounts are rejected."
+    },
+    "approverRole": { "enum": ["founder", "production-environment-reviewer", "code-owner"] },
+    "source": { "enum": ["pull_request_review", "issue_comment", "environment_approval"] },
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "implementerLogin": {
+      "type": "string",
+      "description": "PR author. The orchestrator rejects the record if it equals approverLogin."
+    }
+  }
+}

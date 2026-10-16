@@ -1,0 +1,41 @@
+# CODEOWNERS does not enforce reviews by itself.
+# GitHub only requires these owners when branch protection has
+# "Require review from Code Owners" enabled. Until a human turns that on,
+# this file is documentation plus a routing hint.
+# See docs/github-controls.md.
+
+# Founder placeholder. Replace @Blitz9911 with a GitHub team (for example
+# @ORG/mfk-approvers) once the team exists. Invalid owners are silently ignored.
+
+* @Blitz9911
+
+/policies/ @Blitz9911
+/agents/ @Blitz9911
+/.github/ @Blitz9911
+/docs/ARCHITECTURE.md @Blitz9911
+/docs/IMPLEMENTATION_ROADMAP.md @Blitz9911
+/docs/github-controls.md @Blitz9911
+/docs/FAIL_CLOSED_APPROVALS.md @Blitz9911
+/supabase1/ @Blitz9911
+/lib/db/ @Blitz9911
+/artifacts/api-server/ @Blitz9911
+/artifacts/mfk-mobile/lib/supabase.ts @Blitz9911
+/artifacts/mfk-mobile/src/obd/binding/ @Blitz9911
+
+# Mirrors agents/registry.json protectedPaths (auth, payment, binding, deploy, deps).
+/.npmrc @Blitz9911
+/pnpm-workspace.yaml @Blitz9911
+/pnpm-lock.yaml @Blitz9911
+/vercel.json @Blitz9911
+/.replit @Blitz9911
+/scripts/post-merge.sh @Blitz9911
+**/package.json @Blitz9911
+**/AuthContext.tsx @Blitz9911
+**/supabase.ts @Blitz9911
+**/supabase-api-bridge.ts @Blitz9911
+**/login.tsx @Blitz9911
+**/register.tsx @Blitz9911
+**/subscription.tsx @Blitz9911
+**/pricing.tsx @Blitz9911
+**/eas.json @Blitz9911
+/artifacts/mfk-mobile/app.json @Blitz9911

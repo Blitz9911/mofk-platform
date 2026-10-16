@@ -1,0 +1,70 @@
+name: AI Agent Path Guard
+
+# Runs on every PR so it can be made a required check. Human branches pass
+# immediately; agent/<agentId>/<taskId> branches are checked against
+# agents/registry.json writablePaths and protectedPaths.
+#
+# The guard script and registry come from the PR base commit, never from the
+# PR head, so an agent branch cannot weaken the rules it is checked against.
+# No code from the PR head is executed. No secrets are used.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-agent-path-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  path-guard:
+    name: Agent path guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout guard from base commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: guard
+          persist-credentials: false
+
+      - name: Checkout PR history (not executed)
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pr
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Bootstrap note
+        if: ${{ hashFiles('guard/.github/scripts/agent-path-guard.mjs') == '' }}
+        run: echo "Base commit has no path guard yet (bootstrap PR). Nothing to enforce."
+
+      - name: Check changed paths
+        if: ${{ hashFiles('guard/.github/scripts/agent-path-guard.mjs') != '' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          AGENT_APP_LOGIN: ${{ vars.MFK_AGENT_APP_LOGIN }}
+        run: |
+          git -C pr fetch --no-tags --quiet origin "$BASE_SHA" || true
+          node guard/.github/scripts/agent-path-guard.mjs \
+            --registry guard/agents/registry.json \
+            --repo pr \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA" \
+            --branch "$HEAD_REF" \
+            --author "$PR_AUTHOR" \
+            --agent-login "$AGENT_APP_LOGIN"

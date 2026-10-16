@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mofk.local/agents/contracts/test-report.schema.json",
+  "title": "MFK test report entry",
+  "description": "One executed or unexecuted check. A case that was not run is not_tested, never pass. pass and fail require the command, its exit code, and a log reference.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "status", "kind"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "kind": {
+      "enum": ["typecheck", "unit", "integration", "regression", "lint", "config-validation", "simulator", "uat", "security-scan"]
+    },
+    "status": { "enum": ["pass", "fail", "not_tested", "blocked", "error"] },
+    "command": { "type": "string" },
+    "exitCode": { "type": "integer" },
+    "logRef": {
+      "type": "string",
+      "description": "CI run URL, artifact path, or PR comment URL holding the raw output."
+    },
+    "headSha": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "os": { "type": "string" },
+        "node": { "type": "string" },
+        "pnpm": { "type": "string" },
+        "simulator": { "type": "string", "description": "OBD simulator or fixture set. Never a real vehicle." }
+      }
+    },
+    "executedBy": { "type": "string", "description": "agentId and runId, or a human GitHub login." },
+    "reason": { "type": "string", "description": "Required for not_tested, blocked, and error." },
+    "preExisting": {
+      "type": "boolean",
+      "description": "true when the same failure reproduces on the base commit."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["pass", "fail"] } } },
+      "then": { "required": ["command", "exitCode", "logRef", "headSha"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "pass" } } },
+      "then": { "properties": { "exitCode": { "const": 0 } } }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["not_tested", "blocked", "error"] } } },
+      "then": { "required": ["reason"] }
+    }
+  ]
+}

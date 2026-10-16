@@ -1,0 +1,793 @@
+{
+  "version": 2,
+  "operational": false,
+  "policyFile": "policies/AGENT_POLICY.md",
+  "instructionBase": "agents/BASE.md",
+  "humanOwner": "founder",
+  "notes": [
+    "This registry is documentation plus CI-validated configuration. It does not grant credentials or start agents.",
+    "operational remains false until an orchestrator, scoped GitHub App, sandbox, and protected environments have been tested.",
+    "allowedPaths is the read/focus scope. writablePaths is the only write scope, and protectedPaths always wins over it.",
+    "Prompts do not enforce anything. Enforcement is the GitHub App token scope plus the required 'Agent path guard' check (docs/github-controls.md)."
+  ],
+  "permissionModel": {
+    "readScope": "Whole repository at L0 via a contents:read token. allowedPaths narrows what an agent should load, it is not a security boundary.",
+    "writeScope": "writablePaths minus protectedPaths, only for agents with maxLevel L1 or higher. L0 agents must have an empty writablePaths.",
+    "branchPattern": "agent/<agentId>/<taskId>",
+    "enforcement": [
+      ".github/scripts/agent-path-guard.mjs run by .github/workflows/ai-agent-path-guard.yml, loaded from the PR base commit so a branch cannot weaken its own guard",
+      "GitHub App without the Workflows permission, so agent tokens cannot push .github/workflows changes",
+      "Repository ruleset limiting the agent GitHub App to agent/** refs",
+      "Branch protection on main with required checks and human review"
+    ]
+  },
+  "handoffContract": {
+    "requiredInputs": [
+      "taskId",
+      "acceptanceCriteria",
+      "riskTier",
+      "sensitiveChanges"
+    ],
+    "requiredOutputs": [
+      "taskId",
+      "agentId",
+      "status",
+      "baseSha",
+      "headSha",
+      "riskTier",
+      "sensitiveOperations",
+      "findings",
+      "actions",
+      "changedFiles",
+      "evidence",
+      "risks",
+      "testsRun",
+      "approvalNeeded",
+      "nextAgentIds",
+      "nextSteps"
+    ],
+    "cannotSelfApprove": true,
+    "failClosedIfMissingEvidence": true,
+    "schemas": {
+      "handoffReport": "agents/contracts/handoff-report.schema.json",
+      "testReport": "agents/contracts/test-report.schema.json",
+      "approvalRecord": "agents/contracts/approval-record.schema.json",
+      "taskStatus": "agents/contracts/task-status.json"
+    }
+  },
+  "globalForbiddenActions": [
+    "production_db_write",
+    "production_db_schema_apply",
+    "production_deploy",
+    "production_eas_update",
+    "merge_to_protected_branch",
+    "force_push",
+    "skip_hooks",
+    "live_obd_write",
+    "obd_mode_04",
+    "obd_safety_control",
+    "secret_exfiltration",
+    "customer_pii_export",
+    "raw_vin_export",
+    "payment_data_access",
+    "disable_ci",
+    "disable_branch_protection",
+    "change_environment_reviewers",
+    "credential_elevation",
+    "create_production_write_token",
+    "auto_merge",
+    "edit_github_workflows",
+    "edit_control_plane",
+    "dependency_change_without_approval",
+    "pull_request_target_workflow"
+  ],
+  "sensitiveOperations": {
+    "database_migration": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "auth_policy": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "pricing_billing": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "customer_data_processing": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "device_binding": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "live_obd_or_vehicle_write": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true,
+      "default": "deny"
+    },
+    "production_release": {
+      "minLevel": "L4",
+      "requiredHumanApprovals": [
+        "founder",
+        "production-environment-reviewer"
+      ],
+      "failClosed": true,
+      "requiresApprovedPr": true,
+      "separateFromPrApprover": true
+    },
+    "supply_chain_config": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    },
+    "control_plane_change": {
+      "minLevel": "L3",
+      "requiredHumanApprovals": [
+        "founder"
+      ],
+      "failClosed": true
+    }
+  },
+  "protectedPaths": [
+    {
+      "pattern": ".github/**",
+      "operation": "control_plane_change",
+      "reason": "Workflows run on same-repo PRs; edits can change checks or reach secrets"
+    },
+    {
+      "pattern": "agents/**",
+      "operation": "control_plane_change",
+      "reason": "Agents must not edit their own roles, registry, or contracts"
+    },
+    {
+      "pattern": "policies/**",
+      "operation": "control_plane_change",
+      "reason": "Agent policy"
+    },
+    {
+      "pattern": ".npmrc",
+      "operation": "supply_chain_config",
+      "reason": "Install behaviour"
+    },
+    {
+      "pattern": "pnpm-workspace.yaml",
+      "operation": "supply_chain_config",
+      "reason": "Holds minimumReleaseAge supply-chain defense"
+    },
+    {
+      "pattern": "pnpm-lock.yaml",
+      "operation": "supply_chain_config",
+      "reason": "Dependency pinning"
+    },
+    {
+      "pattern": "**/package.json",
+      "operation": "supply_chain_config",
+      "reason": "Dependencies and lifecycle scripts run in CI"
+    },
+    {
+      "pattern": "**/.env*",
+      "operation": "customer_data_processing",
+      "reason": "Environment and secrets files"
+    },
+    {
+      "pattern": "vercel.json",
+      "operation": "production_release",
+      "reason": "Production hosting config"
+    },
+    {
+      "pattern": ".replit",
+      "operation": "production_release",
+      "reason": "Replit deployment config"
+    },
+    {
+      "pattern": ".replitignore",
+      "operation": "production_release",
+      "reason": "Replit deployment config"
+    },
+    {
+      "pattern": "**/.replit-artifact/**",
+      "operation": "production_release",
+      "reason": "Replit artifact deployment config"
+    },
+    {
+      "pattern": "**/eas.json",
+      "operation": "production_release",
+      "reason": "EAS build and OTA profiles"
+    },
+    {
+      "pattern": "**/.easignore",
+      "operation": "production_release",
+      "reason": "EAS upload contents, including signing credentials"
+    },
+    {
+      "pattern": "artifacts/mfk-mobile/app.json",
+      "operation": "production_release",
+      "reason": "Bundle IDs, OTA channel, permissions"
+    },
+    {
+      "pattern": "scripts/post-merge.sh",
+      "operation": "database_migration",
+      "reason": "Runs drizzle push on merge"
+    },
+    {
+      "pattern": "lib/db/**",
+      "operation": "database_migration",
+      "reason": "Drizzle schema and push config"
+    },
+    {
+      "pattern": "supabase1/**",
+      "operation": "database_migration",
+      "reason": "Supabase schema, RLS, grants"
+    },
+    {
+      "pattern": "**/migrations/**",
+      "operation": "database_migration",
+      "reason": "Migrations"
+    },
+    {
+      "pattern": "**/*.sql",
+      "operation": "database_migration",
+      "reason": "SQL schema or data"
+    },
+    {
+      "pattern": "artifacts/api-server/src/seed.ts",
+      "operation": "database_migration",
+      "reason": "Writes to the configured database"
+    },
+    {
+      "pattern": "artifacts/api-server/src/lib/auth.ts",
+      "operation": "auth_policy",
+      "reason": "API authentication"
+    },
+    {
+      "pattern": "artifacts/api-server/src/routes/auth.ts",
+      "operation": "auth_policy",
+      "reason": "API authentication"
+    },
+    {
+      "pattern": "artifacts/api-server/src/routes/admin.ts",
+      "operation": "auth_policy",
+      "reason": "Admin-only routes"
+    },
+    {
+      "pattern": "**/AuthContext.tsx",
+      "operation": "auth_policy",
+      "reason": "Client session handling"
+    },
+    {
+      "pattern": "**/supabase.ts",
+      "operation": "auth_policy",
+      "reason": "Supabase client and auth"
+    },
+    {
+      "pattern": "**/supabase-api-bridge.ts",
+      "operation": "customer_data_processing",
+      "reason": "Direct customer-data reads and writes"
+    },
+    {
+      "pattern": "**/login.tsx",
+      "operation": "auth_policy",
+      "reason": "Login flow"
+    },
+    {
+      "pattern": "**/register.tsx",
+      "operation": "auth_policy",
+      "reason": "Registration flow"
+    },
+    {
+      "pattern": "artifacts/api-server/src/routes/subscriptions.ts",
+      "operation": "pricing_billing",
+      "reason": "Subscriptions"
+    },
+    {
+      "pattern": "**/subscription.tsx",
+      "operation": "pricing_billing",
+      "reason": "Subscription UI"
+    },
+    {
+      "pattern": "**/pricing.tsx",
+      "operation": "pricing_billing",
+      "reason": "Prices shown to customers"
+    },
+    {
+      "pattern": "**/*checkout*",
+      "operation": "pricing_billing",
+      "reason": "Checkout"
+    },
+    {
+      "pattern": "**/*payment*",
+      "operation": "pricing_billing",
+      "reason": "Payment"
+    },
+    {
+      "pattern": "**/*Commerce*",
+      "operation": "pricing_billing",
+      "reason": "Commerce service"
+    },
+    {
+      "pattern": "artifacts/api-server/src/routes/vehicles.ts",
+      "operation": "device_binding",
+      "reason": "Contains pair-adapter (adapterMac binding)"
+    },
+    {
+      "pattern": "artifacts/mfk-mobile/src/obd/binding/**",
+      "operation": "device_binding",
+      "reason": "Adapter to vehicle binding"
+    }
+  ],
+  "obdCommandPolicy": {
+    "default": "deny",
+    "agentRuntime": "Fixtures and simulators only. Agent sandboxes have no Bluetooth device and no route to a real adapter.",
+    "readOnlyObdModes": [
+      "01",
+      "02",
+      "03",
+      "06",
+      "07",
+      "09",
+      "0A"
+    ],
+    "deniedObdModes": [
+      "04",
+      "05",
+      "08"
+    ],
+    "deniedUdsServices": [
+      "10",
+      "11",
+      "14",
+      "27",
+      "28",
+      "2E",
+      "2F",
+      "31",
+      "34",
+      "35",
+      "36",
+      "37",
+      "3D",
+      "85"
+    ],
+    "note": "Mode 04 clears DTCs and freeze-frame data. Mode 08 and UDS IO/routine control can actuate vehicle systems. Even with founder approval these stay out of agent runtime."
+  },
+  "agents": [
+    {
+      "id": "orchestrator",
+      "instructionFile": "agents/orchestrator.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Build a task graph with owners and dependencies",
+        "Collect evidence and escalate risk",
+        "Never execute repository changes"
+      ],
+      "allowedPaths": [
+        "agents/**",
+        "docs/**",
+        "policies/**",
+        "templates/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "execute_code",
+        "create_pr",
+        "deploy",
+        "grant_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-lead",
+          "engineering-lead"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "product-lead",
+      "instructionFile": "agents/product-lead.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Translate founder intent into outcomes",
+        "Propose product priorities and value hypotheses"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**",
+        ".github/ISSUE_TEMPLATE/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "unilateral_pricing_change",
+        "unilateral_roadmap_change",
+        "implementation",
+        "merge"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-manager",
+          "business-analyst",
+          "ux-reviewer",
+          "product-analytics",
+          "uat"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "product-manager",
+      "instructionFile": "agents/product-manager.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Write user stories and acceptance criteria",
+        "Maintain a prioritized backlog and Definition of Done"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**",
+        ".github/ISSUE_TEMPLATE/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "implementation",
+        "merge_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "engineering-lead",
+          "business-analyst"
+        ],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "business-analyst",
+      "instructionFile": "agents/business-analyst.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Specify business rules including maintenance and subscriptions",
+        "Produce decision tables, edge cases, and state transitions"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "artifacts/mfk-mobile/lib/maintenance-catalog.ts",
+        "artifacts/mfk-mobile/lib/maintenance-engine.mjs"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "assume_vehicle_compatibility",
+        "implementation"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-manager",
+          "data-recommendations",
+          "engineering-lead"
+        ],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "ux-reviewer",
+      "instructionFile": "agents/ux-reviewer.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Review usability and Arabic RTL localization",
+        "Produce annotated UX findings and accessibility checks"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "artifacts/mfk-mobile/app/**",
+        "artifacts/mfk-mobile/components/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "unsanctioned_customer_data_access",
+        "implementation"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-manager",
+          "uat"
+        ],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "product-analytics",
+      "instructionFile": "agents/product-analytics.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Define feature-effectiveness metrics",
+        "Design privacy-safe aggregate queries"
+      ],
+      "allowedPaths": [
+        "docs/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "raw_user_export",
+        "fabricated_metrics",
+        "production_analytics_query_without_approval"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-lead",
+          "product-manager"
+        ],
+        "requiresHumanDecision": false
+      }
+    },
+    {
+      "id": "uat",
+      "instructionFile": "agents/uat.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Create user-acceptance scenarios",
+        "Report Pass / Fail / Not tested with reproducible evidence"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "templates/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "mark_unexecuted_pass",
+        "production_deploy"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "product-manager",
+          "qa-automation"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "engineering-lead",
+      "instructionFile": "agents/engineering-lead.md",
+      "maxLevel": "L0",
+      "responsibilities": [
+        "Design a safe technical plan",
+        "Decompose implementation tasks and review risk"
+      ],
+      "allowedPaths": [
+        "docs/**",
+        "agents/**",
+        "policies/**",
+        "artifacts/**",
+        "lib/**"
+      ],
+      "writablePaths": [],
+      "forbiddenActions": [
+        "self_approve_pr",
+        "production_deploy"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "software-engineer",
+          "obd-iot",
+          "data-recommendations",
+          "devops"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "software-engineer",
+      "instructionFile": "agents/software-engineer.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Implement approved TypeScript/Expo/API changes in an isolated sandbox",
+        "Provide scoped diff, tests, PR summary, and rollback steps"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/**",
+        "artifacts/api-server/**",
+        "lib/**"
+      ],
+      "writablePaths": [
+        "artifacts/mfk-mobile/**",
+        "artifacts/mfk-web/**",
+        "artifacts/api-server/**",
+        "lib/api-spec/**",
+        "lib/api-zod/**",
+        "lib/api-client-react/**",
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "direct_main_push",
+        "production_data_access",
+        "production_deploy",
+        "self_approve_pr"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "qa-automation",
+          "cybersecurity"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "obd-iot",
+      "instructionFile": "agents/obd-iot.md",
+      "maxLevel": "L1",
+      "responsibilities": [
+        "Validate ELM327/BLE/OBD handling on fixtures and simulators",
+        "Produce PID matrix, parser tests, and disconnect/recovery cases"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/src/obd/**",
+        "artifacts/mfk-mobile/lib/obd/**",
+        "docs/obd-ble-integration.md",
+        "docs/obd-installation-guides-phase1.md"
+      ],
+      "writablePaths": [
+        "artifacts/mfk-mobile/src/obd/**",
+        "artifacts/mfk-mobile/lib/obd/**",
+        "artifacts/mfk-mobile/scripts/test-obd-*",
+        "docs/obd-*.md"
+      ],
+      "forbiddenActions": [
+        "live_obd_write",
+        "obd_mode_04",
+        "obd_safety_control"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "qa-automation",
+          "cybersecurity",
+          "software-engineer"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "data-recommendations",
+      "instructionFile": "agents/data-recommendations.md",
+      "maxLevel": "L1",
+      "responsibilities": [
+        "Validate maintenance rules, schedules, and derived recommendations",
+        "Produce deterministic fixtures and false-positive analysis"
+      ],
+      "allowedPaths": [
+        "artifacts/mfk-mobile/lib/**",
+        "docs/**"
+      ],
+      "writablePaths": [
+        "artifacts/mfk-mobile/lib/maintenance-*",
+        "artifacts/mfk-mobile/lib/recommendations*",
+        "artifacts/mfk-mobile/lib/**/*.test.*",
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "autonomous_maintenance_safety_claim",
+        "production_db_write"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "qa-automation",
+          "software-engineer"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "devops",
+      "instructionFile": "agents/devops.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Propose non-production CI, configuration, and observability changes as reviewed patches",
+        "A human applies any .github/workflows change; the agent token has no Workflows permission"
+      ],
+      "allowedPaths": [
+        ".github/workflows/**",
+        "docs/**",
+        "pnpm-workspace.yaml",
+        ".npmrc"
+      ],
+      "writablePaths": [
+        "docs/**"
+      ],
+      "forbiddenActions": [
+        "production_credentials",
+        "production_release",
+        "change_environment_reviewers",
+        "disable_branch_protection",
+        "alter_pnpm_security_settings"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "qa-automation",
+          "cybersecurity"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "qa-automation",
+      "instructionFile": "agents/qa-automation.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Independently verify engineering changes",
+        "Publish regression matrix, test logs, and blockers",
+        "Write tests only; never change the implementation under test"
+      ],
+      "allowedPaths": [
+        "artifacts/**",
+        "docs/**"
+      ],
+      "writablePaths": [
+        "artifacts/**/test/**",
+        "artifacts/**/tests/**",
+        "artifacts/**/__tests__/**",
+        "artifacts/**/*.test.*",
+        "artifacts/**/*.spec.*",
+        "artifacts/mfk-mobile/scripts/test-*",
+        "docs/qa/**"
+      ],
+      "forbiddenActions": [
+        "approve_own_implementation",
+        "mark_unexecuted_pass"
+      ],
+      "handoff": {
+        "nextAgentIds": [
+          "cybersecurity"
+        ],
+        "requiresHumanDecision": true
+      }
+    },
+    {
+      "id": "cybersecurity",
+      "instructionFile": "agents/cybersecurity.md",
+      "maxLevel": "L2",
+      "responsibilities": [
+        "Independently inspect risks and suggest mitigations",
+        "Produce threat model, secret checks, least-privilege findings, and risk tier",
+        "Write findings to docs/security/ only; never patch the code under review"
+      ],
+      "allowedPaths": [
+        "agents/**",
+        "policies/**",
+        "docs/**",
+        ".github/**",
+        "artifacts/**",
+        "lib/**",
+        "supabase1/**"
+      ],
+      "writablePaths": [
+        "docs/security/**"
+      ],
+      "forbiddenActions": [
+        "self_approve",
+        "direct_credential_rotation",
+        "production_db_write"
+      ],
+      "handoff": {
+        "nextAgentIds": [],
+        "requiresHumanDecision": true
+      }
+    }
+  ]
+}

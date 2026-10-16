@@ -1,0 +1,54 @@
+# Fail-closed approval requirements
+
+**Deny unless every required artifact and human seat is present.** Agents, CODEOWNERS, and CI cannot fill a human seat.
+
+## Always required (L1+)
+
+- Task ID and acceptance criteria
+- Isolated branch (never direct push to `main`)
+- Diff summary and rollback
+- Test commands **with logs** (unrun = Not tested, not Pass)
+- Independent QA assessment (not the implementer)
+- Independent cybersecurity assessment (not the implementer)
+- Human decision recorded on the PR
+
+If any item is missing, status is **not approved**.
+
+## L3 (explicit founder comment on the PR)
+
+Required before merge when the change includes any of:
+
+- Database migrations or schema
+- Auth / RLS / grants
+- Pricing, billing, subscriptions that charge money
+- Customer data processing beyond synthetic fixtures
+- Device-binding behavior or privileges
+- Any live-vehicle or OBD write path (default **deny**; even with approval, live writes stay out of agent runtime)
+- Dependency or install-config changes (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`) — `approve:supply_chain_config`
+- Control-plane changes (`.github/`, `agents/`, `policies/`) — `approve:control_plane_change`
+
+The founder comment must name the operation (for example `approve:device_binding`). A generic thumbs-up does not count.
+
+## L4 (production release)
+
+All of L3, plus:
+
+1. PR approved and merged to the protected default branch by a human
+2. Separate GitHub Environment `production` approval by a reviewer who is not the PR author
+3. Release executed only by the restricted CD job bound to that environment (job does not exist yet)
+
+AI cannot approve L4. Auto-merge is forbidden.
+
+## How an approval is recorded
+
+The orchestrator (Phase 4) builds an `agents/contracts/approval-record.schema.json` record from a GitHub review or comment, and checks:
+
+- the account type is `User` (bots and apps are rejected) and is not the PR author
+- the operation token matches (`approve:<operation>`)
+- the approval names the current head SHA; any new push voids it and the task goes back to `in_review`
+
+Until the orchestrator exists, the human reviewer applies the same checks by hand.
+
+## Mapping to the registry
+
+Machine-readable copy: `agents/registry.json` fields `sensitiveOperations`, `protectedPaths`, `globalForbiddenActions`, and `handoffContract.failClosedIfMissingEvidence`. Task statuses that only a human can set: `approved`, `done`, `rejected`, `cancelled` (`agents/contracts/task-status.json`).

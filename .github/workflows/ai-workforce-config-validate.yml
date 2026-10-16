@@ -1,0 +1,45 @@
+name: AI Workforce Config Validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "agents/**"
+      - "policies/**"
+      - ".github/**"
+      - "pnpm-workspace.yaml"
+
+  # No path filter on pull_request: a required check must report on every PR,
+  # otherwise GitHub waits forever for it. The job needs no install (~10s).
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-workforce-config-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-config:
+    name: Validate agent registry and GitHub templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Validate AI workforce files
+        run: node .github/scripts/validate-ai-workforce.mjs
+
+      - name: Test agent path guard
+        run: node --test .github/scripts/agent-path-guard.test.mjs
