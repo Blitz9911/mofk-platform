@@ -6,10 +6,17 @@ import {
   vehiclesTable,
   diagnosticSessionsTable,
   dtcCodesTable,
-  bookingsTable,
-  workshopsTable,
   revenueTable,
+  ordersTable,
+  orderItemsTable,
+  paymentsTable,
+  shipmentsTable,
+  devicesTable,
+  subscriptionsTable,
+  fleetAccountsTable,
+  subscriptionPlansTable,
 } from "@workspace/db";
+import { requireAdmin } from "../lib/auth";
 import {
   GetAdminOverviewResponse,
   ListAdminUsersQueryParams,
@@ -17,11 +24,12 @@ import {
   ListAdminVehiclesResponse,
   ListLiveDiagnosticsResponse,
   GetCommonIssuesResponse,
-  GetWorkshopPipelineResponse,
   GetRevenueBreakdownResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+router.use("/admin", requireAdmin);
 
 router.get("/admin/overview", async (_req, res): Promise<void> => {
   const [{ totalUsers }] = await db
@@ -30,8 +38,6 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
 
   const since1d = new Date();
   since1d.setHours(since1d.getHours() - 24);
-  const since7d = new Date();
-  since7d.setDate(since7d.getDate() - 7);
 
   const [{ activeVehiclesToday }] = await db
     .select({
@@ -66,19 +72,13 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
     .from(usersTable)
     .where(sql`${usersTable.subscriptionTier} IN ('premium','fleet')`);
 
-  const [{ bookingsLast7d }] = await db
-    .select({ bookingsLast7d: sql<number>`count(*)::int` })
-    .from(bookingsTable)
-    .where(gte(bookingsTable.createdAt, since7d));
-
   const [{ avgHealthScore }] = await db
     .select({
       avgHealthScore: sql<number>`coalesce(avg(${vehiclesTable.healthScore}),0)::int`,
     })
     .from(vehiclesTable);
 
-  const revenueMtd =
-    (thisMonth?.subscriptionRevenue ?? 0) + (thisMonth?.commissionRevenue ?? 0);
+  const revenueMtd = thisMonth?.subscriptionRevenue ?? 0;
 
   res.json(
     GetAdminOverviewResponse.parse({
@@ -91,7 +91,6 @@ router.get("/admin/overview", async (_req, res): Promise<void> => {
       revenueTrendPct: 18,
       nps: 67,
       premiumSubscribers,
-      bookingsLast7d,
       avgHealthScore,
     }),
   );
@@ -228,44 +227,67 @@ router.get("/admin/issues/common", async (_req, res): Promise<void> => {
   res.json(GetCommonIssuesResponse.parse(enriched));
 });
 
-router.get("/admin/workshops/pipeline", async (_req, res): Promise<void> => {
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const rows = await db
-    .select({
-      workshopId: workshopsTable.id,
-      name: workshopsTable.name,
-      nameAr: workshopsTable.nameAr,
-      city: workshopsTable.city,
-      rating: workshopsTable.rating,
-      commissionPct: workshopsTable.commissionPct,
-      pendingBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'pending')::int`,
-      confirmedBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'confirmed')::int`,
-      completedBookings: sql<number>`count(*) FILTER (WHERE ${bookingsTable.status} = 'completed' AND ${bookingsTable.scheduledAt} >= ${since})::int`,
-      revenue30d: sql<number>`coalesce(sum(${bookingsTable.finalCost}) FILTER (WHERE ${bookingsTable.status} = 'completed' AND ${bookingsTable.scheduledAt} >= ${since}), 0)::int`,
-    })
-    .from(workshopsTable)
-    .leftJoin(bookingsTable, eq(bookingsTable.workshopId, workshopsTable.id))
-    .groupBy(workshopsTable.id)
-    .orderBy(desc(sql`count(*) FILTER (WHERE ${bookingsTable.status} = 'completed')`));
-
-  res.json(
-    GetWorkshopPipelineResponse.parse(
-      rows.map((r) => ({
-        ...r,
-        rating: Number(r.rating),
-        commission30d: Math.round(r.revenue30d * (r.commissionPct / 100)),
-      })),
-    ),
-  );
-});
-
 router.get("/admin/revenue", async (_req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(revenueTable)
     .orderBy(asc(revenueTable.month));
   res.json(GetRevenueBreakdownResponse.parse(rows));
+});
+
+router.get("/admin/orders", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(ordersTable).orderBy(desc(ordersTable.createdAt));
+  res.json(rows);
+});
+
+router.get("/admin/orders/:id", async (req, res): Promise<void> => {
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, req.params.id)).limit(1);
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  const payments = await db.select().from(paymentsTable).where(eq(paymentsTable.orderId, order.id));
+  const shipments = await db.select().from(shipmentsTable).where(eq(shipmentsTable.orderId, order.id));
+  res.json({ order, items, payments, shipments });
+});
+
+router.patch("/admin/orders/:id/status", async (req, res): Promise<void> => {
+  const status = String(req.body?.status ?? "");
+  const allowed = ["created", "pending_payment", "paid", "preparing", "shipped", "delivered", "cancelled"];
+  if (!allowed.includes(status)) {
+    res.status(400).json({ error: "Invalid order status" });
+    return;
+  }
+  const [order] = await db.update(ordersTable).set({ status, updatedAt: new Date() }).where(eq(ordersTable.id, req.params.id)).returning();
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  res.json(order);
+});
+
+router.get("/admin/devices", async (_req, res): Promise<void> => {
+  res.json(await db.select().from(devicesTable).orderBy(desc(devicesTable.createdAt)));
+});
+
+router.get("/admin/subscriptions", async (_req, res): Promise<void> => {
+  res.json(await db.select().from(subscriptionsTable).orderBy(desc(subscriptionsTable.createdAt)));
+});
+
+router.get("/admin/fleet-accounts", async (_req, res): Promise<void> => {
+  res.json(await db.select().from(fleetAccountsTable).orderBy(desc(fleetAccountsTable.createdAt)));
+});
+
+router.get("/admin/reports", async (_req, res): Promise<void> => {
+  const [{ orders }] = await db.select({ orders: sql<number>`count(*)::int` }).from(ordersTable);
+  const [{ revenue }] = await db.select({ revenue: sql<number>`coalesce(sum(${paymentsTable.amount}),0)::int` }).from(paymentsTable).where(eq(paymentsTable.status, "paid"));
+  res.json({ orders, paidRevenueSar: revenue });
+});
+
+router.get("/admin/settings", async (_req, res): Promise<void> => {
+  const plans = await db.select().from(subscriptionPlansTable).orderBy(asc(subscriptionPlansTable.sortOrder));
+  res.json({ plans, moyasarWebhookConfigured: Boolean(process.env.MOYASAR_WEBHOOK_SECRET) });
 });
 
 export default router;

@@ -1,205 +1,258 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "wouter";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Header } from "@/components/marketing/Header";
 import { Footer } from "@/components/marketing/Footer";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
-import { CheckCircle2, X } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { useListSubscriptionPlans } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  BillingCycle,
+  SubscriptionPlanId,
+  comparisonRows,
+  formatSar,
+  formatVehicles,
+  getDisplayPrice,
+  getMonthlyEquivalent,
+  getPlanById,
+  getYearlySavings,
+  subscriptionPlans,
+} from "@/data/subscriptionPlans";
 
-export default function Pricing() {
-  const [isYearly, setIsYearly] = useState(false);
-  const { data: plans, isLoading } = useListSubscriptionPlans();
+function PlanPrice({ planId, cycle }: { planId: SubscriptionPlanId; cycle: BillingCycle }) {
+  const plan = getPlanById(planId);
+
+  if (plan.saleType === "sales-led") {
+    return (
+      <div className="space-y-1">
+        <div className="text-3xl font-black text-white">تواصل معنا</div>
+        <p className="text-sm text-[#8A8A8A]">بدون سعر معلن</p>
+      </div>
+    );
+  }
+
+  const price = getDisplayPrice(plan, cycle) ?? 0;
+  const monthlyEquivalent = getMonthlyEquivalent(plan);
+  const displayPrice = cycle === "yearly" && monthlyEquivalent ? monthlyEquivalent : price;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col font-sans">
+    <div className="space-y-1">
+      <div className="flex items-end gap-2">
+        <span className="text-4xl font-black text-white">{formatSar(displayPrice)}</span>
+        <span className="pb-1 text-sm text-[#8A8A8A]">ر.س / شهر</span>
+      </div>
+      {cycle === "yearly" && plan.yearlyPrice ? (
+        <p className="text-sm text-[#8A8A8A]">يدفع {formatSar(plan.yearlyPrice)} ر.س سنويًا، وفر {getYearlySavings(plan)}٪</p>
+      ) : (
+        <p className="text-sm text-[#8A8A8A]">{price === 0 ? "بدون بطاقة بنكية" : "دفع شهري مرن"}</p>
+      )}
+    </div>
+  );
+}
+
+function CellValue({ value }: { value: string }) {
+  if (value === "نعم") return <CheckCircle2 className="mx-auto h-5 w-5 text-[#2ECC71]" />;
+  if (value === "لا") return <span className="text-[#5A5A5A]">-</span>;
+  return <span>{value}</span>;
+}
+
+function authCheckoutHref(plan: "mofk" | "family") {
+  const params = new URLSearchParams({ next: "/checkout/plan", plan });
+  return `/auth?${params.toString()}`;
+}
+
+export default function Pricing() {
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("yearly");
+  const [selectedPlanId, setSelectedPlanId] = useState<SubscriptionPlanId>("mofk");
+  const [isLoading] = useState(false);
+  const [networkError] = useState(false);
+
+  const selectedPlan = useMemo(() => getPlanById(selectedPlanId), [selectedPlanId]);
+  const checkoutHrefByPlan: Record<SubscriptionPlanId, string> = {
+    free: "/onboarding?plan=free",
+    mofk: authCheckoutHref("mofk"),
+    family: authCheckoutHref("family"),
+    fleet: "/fleet-contact",
+  };
+
+  return (
+    <div className="dark min-h-screen bg-[#0B0B0B] text-white" dir="rtl" style={{ fontFamily: "Tajawal, Cairo, Almarai, system-ui, sans-serif" }}>
       <Header />
 
-      <main className="flex-1 pt-32 pb-24">
-        <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">استثمر في راحة بالك</h1>
-            <p className="text-xl text-muted-foreground leading-relaxed">
-              باقات مرنة تناسب احتياجاتك. وفر المال باكتشاف الأعطال مبكراً، وتجنب زيارات الورش غير الضرورية.
-            </p>
-            
-            <div className="mt-10 inline-flex items-center gap-4 bg-muted/50 p-2 rounded-full border border-border">
-              <span className={`text-sm font-medium px-4 ${!isYearly ? 'text-foreground' : 'text-muted-foreground'}`}>شهري</span>
-              <Switch 
-                checked={isYearly} 
-                onCheckedChange={setIsYearly} 
-                dir="ltr"
-                className="data-[state=checked]:bg-primary"
-              />
-              <span className={`text-sm font-medium px-4 flex items-center gap-2 ${isYearly ? 'text-foreground' : 'text-muted-foreground'}`}>
-                سنوي
-                <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full font-bold">خصم 20%</span>
-              </span>
+      <main className="pb-32 pt-28 md:pt-32">
+        <section className="mx-auto w-full max-w-7xl px-4 md:px-6">
+          <div className="max-w-3xl space-y-6">
+            <div className="space-y-4">
+              <h1 className="text-4xl font-black leading-tight tracking-normal md:text-6xl">اختر الباقة المناسبة لسيارتك</h1>
+              <p className="max-w-xl text-base leading-8 text-[#8A8A8A] md:text-lg">
+                باقة مجانية للأساسيات، باقة مفك لمركبة واحدة، باقة العائلة لعدة مركبات، وباقة الاسطول للشركات عبر المبيعات.
+              </p>
+            </div>
+
+            <div className="inline-grid grid-cols-2 rounded-[12px] border border-[#2A2A2A] bg-[#1A1A1A] p-1" role="tablist" aria-label="دورة الفوترة">
+              {(["monthly", "yearly"] as BillingCycle[]).map((cycle) => (
+                <button
+                  key={cycle}
+                  type="button"
+                  role="tab"
+                  aria-selected={billingCycle === cycle}
+                  aria-pressed={billingCycle === cycle}
+                  onClick={() => setBillingCycle(cycle)}
+                  className={cn(
+                    "min-w-[112px] rounded-[10px] px-5 py-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                    billingCycle === cycle ? "bg-[#FF6A00] text-white" : "text-[#8A8A8A] hover:text-white",
+                  )}
+                >
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <span>{cycle === "monthly" ? "شهري" : "سنوي"}</span>
+                    {cycle === "yearly" && (
+                      <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs leading-none">وفر أكثر</span>
+                    )}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
+        </section>
+
+        <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
+          {networkError && (
+            <div className="mb-4 flex items-center gap-3 rounded-[16px] border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-100">
+              <AlertCircle className="h-5 w-5" />
+              تعذر تحميل الخطط. تحقق من الاتصال ثم حاول مرة أخرى.
+            </div>
+          )}
 
           {isLoading ? (
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-24">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-[600px] w-full rounded-3xl" />)}
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <Skeleton key={item} className="h-[420px] rounded-[16px] bg-[#1A1A1A]" />
+              ))}
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-24">
-              {Array.isArray(plans) && plans.map((plan) => {
-                const isPopular = plan.isPopular;
-                const price = isYearly && plan.priceYearlySar 
-                  ? Math.round(plan.priceYearlySar / 12) 
-                  : plan.priceMonthlySar;
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {subscriptionPlans.map((plan) => {
+                const selected = selectedPlanId === plan.id;
 
                 return (
-                  <div 
-                    key={plan.id} 
-                    className={`relative bg-card rounded-3xl p-8 flex flex-col ${
-                      isPopular 
-                        ? 'border-2 border-primary shadow-xl shadow-primary/10 scale-105 z-10' 
-                        : 'border border-border'
-                    }`}
+                  <button
+                    key={plan.id}
+                    type="button"
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    aria-pressed={selected}
+                    className={cn(
+                      "relative flex min-h-[410px] flex-col rounded-[16px] border bg-[#1A1A1A] p-5 text-right transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6A00]",
+                      selected ? "border-[#FF6A00] bg-[#222]" : "border-[#2A2A2A] hover:border-[#FF6A00]/70",
+                    )}
                   >
-                    {isPopular && (
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-sm font-bold px-4 py-1 rounded-full">
-                        الأكثر طلباً
+                    {plan.badge && <span className="absolute left-4 top-4 rounded-full bg-[#FF6A00] px-3 py-1 text-xs font-black text-white">{plan.badge}</span>}
+
+                    <div className="space-y-3">
+                      <h2 className="text-2xl font-black">{plan.name}</h2>
+                      <p className="min-h-12 text-sm leading-6 text-[#8A8A8A]">{plan.subtitle}</p>
+                      <PlanPrice planId={plan.id} cycle={billingCycle} />
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                      {plan.included.slice(0, 5).map((feature) => (
+                        <div key={feature} className="flex items-start gap-2 text-sm leading-6">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                          <span>{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                      <div className="rounded-[12px] border border-[#2A2A2A] bg-[#0B0B0B] px-4 py-3 text-center text-sm font-bold text-white">
+                        {plan.saleType === "sales-led" ? "تواصل مع المبيعات" : selected ? "الباقة المحددة" : "اختيار الباقة"}
                       </div>
-                    )}
-                    
-                    <div className="mb-8">
-                      <h3 className="text-2xl font-bold mb-2">{plan.nameAr}</h3>
-                      <p className="text-muted-foreground text-sm h-10">{plan.descriptionAr}</p>
                     </div>
-
-                    <div className="mb-8 flex items-baseline gap-1">
-                      <span className="text-5xl font-black text-foreground">{price}</span>
-                      <div className="flex flex-col text-sm text-muted-foreground">
-                        <span>ر.س</span>
-                        <span>/ {isYearly ? 'شهر (يُدفع سنوياً)' : 'شهر'}</span>
-                      </div>
-                    </div>
-
-                    {plan.tier === "fleet" ? (
-                      <Link href="/contact" className="mt-auto block w-full">
-                        <Button className="w-full h-12 text-lg font-medium" variant="outline">
-                          تواصل مع المبيعات
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Link href="/login" className="mt-auto block w-full">
-                        <Button 
-                          className="w-full h-12 text-lg font-medium" 
-                          variant={isPopular ? "default" : "outline"}
-                        >
-                          {plan.priceMonthlySar === 0 ? 'ابدأ مجاناً' : 'اشترك الآن'}
-                        </Button>
-                      </Link>
-                    )}
-
-                    <div className="mt-8 pt-8 border-t border-border">
-                      <ul className="space-y-4">
-                        {plan.featuresAr?.map((feature, i) => (
-                          <li key={i} className="flex items-start gap-3">
-                            <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                            <span className="text-sm text-foreground">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
+        </section>
 
-          {/* Feature Matrix */}
-          <div className="max-w-4xl mx-auto mb-24">
-            <h2 className="text-3xl font-bold text-center mb-10">مقارنة الباقات بالتفصيل</h2>
-            <div className="overflow-x-auto rounded-2xl border border-border bg-card">
-              <table className="w-full min-w-[600px] text-sm">
+        <section className="mx-auto mt-6 w-full max-w-7xl px-4 md:px-6">
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-bold text-[#FF6A00]">تفاصيل الباقة</p>
+                <h2 className="mt-2 text-2xl font-black">{selectedPlan.name}</h2>
+                <p className="mt-2 text-sm leading-7 text-[#8A8A8A]">{selectedPlan.summary}</p>
+              </div>
+              <div className="rounded-[12px] border border-[#2A2A2A] bg-[#222] px-4 py-3 text-sm text-[#8A8A8A]">
+                {selectedPlan.maxVehicles === "sales" ? "٥ مركبات فأكثر" : `حتى ${formatVehicles(selectedPlan.maxVehicles)} مركبة`}
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {selectedPlan.included.map((feature) => (
+                <div key={feature} className="flex items-start gap-3 rounded-[12px] bg-[#222] p-3 text-sm leading-6">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#2ECC71]" />
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto mt-10 w-full max-w-7xl px-4 md:px-6">
+          <div className="rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-5 md:p-6">
+            <div className="mb-6">
+              <p className="text-sm font-bold text-[#FF6A00]">جدول المقارنة</p>
+              <h2 className="mt-2 text-2xl font-black">مقارنة الميزات</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[920px] text-sm">
                 <thead>
-                  <tr className="bg-muted/50 border-b border-border">
-                    <th className="p-4 text-right font-bold text-base w-2/5">الميزات</th>
-                    <th className="p-4 text-center font-bold text-base w-1/5">الأساسية</th>
-                    <th className="p-4 text-center font-bold text-base text-primary w-1/5">برو</th>
-                    <th className="p-4 text-center font-bold text-base w-1/5">الأسطول</th>
+                  <tr className="border-b border-[#2A2A2A] text-[#8A8A8A]">
+                    <th className="p-3 text-right">الميزة</th>
+                    <th className="p-3 text-center">باقة مجانية</th>
+                    <th className="p-3 text-center text-[#FF6A00]">باقة مفك</th>
+                    <th className="p-3 text-center">باقة العائلة</th>
+                    <th className="p-3 text-center">باقة الاسطول</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {[
-                    { name: "قراءة أكواد الأعطال (OBD2)", free: true, pro: true, fleet: true },
-                    { name: "مسح لمبة المحرك", free: true, pro: true, fleet: true },
-                    { name: "البيانات الحية الأساسية", free: true, pro: true, fleet: true },
-                    { name: "تفسير الأعطال باللغة العربية", free: false, pro: true, fleet: true },
-                    { name: "تنبيهات الصيانة الذكية", free: false, pro: true, fleet: true },
-                    { name: "المساعد الذكي (AI)", free: false, pro: true, fleet: true },
-                    { name: "حجز مواعيد الورش", free: false, pro: true, fleet: true },
-                    { name: "تقارير التكلفة التقديرية", free: false, pro: true, fleet: true },
-                    { name: "عدد المركبات", free: "مركبة واحدة", pro: "حتى 3 مركبات", fleet: "غير محدود" },
-                    { name: "لوحة تحكم إدارية مخصصة", free: false, pro: false, fleet: true },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-muted/30">
-                      <td className="p-4 font-medium text-foreground">{row.name}</td>
-                      <td className="p-4 text-center">
-                        {typeof row.free === 'boolean' ? (
-                          row.free ? <CheckCircle2 className="w-5 h-5 text-muted-foreground mx-auto" /> : <X className="w-5 h-5 text-muted/30 mx-auto" />
-                        ) : <span className="text-muted-foreground">{row.free}</span>}
-                      </td>
-                      <td className="p-4 text-center bg-primary/5">
-                        {typeof row.pro === 'boolean' ? (
-                          row.pro ? <CheckCircle2 className="w-5 h-5 text-primary mx-auto" /> : <X className="w-5 h-5 text-muted/30 mx-auto" />
-                        ) : <span className="font-bold text-primary">{row.pro}</span>}
-                      </td>
-                      <td className="p-4 text-center">
-                        {typeof row.fleet === 'boolean' ? (
-                          row.fleet ? <CheckCircle2 className="w-5 h-5 text-muted-foreground mx-auto" /> : <X className="w-5 h-5 text-muted/30 mx-auto" />
-                        ) : <span className="text-muted-foreground">{row.fleet}</span>}
-                      </td>
-                    </tr>
-                  ))}
+                <tbody>
+                  {comparisonRows.map((row) =>
+                    row.type === "section" ? (
+                      <tr key={row.label}>
+                        <td colSpan={5} className="bg-[#0B0B0B] p-3 text-sm font-black text-[#FF6A00]">{row.label}</td>
+                      </tr>
+                    ) : (
+                      <tr key={row.label} className="border-b border-[#2A2A2A]/80">
+                        <td className="p-3 font-bold">{row.label}</td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.free} /></td>
+                        <td className="bg-[#FF6A00]/5 p-3 text-center font-bold text-white"><CellValue value={row.mofk} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.family} /></td>
+                        <td className="p-3 text-center text-[#CFCFCF]"><CellValue value={row.fleet} /></td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+        </section>
+      </main>
 
-          {/* FAQ */}
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold text-center mb-10">أسئلة متكررة عن الاشتراك</h2>
-            <Accordion type="single" collapsible className="w-full bg-card border border-border rounded-2xl px-6 py-2">
-              <AccordionItem value="q1" className="border-b border-border">
-                <AccordionTrigger className="text-base font-bold">هل أحتاج لشراء الجهاز أولاً؟</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed">
-                  نعم، التطبيق يتطلب جهاز MFK OBD-II ليعمل. عند اشتراكك في باقة (برو) السنوية، ستحصل على الجهاز مجاناً مع توصيل مجاني. أما في الباقة الأساسية فستحتاج لشراء الجهاز بشكل منفصل.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="q2" className="border-b border-border">
-                <AccordionTrigger className="text-base font-bold">كيف يعمل ضمان استرجاع الأموال؟</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed">
-                  إذا لم تكن راضياً عن الخدمة لأي سبب خلال أول 14 يوماً من استلام الجهاز، يمكنك إرجاع الجهاز واسترداد كامل مبلغ الاشتراك وقيمة الجهاز بدون أي أسئلة.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="q3" className="border-b border-border">
-                <AccordionTrigger className="text-base font-bold">هل يمكنني تغيير أو إلغاء باقتي لاحقاً؟</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed">
-                  بالتأكيد. يمكنك ترقية باقتك، أو تخفيضها، أو إلغاء التجديد التلقائي في أي وقت من خلال إعدادات حسابك في التطبيق. لن يتم فرض أي رسوم إلغاء.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="q4" className="border-none">
-                <AccordionTrigger className="text-base font-bold">لدي أكثر من سيارة، هل أحتاج لاشتراكات متعددة؟</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground leading-relaxed">
-                  باقة (برو) تسمح لك بإدارة حتى 3 مركبات بنفس الحساب والجهاز (يمكنك نقل الجهاز بينها). إذا كان لديك عدد أكبر من السيارات أو تدير أسطولاً، يرجى التواصل معنا للاشتراك في باقة (الأسطول).
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+      {selectedPlan.id !== "free" && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#2A2A2A] bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/95 to-transparent px-4 pb-4 pt-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-[16px] border border-[#2A2A2A] bg-[#1A1A1A] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-[#8A8A8A]">الباقة المحددة</p>
+              <p className="text-lg font-black">{selectedPlan.name}</p>
+            </div>
+            <Link href={checkoutHrefByPlan[selectedPlan.id]}>
+              <Button className="h-12 w-full rounded-[12px] bg-[#FF6A00] px-8 text-base font-black hover:bg-[#E65C00] sm:w-auto">
+                {selectedPlan.saleType === "sales-led" ? "تواصل مع المبيعات" : "ابدأ الاشتراك"}
+              </Button>
+            </Link>
           </div>
         </div>
-      </main>
+      )}
 
       <Footer />
     </div>

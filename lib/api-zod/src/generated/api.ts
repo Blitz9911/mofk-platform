@@ -24,14 +24,13 @@ export const GetDashboardOverviewResponse = zod.object({
   upcomingMaintenanceCount: zod.number(),
   overdueMaintenanceCount: zod.number().optional(),
   avgHealthScore: zod.number(),
-  upcomingBookingCount: zod.number().optional(),
   totalSessionsLast30d: zod.number().optional(),
   kmDrivenLast30d: zod.number().optional(),
   estimatedSavingsSar: zod.number().optional(),
 });
 
 /**
- * @summary Recent diagnostic / maintenance / booking activity feed
+ * @summary Recent diagnostic / maintenance activity feed
  */
 export const getRecentActivityQueryLimitDefault = 10;
 export const getRecentActivityQueryLimitMax = 50;
@@ -50,8 +49,6 @@ export const GetRecentActivityResponseItem = zod.object({
     "dtc_detected",
     "dtc_cleared",
     "maintenance_done",
-    "booking_created",
-    "booking_completed",
     "ai_recommendation",
   ]),
   titleAr: zod.string(),
@@ -494,7 +491,6 @@ export const LogMaintenanceBody = zod.object({
   doneAt: zod.coerce.date(),
   doneAtKm: zod.number(),
   cost: zod.number().optional(),
-  workshopId: zod.string().optional(),
   notes: zod.string().optional(),
 });
 
@@ -528,125 +524,6 @@ export const GetUpcomingMaintenanceResponse = zod.array(
   GetUpcomingMaintenanceResponseItem,
 );
 
-export const ListWorkshopsQueryParams = zod.object({
-  city: zod.coerce.string().optional(),
-  service: zod.coerce.string().optional(),
-});
-
-export const ListWorkshopsResponseItem = zod.object({
-  id: zod.string(),
-  name: zod.string(),
-  nameAr: zod.string(),
-  phone: zod.string().nullish(),
-  city: zod.string(),
-  district: zod.string().nullish(),
-  rating: zod.number(),
-  reviewsCount: zod.number().optional(),
-  services: zod.array(zod.string()).optional(),
-  servicesAr: zod.array(zod.string()).optional(),
-  isVerified: zod.boolean().optional(),
-  imageUrl: zod.string().nullish(),
-  priceLevel: zod.enum(["budget", "standard", "premium"]).optional(),
-});
-export const ListWorkshopsResponse = zod.array(ListWorkshopsResponseItem);
-
-export const GetWorkshopParams = zod.object({
-  workshopId: zod.coerce.string(),
-});
-
-export const GetWorkshopResponse = zod
-  .object({
-    id: zod.string(),
-    name: zod.string(),
-    nameAr: zod.string(),
-    phone: zod.string().nullish(),
-    city: zod.string(),
-    district: zod.string().nullish(),
-    rating: zod.number(),
-    reviewsCount: zod.number().optional(),
-    services: zod.array(zod.string()).optional(),
-    servicesAr: zod.array(zod.string()).optional(),
-    isVerified: zod.boolean().optional(),
-    imageUrl: zod.string().nullish(),
-    priceLevel: zod.enum(["budget", "standard", "premium"]).optional(),
-  })
-  .and(
-    zod.object({
-      description: zod.string().nullish(),
-      descriptionAr: zod.string().nullish(),
-      openingHours: zod.string().nullish(),
-      address: zod.string().nullish(),
-      addressAr: zod.string().nullish(),
-      recentBookingsCount: zod.number().optional(),
-    }),
-  );
-
-export const ListBookingsResponseItem = zod.object({
-  id: zod.string(),
-  vehicleId: zod.string(),
-  vehicleMake: zod.string().optional(),
-  vehicleModel: zod.string().optional(),
-  workshopId: zod.string(),
-  workshopName: zod.string().optional(),
-  workshopNameAr: zod.string().optional(),
-  serviceType: zod.string().optional(),
-  serviceTypeAr: zod.string().optional(),
-  scheduledAt: zod.coerce.date(),
-  status: zod.enum([
-    "pending",
-    "confirmed",
-    "in_progress",
-    "completed",
-    "cancelled",
-  ]),
-  estimatedCost: zod.number().nullish(),
-  finalCost: zod.number().nullish(),
-  createdAt: zod.coerce.date().optional(),
-});
-export const ListBookingsResponse = zod.array(ListBookingsResponseItem);
-
-export const CreateBookingBody = zod.object({
-  vehicleId: zod.string(),
-  workshopId: zod.string(),
-  serviceType: zod.string(),
-  scheduledAt: zod.coerce.date(),
-  notes: zod.string().optional(),
-});
-
-export const UpdateBookingParams = zod.object({
-  bookingId: zod.coerce.string(),
-});
-
-export const UpdateBookingBody = zod.object({
-  status: zod
-    .enum(["pending", "confirmed", "in_progress", "completed", "cancelled"])
-    .optional(),
-  scheduledAt: zod.coerce.date().optional(),
-});
-
-export const UpdateBookingResponse = zod.object({
-  id: zod.string(),
-  vehicleId: zod.string(),
-  vehicleMake: zod.string().optional(),
-  vehicleModel: zod.string().optional(),
-  workshopId: zod.string(),
-  workshopName: zod.string().optional(),
-  workshopNameAr: zod.string().optional(),
-  serviceType: zod.string().optional(),
-  serviceTypeAr: zod.string().optional(),
-  scheduledAt: zod.coerce.date(),
-  status: zod.enum([
-    "pending",
-    "confirmed",
-    "in_progress",
-    "completed",
-    "cancelled",
-  ]),
-  estimatedCost: zod.number().nullish(),
-  finalCost: zod.number().nullish(),
-  createdAt: zod.coerce.date().optional(),
-});
-
 export const AiChatBody = zod.object({
   message: zod.string(),
   vehicleId: zod.string().optional(),
@@ -660,7 +537,6 @@ export const AiChatResponse = zod.object({
         labelAr: zod.string().optional(),
         kind: zod
           .enum([
-            "book_workshop",
             "view_dtc",
             "schedule_maintenance",
             "view_vehicle",
@@ -753,7 +629,6 @@ export const GetAdminOverviewResponse = zod.object({
   revenueTrendPct: zod.number().optional(),
   nps: zod.number().optional(),
   premiumSubscribers: zod.number().optional(),
-  bookingsLast7d: zod.number().optional(),
   avgHealthScore: zod.number().optional(),
 });
 
@@ -828,28 +703,6 @@ export const GetCommonIssuesResponseItem = zod.object({
 });
 export const GetCommonIssuesResponse = zod.array(GetCommonIssuesResponseItem);
 
-/**
- * @summary Workshop bookings pipeline + commission tracking
- */
-export const GetWorkshopPipelineResponseItem = zod.object({
-  workshopId: zod.string(),
-  name: zod.string(),
-  nameAr: zod.string(),
-  city: zod.string().optional(),
-  pendingBookings: zod.number().optional(),
-  confirmedBookings: zod.number().optional(),
-  completedBookings: zod.number().optional(),
-  revenue30d: zod.number().optional(),
-  commission30d: zod.number().optional(),
-  rating: zod.number().optional(),
-});
-export const GetWorkshopPipelineResponse = zod.array(
-  GetWorkshopPipelineResponseItem,
-);
-
-/**
- * @summary Subscription + booking revenue, last 12 months
- */
 export const GetRevenueBreakdownResponseItem = zod.object({
   month: zod.string(),
   subscriptionRevenue: zod.number(),

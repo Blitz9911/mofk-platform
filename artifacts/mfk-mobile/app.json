@@ -15,9 +15,18 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mfk.diagnostics"
+      "bundleIdentifier": "com.mfk.diagnostics",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."
+      }
     },
-    "android": {},
+    "android": {
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -29,7 +38,15 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "react-native-ble-plx",
+        {
+          "neverForLocation": false,
+          "isBackgroundEnabled": false,
+          "bluetoothAlwaysPermission": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

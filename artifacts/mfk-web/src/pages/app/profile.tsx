@@ -28,6 +28,10 @@ type ProfileForm = {
   phone: string;
   email: string;
   role: string;
+  subscriptionTier: string;
+  subscriptionEndsAt?: string | null;
+  subscriptionAutoRenew?: boolean | null;
+  isActive?: boolean | null;
 };
 
 type DashboardOverview = {
@@ -38,6 +42,41 @@ type DashboardOverview = {
   activeRecommendationsCount?: number;
   completedMaintenanceCount?: number;
 };
+
+function getTierLabel(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+      return "مفك";
+    case "premium":
+      return "احترافي";
+    case "pro":
+      return "متقدم";
+    case "family":
+      return "العائلة";
+    case "fleet":
+      return "الأسطول";
+    default:
+      return "مجاني";
+  }
+}
+
+function getTierDescription(tier?: string | null) {
+  switch (tier) {
+    case "plus":
+    case "mofk":
+      return "مركبة واحدة مع تجهيز الربط بجهاز OBD.";
+    case "premium":
+    case "pro":
+      return "حتى 3 مركبات حسب صلاحيات الباقة.";
+    case "family":
+      return "حتى 5 مركبات للعائلة.";
+    case "fleet":
+      return "حساب أسطول بصلاحيات موسعة ودعم خاص.";
+    default:
+      return "مركبة واحدة للميزات الأساسية.";
+  }
+}
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -91,6 +130,10 @@ export default function ProfilePage() {
     phone: "",
     email: "",
     role: "user",
+    subscriptionTier: "free",
+    subscriptionEndsAt: null,
+    subscriptionAutoRenew: true,
+    isActive: true,
   });
 
   const [originalForm, setOriginalForm] = useState<ProfileForm | null>(null);
@@ -103,9 +146,11 @@ export default function ProfilePage() {
 
   const initials = form.name?.trim()?.charAt(0) || "م";
   const isAdmin = form.role === "admin";
+  const tierLabel = getTierLabel(form.subscriptionTier);
+  const tierDescription = getTierDescription(form.subscriptionTier);
 
   const completion = useMemo(() => {
-    const fields = [form.name, form.phone, form.email, form.role];
+    const fields = [form.name, form.phone, form.email, form.role, form.subscriptionTier];
     const completed = fields.filter((field) => String(field || "").trim()).length;
     return Math.round((completed / fields.length) * 100);
   }, [form]);
@@ -139,6 +184,10 @@ export default function ProfilePage() {
           phone: profile.phone || "",
           email: profile.email || "",
           role: profile.role || "user",
+          subscriptionTier: profile.subscriptionTier || "free",
+          subscriptionEndsAt: profile.subscriptionEndsAt ?? null,
+          subscriptionAutoRenew: profile.subscriptionAutoRenew ?? true,
+          isActive: profile.isActive ?? true,
         };
 
         setForm(nextForm);
@@ -193,6 +242,10 @@ export default function ProfilePage() {
         phone: updatedProfile.phone || "",
         email: updatedProfile.email || "",
         role: updatedProfile.role || "user",
+        subscriptionTier: updatedProfile.subscriptionTier || "free",
+        subscriptionEndsAt: updatedProfile.subscriptionEndsAt ?? null,
+        subscriptionAutoRenew: updatedProfile.subscriptionAutoRenew ?? true,
+        isActive: updatedProfile.isActive ?? true,
       };
 
       setForm(nextForm);
@@ -301,12 +354,14 @@ export default function ProfilePage() {
               </div>
 
               <div className="rounded-2xl bg-white/15 border border-white/20 p-4 backdrop-blur">
-                <p className="text-xs text-white/70">الباقة الحالية</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Crown className="h-5 w-5" />
-                  <p className="text-2xl font-black">Premium</p>
-                </div>
-                <p className="text-xs text-white/70 mt-2">حساب مفعل</p>
+                  <p className="text-xs text-white/70">الباقة الحالية</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Crown className="h-5 w-5" />
+                  <p className="text-2xl font-black">{tierLabel}</p>
+                  </div>
+                <p className="text-xs text-white/70 mt-2">
+                  {form.isActive === false ? "حساب غير نشط" : "حساب مفعل"}
+                </p>
               </div>
             </div>
           </div>
@@ -488,7 +543,8 @@ export default function ProfilePage() {
               <InfoRow icon={Mail} label="البريد الإلكتروني" value={form.email} />
               <InfoRow icon={Phone} label="رقم الجوال" value={form.phone} />
               <InfoRow icon={Shield} label="الصلاحية" value={isAdmin ? "مدير النظام" : "مستخدم"} />
-              <InfoRow icon={CheckCircle2} label="حالة الحساب" value="مفعل" />
+              <InfoRow icon={Crown} label="الباقة" value={tierLabel} />
+              <InfoRow icon={CheckCircle2} label="حالة الحساب" value={form.isActive === false ? "غير نشط" : "مفعل"} />
             </CardContent>
           </Card>
         </div>
@@ -499,7 +555,7 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-white/75">الاشتراك الحالي</p>
-                  <h3 className="text-2xl font-black mt-1">Premium</h3>
+                  <h3 className="text-2xl font-black mt-1">{tierLabel}</h3>
                 </div>
 
                 <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
@@ -508,14 +564,16 @@ export default function ProfilePage() {
               </div>
 
               <p className="text-sm text-white/75 mt-3">
-                وصول كامل للمزايا الذكية والتنبيهات والتوصيات.
+                {tierDescription}
               </p>
             </div>
 
             <CardContent className="p-5 space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">الحالة</span>
-                <span className="font-semibold text-green-600">نشط</span>
+                <span className="font-semibold text-green-600">
+                  {form.isActive === false ? "غير نشط" : "نشط"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between text-sm">

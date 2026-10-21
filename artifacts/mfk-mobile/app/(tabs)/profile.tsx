@@ -18,8 +18,12 @@ import { useColors } from "@/hooks/useColors";
 
 const TIER_LABELS: Record<string, string> = {
   free: "مجاني",
+  mofk: "مفك",
+  plus: "مفك",
   basic: "أساسي",
-  premium: "مميز",
+  premium: "احترافي",
+  pro: "متقدم",
+  family: "العائلة",
   fleet: "الأسطول",
 };
 
@@ -46,7 +50,8 @@ export default function ProfileScreen() {
   const { data: plans } = useListSubscriptionPlans();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const currentPlan = plans?.find((p) => p.tier === sub?.tier);
+  const activeTier = user?.subscriptionTier || sub?.tier || "free";
+  const currentPlan = plans?.find((p) => p.tier === activeTier || p.id === activeTier);
 
   const firstLetter = user?.name?.charAt(0) ?? "م";
 
@@ -82,20 +87,20 @@ export default function ProfileScreen() {
         </View>
 
         {/* Subscription Card */}
-        {sub && (
+        {(sub || user) && (
           <View style={[styles.subCard, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}>
             <View style={styles.subHeader}>
               <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
               <Text style={[styles.subTitle, { color: colors.primary }]}>
-                الاشتراك {TIER_LABELS[sub.tier] ?? sub.tier}
+                الاشتراك {TIER_LABELS[activeTier] ?? activeTier}
               </Text>
             </View>
             {currentPlan && (
               <Text style={[styles.subDesc, { color: colors.foreground }]}>{currentPlan.nameAr}</Text>
             )}
-            {sub.endsAt && (
+            {(user?.subscriptionEndsAt || sub?.endsAt) && (
               <Text style={[styles.subExp, { color: colors.mutedForeground }]}>
-                صالح حتى {new Date(sub.endsAt).toLocaleDateString("ar-SA")}
+                صالح حتى {new Date(user?.subscriptionEndsAt || sub?.endsAt || "").toLocaleDateString("ar-SA")}
               </Text>
             )}
           </View>

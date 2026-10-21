@@ -240,93 +240,7 @@ export interface LogMaintenanceBody {
   doneAt: string;
   doneAtKm: number;
   cost?: number;
-  workshopId?: string;
   notes?: string;
-}
-
-export type WorkshopPriceLevel =
-  (typeof WorkshopPriceLevel)[keyof typeof WorkshopPriceLevel];
-
-export const WorkshopPriceLevel = {
-  budget: "budget",
-  standard: "standard",
-  premium: "premium",
-} as const;
-
-export interface Workshop {
-  id: string;
-  name: string;
-  nameAr: string;
-  phone?: string | null;
-  city: string;
-  district?: string | null;
-  rating: number;
-  reviewsCount?: number;
-  services?: string[];
-  servicesAr?: string[];
-  isVerified?: boolean;
-  imageUrl?: string | null;
-  priceLevel?: WorkshopPriceLevel;
-}
-
-export type WorkshopDetail = Workshop & {
-  description?: string | null;
-  descriptionAr?: string | null;
-  openingHours?: string | null;
-  address?: string | null;
-  addressAr?: string | null;
-  recentBookingsCount?: number;
-};
-
-export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
-
-export const BookingStatus = {
-  pending: "pending",
-  confirmed: "confirmed",
-  in_progress: "in_progress",
-  completed: "completed",
-  cancelled: "cancelled",
-} as const;
-
-export interface Booking {
-  id: string;
-  vehicleId: string;
-  vehicleMake?: string;
-  vehicleModel?: string;
-  workshopId: string;
-  workshopName?: string;
-  workshopNameAr?: string;
-  serviceType?: string;
-  serviceTypeAr?: string;
-  scheduledAt: string;
-  status: BookingStatus;
-  estimatedCost?: number | null;
-  finalCost?: number | null;
-  createdAt?: string;
-}
-
-export interface CreateBookingBody {
-  vehicleId: string;
-  workshopId: string;
-  serviceType: string;
-  scheduledAt: string;
-  notes?: string;
-}
-
-export type UpdateBookingBodyStatus =
-  (typeof UpdateBookingBodyStatus)[keyof typeof UpdateBookingBodyStatus];
-
-export const UpdateBookingBodyStatus = {
-  pending: "pending",
-  confirmed: "confirmed",
-  in_progress: "in_progress",
-  completed: "completed",
-  cancelled: "cancelled",
-} as const;
-
-export interface UpdateBookingBody {
-  status?: UpdateBookingBodyStatus;
-  scheduledAt?: string;
 }
 
 export interface AiChatBody {
@@ -338,7 +252,6 @@ export type AiChatResponseSuggestedActionsItemKind =
   (typeof AiChatResponseSuggestedActionsItemKind)[keyof typeof AiChatResponseSuggestedActionsItemKind];
 
 export const AiChatResponseSuggestedActionsItemKind = {
-  book_workshop: "book_workshop",
   view_dtc: "view_dtc",
   schedule_maintenance: "schedule_maintenance",
   view_vehicle: "view_vehicle",
@@ -477,7 +390,6 @@ export interface DashboardOverview {
   upcomingMaintenanceCount: number;
   overdueMaintenanceCount?: number;
   avgHealthScore: number;
-  upcomingBookingCount?: number;
   totalSessionsLast30d?: number;
   kmDrivenLast30d?: number;
   estimatedSavingsSar?: number;
@@ -491,8 +403,6 @@ export const ActivityItemKind = {
   dtc_detected: "dtc_detected",
   dtc_cleared: "dtc_cleared",
   maintenance_done: "maintenance_done",
-  booking_created: "booking_created",
-  booking_completed: "booking_completed",
   ai_recommendation: "ai_recommendation",
 } as const;
 
@@ -532,7 +442,6 @@ export interface AdminOverview {
   revenueTrendPct?: number;
   nps?: number;
   premiumSubscribers?: number;
-  bookingsLast7d?: number;
   avgHealthScore?: number;
 }
 
@@ -616,18 +525,6 @@ export interface CommonIssue {
   trendPct?: number;
 }
 
-export interface WorkshopPipeline {
-  workshopId: string;
-  name: string;
-  nameAr: string;
-  city?: string;
-  pendingBookings?: number;
-  confirmedBookings?: number;
-  completedBookings?: number;
-  revenue30d?: number;
-  commission30d?: number;
-  rating?: number;
-}
 
 export interface RevenuePoint {
   month: string;
@@ -662,10 +559,6 @@ export const ListDtcCodesStatus = {
   pending: "pending",
 } as const;
 
-export type ListWorkshopsParams = {
-  city?: string;
-  service?: string;
-};
 
 export type ListAdminUsersParams = {
   search?: string;

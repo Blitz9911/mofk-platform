@@ -30,7 +30,6 @@ const ACTIVITY_ICONS: Record<string, { name: string; color: string }> = {
   dtc_detected: { name: "warning-outline", color: "#ef4444" },
   dtc_cleared: { name: "checkmark-circle-outline", color: "#22c55e" },
   maintenance_done: { name: "construct-outline", color: "#f59e0b" },
-  booking_created: { name: "calendar-outline", color: "#FF6A00" },
 };
 
 const MAINT_STATUS: Record<string, { label: string; color: string }> = {
