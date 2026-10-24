@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -11,6 +12,7 @@ import {
   jsonb,
   date,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
@@ -391,11 +393,130 @@ export const notificationsTable = pgTable(
     readAt: timestamp("read_at", { withTimezone: true }),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    supersededAt: timestamp("superseded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     userIdx: index("idx_notifications_user").on(t.userId, t.createdAt),
     dedupeIdx: index("idx_notifications_dedupe").on(t.userId, t.dedupeKey),
+    activeDedupe: uniqueIndex("idx_notifications_active_dedupe")
+      .on(t.userId, t.dedupeKey)
+      .where(sql`${t.dedupeKey} is not null and ${t.supersededAt} is null`),
+  }),
+);
+
+export const devicePushTokensTable = pgTable(
+  "device_push_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    platform: varchar("platform", { length: 20 }).notNull().default("unknown"),
+    deviceLabel: varchar("device_label", { length: 80 }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userToken: uniqueIndex("idx_device_push_tokens_user_token").on(t.userId, t.token),
+    userActive: index("idx_device_push_tokens_user").on(t.userId),
+  }),
+);
+
+export const notificationPreferencesTable = pgTable("notification_preferences", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  pushEnabled: boolean("push_enabled").notNull().default(true),
+  maintenanceEnabled: boolean("maintenance_enabled").notNull().default(true),
+  recommendationsEnabled: boolean("recommendations_enabled").notNull().default(true),
+  diagnosticsEnabled: boolean("diagnostics_enabled").notNull().default(true),
+  documentsEnabled: boolean("documents_enabled").notNull().default(true),
+  deviceEnabled: boolean("device_enabled").notNull().default(true),
+  subscriptionsEnabled: boolean("subscriptions_enabled").notNull().default(true),
+  quietHoursStart: smallint("quiet_hours_start"),
+  quietHoursEnd: smallint("quiet_hours_end"),
+  unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const notificationDeliveriesTable = pgTable(
+  "notification_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    notificationId: uuid("notification_id")
+      .notNull()
+      .references(() => notificationsTable.id, { onDelete: "cascade" }),
+    tokenId: uuid("token_id").references(() => devicePushTokensTable.id, {
+      onDelete: "set null",
+    }),
+    provider: varchar("provider", { length: 20 }).notNull().default("expo"),
+    ticketId: varchar("ticket_id", { length: 80 }),
+    status: varchar("status", { length: 30 }).notNull(),
+    errorMessage: text("error_message"),
+    receiptStatus: varchar("receipt_status", { length: 30 }),
+    receiptError: text("receipt_error"),
+    receiptCheckedAt: timestamp("receipt_checked_at", { withTimezone: true }),
+    attempt: integer("attempt").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    notificationIdx: index("idx_notification_deliveries_notification").on(t.notificationId),
+    statusIdx: index("idx_notification_deliveries_status").on(t.status, t.createdAt),
+  }),
+);
+
+export const notificationEventsTable = pgTable(
+  "notification_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id").references(() => vehiclesTable.id, { onDelete: "set null" }),
+    eventType: varchar("event_type", { length: 60 }).notNull(),
+    source: varchar("source", { length: 40 }).notNull().default("system"),
+    sourceId: varchar("source_id", { length: 160 }),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("idx_notification_events_user").on(t.userId, t.createdAt),
+    typeIdx: index("idx_notification_events_type").on(t.eventType, t.createdAt),
+  }),
+);
+
+export const notificationRulesTable = pgTable("notification_rules", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const vehicleDocumentsTable = pgTable(
+  "vehicle_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    vehicleId: uuid("vehicle_id")
+      .notNull()
+      .references(() => vehiclesTable.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 30 }).notNull(),
+    expiresAt: date("expires_at").notNull(),
+    source: varchar("source", { length: 30 }).notNull().default("user_entered"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    vehicleKind: uniqueIndex("idx_vehicle_documents_vehicle_kind").on(t.vehicleId, t.kind),
+    userIdx: index("idx_vehicle_documents_user").on(t.userId),
   }),
 );
 

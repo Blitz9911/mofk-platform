@@ -12,8 +12,10 @@ import {
   shipmentsTable,
   subscriptionPlansTable,
   subscriptionsTable,
+  usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { notifyObdBinding, notifyVerifiedSubscription } from "../services/notification-events";
 
 const router: IRouter = Router();
 
@@ -29,6 +31,16 @@ const shippingAddressSchema = z.object({
 });
 
 const paidPlanIds = ["plus", "pro", "mofk", "family", "individual-basic", "individual-advanced"];
+
+function userEntitlementFromPlanId(planId: string) {
+  const value = String(planId || "free").toLowerCase();
+  if (value === "plus" || value === "mofk" || value === "individual-basic") return "mofk";
+  if (value === "premium" || value === "pro" || value === "family" || value === "individual-advanced") {
+    return "family";
+  }
+  if (value === "fleet") return "fleet";
+  return value || "free";
+}
 
 function periodPrice(plan: typeof subscriptionPlansTable.$inferSelect, billingCycle: "monthly" | "annual") {
   return billingCycle === "annual" ? plan.priceYearlySar : plan.priceMonthlySar;
@@ -63,6 +75,15 @@ async function activatePaidOrder(orderId: string, rawWebhook: Record<string, unk
     currentPeriodEnd: nextPeriod,
   }).returning();
 
+  await db.update(usersTable)
+    .set({
+      subscriptionTier: userEntitlementFromPlanId(order.planId),
+      subscriptionStartedAt: new Date(),
+      subscriptionEndsAt: nextPeriod,
+      subscriptionAutoRenew: true,
+    })
+    .where(eq(usersTable.id, order.userId));
+
   await db.update(ordersTable)
     .set({ status: "paid", updatedAt: new Date() })
     .where(eq(ordersTable.id, order.id));
@@ -84,6 +105,12 @@ async function activatePaidOrder(orderId: string, rawWebhook: Record<string, unk
     subscriptionId: subscription.id,
     status: "shipped",
   });
+
+  await notifyVerifiedSubscription({
+    userId: order.userId,
+    type: "subscription_activated",
+    payment: { status: "paid", providerStatus: "paid", source: "moyasar", id: moyasarPaymentId ?? order.id },
+  }).catch(() => null);
 
   return { orderId: order.id, subscriptionId: subscription.id, shipmentId: shipment.id };
 }
@@ -216,6 +243,16 @@ router.post("/webhooks/moyasar", async (req, res): Promise<void> => {
     await db.update(paymentsTable)
       .set({ status: parsed.data.status, rawWebhook: req.body, updatedAt: new Date() })
       .where(eq(paymentsTable.orderId, orderId));
+    if (parsed.data.status === "failed") {
+      const [order] = await db.select({ userId: ordersTable.userId }).from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+      if (order) {
+        await notifyVerifiedSubscription({
+          userId: order.userId,
+          type: "subscription_payment_failed",
+          payment: { status: "failed", providerStatus: parsed.data.status, source: "moyasar", id: parsed.data.id },
+        }).catch(() => null);
+      }
+    }
     res.json({ received: true });
     return;
   }
@@ -230,7 +267,7 @@ router.post("/webhooks/moyasar", async (req, res): Promise<void> => {
 
 router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
   const [order] = await db.select().from(ordersTable)
-    .where(and(eq(ordersTable.id, req.params.id), eq(ordersTable.userId, req.userId)))
+    .where(and(eq(ordersTable.id, String(req.params.id)), eq(ordersTable.userId, req.userId)))
     .limit(1);
   if (!order) {
     res.status(404).json({ error: "Order not found" });
@@ -257,9 +294,19 @@ router.post("/devices/activate", requireAuth, async (req, res): Promise<void> =>
     .returning();
 
   if (!device) {
+    await notifyObdBinding({
+      userId: req.userId,
+      type: "obd_pair_error",
+      serial: parsed.data.serial,
+    });
     res.status(404).json({ error: "Device not found for this user" });
     return;
   }
+  await notifyObdBinding({
+    userId: req.userId,
+    type: "obd_pair_success",
+    serial: device.serial,
+  });
   res.json({ device, mode: parsed.data.mode });
 });
 
