@@ -42,6 +42,12 @@ import {
   serviceLabelAr,
   sourceKeyForTelemetry,
 } from "@/lib/maintenance-engine.mjs";
+import { publicApiBaseUrl } from "@/lib/push-api-passthrough.mjs";
+import { resolvePushPassthrough } from "@/lib/api-environment.mjs";
+import {
+  buildFuelStats as buildAccurateFuelStats,
+  withFuelConsumption as calculateFuelConsumption,
+} from "@/lib/fuel-calculations";
 
 type VehicleRow = {
   id: string;
@@ -273,6 +279,7 @@ type ApiBridgeResult =
     }
   | {
       handled: false;
+      passthroughUrl?: string;
     };
 
 type MaintenanceRule = {
@@ -284,6 +291,7 @@ type MaintenanceRule = {
 };
 
 let installed = false;
+let passthroughFetch: typeof fetch | null = null;
 
 class ApiBridgeError extends Error {
   status: number;
@@ -2409,16 +2417,6 @@ function entitlementTier(raw?: string | null) {
   return value || "free";
 }
 
-function periodEnd(cycle: string) {
-  const ends = new Date();
-  if (cycle === "yearly" || cycle === "annual") {
-    ends.setFullYear(ends.getFullYear() + 1);
-  } else {
-    ends.setMonth(ends.getMonth() + 1);
-  }
-  return ends.toISOString();
-}
-
 async function latestAccountSubscription(accessToken: string, userId: string) {
   try {
     const rows = await supabaseRequest<
@@ -2455,95 +2453,10 @@ async function handleSubscriptions(
   init?: RequestInit,
 ): Promise<ApiBridgeResult> {
   if (path === "/api/subscriptions/activate" && method === "POST") {
-    const session = await requireSession();
-    const body = await readJsonBody(input as RequestInfo | URL, init);
-    const planId = entitlementTier(String(body.planId ?? body.tier ?? ""));
-    const billingCycle = String(body.billingCycle ?? "monthly");
-    if (!planId || planId === "free") {
-      throw new ApiBridgeError("اختر باقة مفك أو العائلة لتفعيلها على حسابك.", 400);
-    }
-    const startedAt = new Date().toISOString();
-    const endsAt = periodEnd(billingCycle);
-
-    await supabaseRequest(
-      `/rest/v1/users?id=eq.${encodeURIComponent(session.user.id)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify({
-          subscription_tier: planId,
-          subscription_started_at: startedAt,
-          subscription_ends_at: endsAt,
-          subscription_auto_renew: true,
-        }),
-      },
-      session.access_token,
+    throw new ApiBridgeError(
+      "لا يمكن تعيين الباقة من التطبيق. الترقية تتم فقط بعد حدث دفع موثّق من الخادم.",
+      403,
     );
-
-    const rows = await supabaseRequest<SubscriptionUserRow[]>(
-      `/rest/v1/users?select=subscription_tier,subscription_started_at,subscription_ends_at,subscription_auto_renew,is_active&id=eq.${encodeURIComponent(
-        session.user.id,
-      )}&limit=1`,
-      { method: "GET" },
-      session.access_token,
-    );
-
-    if (entitlementTier(rows[0]?.subscription_tier) !== planId) {
-      throw new ApiBridgeError(
-        "تعذر حفظ الباقة على الحساب. حدّث صلاحيات users.subscription_tier أو أعد تسجيل الدخول بعد تطبيق المنح.",
-        403,
-      );
-    }
-
-    const subscriptionPayloads = [
-      {
-        user_id: session.user.id,
-        plan_id: planId,
-        billing_cycle: billingCycle === "yearly" ? "annual" : "monthly",
-        status: "active",
-        current_period_end: endsAt,
-      },
-      {
-        user_id: session.user.id,
-        plan: planId,
-        status: "active",
-        started_at: startedAt,
-        ends_at: endsAt,
-      },
-    ];
-    for (const payload of subscriptionPayloads) {
-      try {
-        await supabaseRequest(
-          "/rest/v1/subscriptions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Prefer: "return=minimal",
-            },
-            body: JSON.stringify(payload),
-          },
-          session.access_token,
-        );
-        break;
-      } catch {
-        /* Try the next subscriptions table shape. */
-      }
-    }
-
-    return {
-      handled: true,
-      data: {
-        tier: entitlementTier(rows[0].subscription_tier),
-        status: "active",
-        startedAt: rows[0].subscription_started_at ?? startedAt,
-        endsAt: rows[0].subscription_ends_at ?? endsAt,
-        autoRenew: rows[0].subscription_auto_renew ?? true,
-      },
-    };
   }
 
   if (method !== "GET") {
@@ -2669,40 +2582,18 @@ function toFuelLog(row: FuelLogRow, consumption: unknown = null) {
     totalCostSar: row.total_cost_halalas / 100,
     fuelGrade: row.fuel_grade,
     stationNameAr: row.station_name_ar ?? undefined,
-    isFull: row.is_full ?? false,
+    isFull: row.is_full,
     notes: row.notes ?? undefined,
     consumption,
   };
 }
 
 function withFuelConsumption(rows: FuelLogRow[]) {
-  const asc = [...rows].sort((a, b) => Number(a.odometer_km) - Number(b.odometer_km));
-  const map = new Map<string, unknown>();
-
-  asc.forEach((row, index) => {
-    const prev = asc[index - 1];
-
-    if (!prev) {
-      map.set(row.id, null);
-      return;
-    }
-
-    const distanceKm = Number(row.odometer_km) - Number(prev.odometer_km);
-    const liters = Number(row.liters);
-
-    if (distanceKm <= 0 || liters <= 0) {
-      map.set(row.id, null);
-      return;
-    }
-
-    map.set(row.id, {
-      distanceKm,
-      consumptionL100km: Number(((liters / distanceKm) * 100).toFixed(2)),
-      kmPerLiter: Number((distanceKm / liters).toFixed(2)),
-    });
-  });
-
-  return rows.map((row) => toFuelLog(row, map.get(row.id) ?? null));
+  const calculated = calculateFuelConsumption(rows).reduce(
+    (map, item) => map.set(item.row.id, item.consumption),
+    new Map<string, unknown>(),
+  );
+  return rows.map((row) => toFuelLog(row, calculated.get(row.id) ?? null));
 }
 
 async function listFuelRows(
@@ -2721,67 +2612,8 @@ async function listFuelRows(
   );
 }
 
-function filterFuelRowsByPeriod(rows: FuelLogRow[], period: string) {
-  if (period === "all") return rows;
-
-  const now = new Date();
-  const from = new Date(now);
-
-  if (period === "week") {
-    from.setDate(now.getDate() - 7);
-  } else if (period === "month") {
-    from.setMonth(now.getMonth() - 1);
-  } else if (period === "year") {
-    from.setFullYear(now.getFullYear() - 1);
-  } else {
-    return rows;
-  }
-
-  return rows.filter((row) => new Date(row.filled_at) >= from);
-}
-
 function buildFuelStats(rows: FuelLogRow[], period: string) {
-  const filtered = filterFuelRowsByPeriod(rows, period);
-  const logs = withFuelConsumption(filtered);
-
-  const totalLiters = logs.reduce((sum, log) => sum + Number(log.liters || 0), 0);
-  const totalCostSar = logs.reduce((sum, log) => sum + Number(log.totalCostSar || 0), 0);
-  const validConsumption = logs.map((log) => log.consumption as any).filter(Boolean);
-
-  const avgConsumptionL100km = validConsumption.length
-    ? Number((validConsumption.reduce((sum: number, item: any) => sum + item.consumptionL100km, 0) / validConsumption.length).toFixed(2))
-    : null;
-  const avgKmPerLiter = validConsumption.length
-    ? Number((validConsumption.reduce((sum: number, item: any) => sum + item.kmPerLiter, 0) / validConsumption.length).toFixed(2))
-    : null;
-
-  const byDay = new Map<string, { date: string; liters: number; costSar: number; fills: number }>();
-
-  filtered.forEach((row) => {
-    const date = row.filled_at.slice(0, 10);
-    const current = byDay.get(date) ?? { date, liters: 0, costSar: 0, fills: 0 };
-    current.liters += Number(row.liters || 0);
-    current.costSar += Number(row.total_cost_halalas || 0) / 100;
-    current.fills += 1;
-    byDay.set(date, current);
-  });
-
-  const trendByDay = Array.from(byDay.values())
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((item) => ({
-      ...item,
-      liters: Number(item.liters.toFixed(2)),
-      costSar: Number(item.costSar.toFixed(2)),
-    }));
-
-  return {
-    totalLiters: Number(totalLiters.toFixed(2)),
-    totalCostSar: Number(totalCostSar.toFixed(2)),
-    avgConsumptionL100km,
-    avgKmPerLiter,
-    fillCount: filtered.length,
-    trendByDay,
-  };
+  return buildAccurateFuelStats(rows, period);
 }
 
 async function handleFuel(
@@ -2844,11 +2676,11 @@ async function handleFuel(
       throw new ApiBridgeError("المركبة غير موجودة.", 404);
     }
 
-    if (rawOdometer !== null && (!Number.isFinite(rawOdometer) || rawOdometer < 0)) {
-      throw new ApiBridgeError("قراءة العداد غير صحيحة.", 400);
+    if (rawOdometer === null || !Number.isFinite(rawOdometer) || rawOdometer <= 0) {
+      throw new ApiBridgeError("قراءة العداد مطلوبة وصحيحة لحساب الصرفية.", 400);
     }
 
-    const odometerKm = rawOdometer !== null ? rawOdometer : Number(vehicle.odometer_km ?? 0);
+    const odometerKm = rawOdometer;
     const pricePerLiterHalalas = Math.round(pricePerLiterSar * 100);
     const totalCostHalalas = Math.round(liters * pricePerLiterSar * 100);
 
@@ -2873,7 +2705,7 @@ async function handleFuel(
             typeof body.stationNameAr === "string" && body.stationNameAr.trim()
               ? body.stationNameAr.trim()
               : null,
-          is_full: true,
+          is_full: body.isFull !== false,
           notes:
             typeof body.notes === "string" && body.notes.trim()
               ? body.notes.trim()
@@ -3196,7 +3028,7 @@ function maintenanceNotificationFromItem(
     id: `maintenance-${item.vehicleId}-${item.serviceType}-${item.status}`,
     user_id: userId,
     vehicle_id: item.vehicleId,
-    type: "maintenance",
+    type: isOverdue ? "maintenance_overdue" : "maintenance_upcoming",
     severity: isOverdue ? "critical" : "warning",
     title_ar: isOverdue
       ? `${serviceLabel} متأخرة`
@@ -3204,7 +3036,8 @@ function maintenanceNotificationFromItem(
     body_ar: `${vehicleLabel}: ${dueHint}`,
     action_url: "/maintenance",
     dedupe_key: [
-      "maintenance",
+      "mofk",
+      isOverdue ? "maintenance_overdue" : "maintenance_upcoming",
       item.vehicleId,
       item.serviceType,
       item.status,
@@ -3244,90 +3077,10 @@ async function listNotificationRows(
   );
 }
 
-async function createNotificationIfMissing(
-  accessToken: string,
-  payload: {
-    userId: string;
-    vehicleId?: string | null;
-    type: string;
-    severity: string;
-    titleAr: string;
-    bodyAr?: string | null;
-    actionUrl?: string | null;
-    dedupeKey?: string | null;
-    scheduledAt?: string | null;
-  },
-) {
-  if (payload.dedupeKey) {
-    const existing = await supabaseRequest<Pick<NotificationRow, "id">[]>(
-      `/rest/v1/notifications?select=id&user_id=eq.${encodeURIComponent(
-        payload.userId,
-      )}&dedupe_key=eq.${encodeURIComponent(payload.dedupeKey)}&limit=1`,
-      {
-        method: "GET",
-      },
-      accessToken,
-    );
-
-    if (existing.length > 0) {
-      return null;
-    }
-  }
-
-  const rows = await supabaseRequest<NotificationRow[]>(
-    "/rest/v1/notifications?select=*",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({
-        user_id: payload.userId,
-        vehicle_id: payload.vehicleId ?? null,
-        type: payload.type,
-        severity: payload.severity,
-        title_ar: payload.titleAr,
-        body_ar: payload.bodyAr ?? null,
-        action_url: payload.actionUrl ?? null,
-        dedupe_key: payload.dedupeKey ?? null,
-        scheduled_at: payload.scheduledAt ?? null,
-      }),
-    },
-    accessToken,
-  );
-
-  return rows[0] ?? null;
-}
-
-async function generateMaintenanceNotifications(
-  accessToken: string,
-  userId: string,
-) {
-  const generatedRows = await listGeneratedNotificationRows(
-    accessToken,
-    userId,
-  );
-
-  for (const row of generatedRows) {
-    try {
-      await createNotificationIfMissing(accessToken, {
-        userId,
-        vehicleId: row.vehicle_id ?? null,
-        type: row.type,
-        severity: row.severity,
-        titleAr: row.title_ar,
-        bodyAr: row.body_ar ?? null,
-        actionUrl: row.action_url ?? null,
-        dedupeKey: row.dedupe_key ?? null,
-        scheduledAt: row.scheduled_at ?? null,
-      });
-    } catch {
-      return generatedRows;
-    }
-  }
-
-  return generatedRows;
+function mergeInboxRows(persisted: NotificationRow[], generated: NotificationRow[]) {
+  const keys = new Set(persisted.map((row) => row.dedupe_key).filter(Boolean));
+  const overlay = generated.filter((row) => !row.dedupe_key || !keys.has(row.dedupe_key));
+  return [...overlay, ...persisted];
 }
 
 async function handleHealthIntelligence(
@@ -3581,22 +3334,153 @@ async function handleNotifications(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<ApiBridgeResult> {
+  if (path !== "/api/devices/push-token" && !path.startsWith("/api/notifications")) {
+    return { handled: false };
+  }
+
   const session = await requireSession();
   const userId = session.user.id;
   const accessToken = session.access_token;
 
+  if (path === "/api/devices/push-token" && method === "POST") {
+    const body = await readJsonBody(input, init);
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    if (!token.startsWith("ExponentPushToken[") && !token.startsWith("ExpoPushToken[")) {
+      return { handled: true, status: 400, data: { error: "invalid_expo_push_token" } };
+    }
+    return {
+      handled: true,
+      status: 503,
+      data: {
+        error: "api_base_unconfigured",
+        persisted: false,
+        note: "Push tokens persist only through the API postgres path, never client REST.",
+      },
+    };
+  }
+
+  if (path === "/api/devices/push-token" && method === "DELETE") {
+    return {
+      handled: true,
+      status: 503,
+      data: { error: "api_base_unconfigured", persisted: false },
+    };
+  }
+
+  if (
+    path === "/api/notifications/self-test" ||
+    path === "/api/notifications/push-status" ||
+    path === "/api/notifications/push-receipts"
+  ) {
+    const apiBase = (
+      process.env.EXPO_PUBLIC_API_BASE_URL ||
+      (process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "")
+    ).replace(/\/+$/, "");
+    if (!apiBase) {
+      return {
+        handled: true,
+        status: 503,
+        data: {
+          error: "api_base_url_unconfigured",
+          note: "Set EXPO_PUBLIC_API_BASE_URL to the UAT api-server before a real iPhone probe.",
+        },
+      };
+    }
+    const originalFetch = passthroughFetch ?? globalThis.fetch.bind(globalThis);
+    const response = await originalFetch(`${apiBase}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: method === "GET" ? undefined : init?.body ?? "{}",
+    });
+    const data = await response.json().catch(() => ({}));
+    return { handled: true, status: response.status, data };
+  }
+
+  if (path === "/api/notifications/preferences" && method === "GET") {
+    try {
+      const rows = await supabaseRequest<Record<string, unknown>[]>(
+        `/rest/v1/notification_preferences?user_id=eq.${encodeURIComponent(userId)}&select=*`,
+        { method: "GET" },
+        accessToken,
+      );
+      return {
+        handled: true,
+        data: rows[0] ?? {
+          userId,
+          pushEnabled: true,
+          maintenanceEnabled: true,
+          recommendationsEnabled: true,
+          diagnosticsEnabled: true,
+        },
+      };
+    } catch (error) {
+      if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
+      return {
+        handled: true,
+        data: {
+          userId,
+          pushEnabled: true,
+          maintenanceEnabled: true,
+          recommendationsEnabled: true,
+          diagnosticsEnabled: true,
+        },
+      };
+    }
+  }
+
+  if (path === "/api/notifications/preferences" && method === "PATCH") {
+    const body = await readJsonBody(input, init);
+    const payload = {
+      user_id: userId,
+      push_enabled: body.pushEnabled !== false,
+      maintenance_enabled: body.maintenanceEnabled !== false,
+      recommendations_enabled: body.recommendationsEnabled !== false,
+      diagnostics_enabled: body.diagnosticsEnabled !== false,
+      unsubscribed_at: body.pushEnabled === false ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await supabaseRequest(
+        "/rest/v1/notification_preferences?select=*",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "return=representation,resolution=merge-duplicates",
+          },
+          body: JSON.stringify(payload),
+        },
+        accessToken,
+      );
+    } catch (error) {
+      if (!isMissingTableError(error) && !isUnknownColumnError(error)) throw error;
+    }
+    return {
+      handled: true,
+      data: {
+        userId,
+        pushEnabled: payload.push_enabled,
+        maintenanceEnabled: payload.maintenance_enabled,
+        recommendationsEnabled: payload.recommendations_enabled,
+        diagnosticsEnabled: payload.diagnostics_enabled,
+      },
+    };
+  }
+
   if (path === "/api/notifications" && method === "GET") {
-    const generatedRows = await generateMaintenanceNotifications(
+    const generatedRows = await listGeneratedNotificationRows(
       accessToken,
       userId,
     );
 
     try {
       const rows = await listNotificationRows(accessToken, userId);
-
       return {
         handled: true,
-        data: rows.map(toNotification),
+        data: mergeInboxRows(rows, generatedRows).map(toNotification),
       };
     } catch {
       return {
@@ -3607,24 +3491,10 @@ async function handleNotifications(
   }
 
   if (path === "/api/notifications" && method === "POST") {
-    const body = await readJsonBody(input, init);
-
-    const row = await createNotificationIfMissing(accessToken, {
-      userId,
-      vehicleId: typeof body.vehicleId === "string" ? body.vehicleId : null,
-      type: String(body.type ?? "system"),
-      severity: String(body.severity ?? "info"),
-      titleAr: String(body.titleAr ?? "تنبيه"),
-      bodyAr: typeof body.bodyAr === "string" ? body.bodyAr : null,
-      actionUrl: typeof body.actionUrl === "string" ? body.actionUrl : null,
-      dedupeKey: typeof body.dedupeKey === "string" ? body.dedupeKey : null,
-      scheduledAt: typeof body.scheduledAt === "string" ? body.scheduledAt : null,
-    });
-
     return {
       handled: true,
-      status: 201,
-      data: row ? toNotification(row) : { ok: true },
+      status: 403,
+      data: { error: "client_notification_insert_forbidden" },
     };
   }
 
@@ -3691,21 +3561,10 @@ async function handleNotifications(
   const deleteMatch = path.match(/^\/api\/notifications\/([^/]+)$/);
 
   if (deleteMatch && method === "DELETE") {
-    const id = decodeURIComponent(deleteMatch[1]);
-
-    await supabaseRequest(
-      `/rest/v1/notifications?id=eq.${encodeURIComponent(
-        id,
-      )}&user_id=eq.${encodeURIComponent(userId)}`,
-      {
-        method: "DELETE",
-      },
-      accessToken,
-    );
-
     return {
       handled: true,
-      data: { ok: true },
+      status: 403,
+      data: { error: "client_notification_delete_forbidden" },
     };
   }
 
@@ -3766,6 +3625,16 @@ async function handleRequest(
 
   if (!path.startsWith("/api")) {
     return { handled: false };
+  }
+
+  const apiBase = publicApiBaseUrl();
+  const pushRoute = resolvePushPassthrough(path);
+  if (pushRoute.blocked) {
+    return { handled: true, status: 409, data: { error: pushRoute.reason } };
+  }
+  if (pushRoute.passthrough) {
+    const origin = pushRoute.origin || apiBase;
+    return { handled: false, passthroughUrl: `${origin}${url.pathname}${url.search}` };
   }
 
   if (path === "/api/healthz") {
@@ -4021,6 +3890,7 @@ export function installSupabaseApiBridge() {
 
   const originalFetch =
     globalThis.fetch.bind(globalThis);
+  passthroughFetch = originalFetch;
 
   globalThis.fetch = (async (
     input: RequestInfo | URL,
@@ -4037,6 +3907,16 @@ export function installSupabaseApiBridge() {
           result.data ?? null,
           result.status ?? 200,
         );
+      }
+
+      if (!result.handled && result.passthroughUrl) {
+        const session = await getValidSupabaseSession();
+        const headers = new Headers(init?.headers);
+        headers.set("Content-Type", headers.get("Content-Type") || "application/json");
+        if (session?.access_token && !headers.has("Authorization")) {
+          headers.set("Authorization", `Bearer ${session.access_token}`);
+        }
+        return originalFetch(result.passthroughUrl, { ...init, headers });
       }
     } catch (error) {
       const status =

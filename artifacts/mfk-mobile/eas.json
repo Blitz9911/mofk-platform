@@ -25,11 +25,29 @@
     },
     "uat": {
       "distribution": "internal",
-      "credentialsSource": "local",
+      "credentialsSource": "remote",
       "channel": "uat",
       "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_MFK_ENV": "uat",
+        "EXPO_PUBLIC_MFK_UAT_SUPABASE_REF": "nbuqxtasvqdnallukbyx",
+        "EXPO_PUBLIC_AUTH_OTP_MODE": "mock",
+        "MFK_PUSH_SEND_ENABLED": "false"
+      },
       "ios": {
         "simulator": false
+      }
+    },
+    "testflight-uat": {
+      "distribution": "store",
+      "channel": "uat",
+      "environment": "preview",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_MFK_ENV": "uat",
+        "EXPO_PUBLIC_MFK_UAT_SUPABASE_REF": "nbuqxtasvqdnallukbyx",
+        "EXPO_PUBLIC_AUTH_OTP_MODE": "mock",
+        "MFK_PUSH_SEND_ENABLED": "false"
       }
     },
     "development-simulator": {
@@ -50,6 +68,11 @@
     }
   },
   "submit": {
+    "testflight-uat": {
+      "ios": {
+        "ascAppId": "6826274563"
+      }
+    },
     "production": {}
   }
 }

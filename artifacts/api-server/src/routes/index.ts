@@ -13,6 +13,7 @@ import adminRouter from "./admin";
 import fuelRouter from "./fuel";
 import commerceRouter from "./commerce";
 import healthIntelligenceRouter from "./health-intelligence";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,7 @@ router.use(aiRouter);
 router.use(subscriptionsRouter);
 router.use(commerceRouter);
 router.use(healthIntelligenceRouter);
+router.use(notificationsRouter);
 router.use(adminRouter);
 router.use(fuelRouter);
 

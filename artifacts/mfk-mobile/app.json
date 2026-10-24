@@ -22,8 +22,12 @@
       },
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "يستخدم مفك البلوتوث للاتصال بجهاز فحص السيارة وقراءة بيانات المركبة.",
-        "ITSAppUsesNonExemptEncryption": false
-      }
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      },
+      "buildNumber": "5"
     },
     "android": {
       "package": "com.mfk.diagnostics",
@@ -54,7 +58,14 @@
       "expo-font",
       "expo-web-browser",
       "expo-document-picker",
-      "./plugins/with-notifications.js",
+      [
+        "expo-notifications",
+        {
+          "color": "#FF6A00",
+          "defaultChannel": "mofk",
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
       "./plugins/with-carplay.js"
     ],
     "experiments": {

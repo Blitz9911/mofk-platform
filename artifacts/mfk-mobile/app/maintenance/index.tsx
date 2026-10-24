@@ -24,6 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ArabicText } from "@/components/ArabicText";
+import { useToast } from "@/components/Toast";
 import { ArabicDateField } from "@/components/ArabicDatePicker";
 import { useColors } from "@/hooks/useColors";
 import { rowDir } from "@/lib/layout";
@@ -242,6 +243,7 @@ function ManualMaintenanceModal({
   recommendationId?: string;
 }) {
   const colors = useColors();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const logMaintenance = useLogMaintenance();
@@ -365,6 +367,7 @@ function ManualMaintenanceModal({
           queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0] || "").includes("maintenance") });
           const createdId = item?.id;
           close();
+          showToast("تم تسجيل الصيانة");
           if (createdId) onCreated?.(createdId);
         },
         onError: () => {

@@ -26,6 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useThemeMode } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 import { ArabicText } from "@/components/ArabicText";
+import { useToast } from "@/components/Toast";
 import { rowDir } from "@/lib/layout";
 import {
   disableAppNotifications,
@@ -383,6 +384,7 @@ function Field({
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { showToast } = useToast();
   const isDark = colors.mode === "dark";
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -428,7 +430,7 @@ export default function ProfileScreen() {
     try {
       await updateProfile({ name, phone, city });
       setEditVisible(false);
-      Alert.alert("تم الحفظ", "تم تحديث بيانات ملفك الشخصي.");
+      showToast("تم حفظ التغييرات");
     } catch (error) {
       Alert.alert(
         "تعذر الحفظ",
@@ -625,6 +627,13 @@ export default function ProfileScreen() {
           </ArabicText>
           <View style={styles.menuGroup}>
             <NotificationsToggleRow />
+            <MenuItem
+              icon="notifications-circle-outline"
+              label="إعدادات الإشعارات"
+              description="الصيانة والأعطال والوثائق وقطعة مفك والاشتراك"
+              tone="#EC4899"
+              onPress={() => router.push("/notification-settings")}
+            />
             <ThemeToggleRow />
             <MenuItem
               icon="person-circle-outline"

@@ -21,6 +21,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ArabicText } from "@/components/ArabicText";
+import { useToast } from "@/components/Toast";
 import { useColors } from "@/hooks/useColors";
 import { rowDir } from "@/lib/layout";
 import { smoothBack } from "@/lib/navigation";
@@ -353,6 +354,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 export default function AddVehicleScreen() {
   const colors = useColors();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -427,10 +429,8 @@ export default function AddVehicleScreen() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVehiclesQueryKey() });
-          if (Platform.OS === "web") smoothBack(router);
-          else Alert.alert("✓ تمت الإضافة", "تم إضافة المركبة بنجاح", [
-            { text: "حسناً", onPress: () => smoothBack(router) },
-          ]);
+          showToast("تمت إضافة السيارة");
+          smoothBack(router);
         },
         onError: (err: any) => {
           Alert.alert("خطأ", err?.message || "تعذرت إضافة المركبة. حاول مرة أخرى.");

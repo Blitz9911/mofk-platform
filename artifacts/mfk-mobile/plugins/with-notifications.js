@@ -21,5 +21,6 @@ module.exports = function withMfkNotifications(config) {
   return impl(config, {
     color: "#FF6A00",
     defaultChannel: "mofk",
+    enableBackgroundRemoteNotifications: true,
   });
 };

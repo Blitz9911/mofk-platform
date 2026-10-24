@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/Toast";
 import { useColors } from "@/hooks/useColors";
 import { smoothBack } from "@/lib/navigation";
 
@@ -54,6 +55,7 @@ export default function ProfileEditScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, updateProfile } = useAuth();
+  const { showToast } = useToast();
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [city, setCity] = useState("");
@@ -69,7 +71,7 @@ export default function ProfileEditScreen() {
     setSaving(true);
     try {
       await updateProfile({ name, phone, city });
-      Alert.alert("تم الحفظ", "تم تحديث بياناتك بنجاح.");
+      showToast("تم حفظ التغييرات");
       smoothBack(router);
     } catch (error) {
       Alert.alert("تعذر الحفظ", error instanceof Error ? error.message : "حاول مرة أخرى.");

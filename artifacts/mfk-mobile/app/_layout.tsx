@@ -25,6 +25,7 @@ import { useColors } from "@/hooks/useColors";
 import "@/lib/supabase-api-bridge";
 import { useAppNotifications } from "@/hooks/useAppNotifications";
 import { useObdTelemetrySync } from "@/src/obd";
+import { ToastProvider } from "@/components/Toast";
 
 
 
@@ -199,15 +200,17 @@ export default function RootLayout() {
         <LocaleProvider>
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
-              <AuthProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <AuthGate>
-                      <RootLayoutNav />
-                    </AuthGate>
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </AuthProvider>
+              <ToastProvider>
+                <AuthProvider>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <KeyboardProvider>
+                      <AuthGate>
+                        <RootLayoutNav />
+                      </AuthGate>
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </AuthProvider>
+              </ToastProvider>
             </QueryClientProvider>
           </ErrorBoundary>
         </LocaleProvider>
