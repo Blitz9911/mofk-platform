@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeModules, Platform, TurboModuleRegistry } from "react-native";
+import { shouldPersistPushToken } from "@/lib/push-registration.mjs";
 
 const ENABLED_KEY = "mfk-notifications-enabled";
 const PRESENTED_KEY = "mfk-notifications-presented";
@@ -387,9 +388,6 @@ export async function registerExpoPushToken() {
     }
     const previous = await AsyncStorage.getItem("mfk-expo-push-token");
     const renewed = Boolean(previous && previous !== token);
-    // Token acquisition is independent from API persistence so the isolated
-    // Expo/APNs UAT probe can run before the authenticated UAT API is deployed.
-    await AsyncStorage.setItem("mfk-expo-push-token", token);
     const response = await fetch("/api/devices/push-token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -399,15 +397,12 @@ export async function registerExpoPushToken() {
       }),
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    if (!shouldPersistPushToken({ status: response.status, payload })) {
       const reason = typeof payload?.error === "string" ? payload.error : "register_failed";
       await AsyncStorage.setItem(REGISTER_DIAG_KEY, JSON.stringify({ ok: false, reason, at: new Date().toISOString() }));
       return { ok: false as const, reason };
     }
-    if (payload?.persisted === false) {
-      await AsyncStorage.setItem(REGISTER_DIAG_KEY, JSON.stringify({ ok: false, reason: "table_missing", at: new Date().toISOString() }));
-      return { ok: false as const, reason: "table_missing" };
-    }
+    await AsyncStorage.setItem("mfk-expo-push-token", token);
     await AsyncStorage.setItem(
       REGISTER_DIAG_KEY,
       JSON.stringify({
@@ -453,8 +448,8 @@ export async function enableAppNotifications() {
   await setNotificationsEnabled(true);
   const permission = await requestNotificationPermission();
   if (permission.granted) {
-    await registerExpoPushToken();
-    await presentActivationNotice();
+    const registration = await registerExpoPushToken();
+    if (registration.ok) await presentActivationNotice();
     try {
       await fetch("/api/notifications/preferences", {
         method: "PATCH",

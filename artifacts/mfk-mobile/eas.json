@@ -73,6 +73,15 @@
         "ascAppId": "6826274563"
       }
     },
+    "testflight-uat-local": {
+      "ios": {
+        "ascAppId": "6826274563",
+        "appleTeamId": "Y6938CRG74",
+        "ascApiKeyId": "5RVB4N9AJJ",
+        "ascApiKeyIssuerId": "778c6afc-36c4-4522-81e5-b52276afd0c8",
+        "ascApiKeyPath": "$ASC_API_KEY_PATH"
+      }
+    },
     "production": {}
   }
 }

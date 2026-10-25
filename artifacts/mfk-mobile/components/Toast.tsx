@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {message ? (
-        <Animated.View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.host, { top: insets.top + 12, opacity }]}>
+        <Animated.View pointerEvents="none" accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.host, { top: insets.top + 12, opacity }]}>
           <View style={styles.toast}><Text style={styles.text}>{message}</Text></View>
         </Animated.View>
       ) : null}
@@ -44,7 +44,7 @@ export function useToast() {
 }
 
 const styles = StyleSheet.create({
-  host: { position: "absolute", left: 16, right: 16, zIndex: 1000, alignItems: "center" },
+  host: { position: "absolute", left: 16, right: 16, zIndex: 10000, elevation: 10000, alignItems: "center" },
   toast: { maxWidth: 420, minHeight: 44, paddingHorizontal: 18, paddingVertical: 11, borderRadius: 14, backgroundColor: "#202020", borderWidth: StyleSheet.hairlineWidth, borderColor: "#555", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
   text: { color: "#fff", fontSize: 14, textAlign: "center", writingDirection: "rtl", fontFamily: "Inter_600SemiBold" },
 });

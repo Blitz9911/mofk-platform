@@ -27,7 +27,7 @@
           "remote-notification"
         ]
       },
-      "buildNumber": "5"
+      "buildNumber": "6"
     },
     "android": {
       "package": "com.mfk.diagnostics",

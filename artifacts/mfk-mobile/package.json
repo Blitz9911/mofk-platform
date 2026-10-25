@@ -24,6 +24,7 @@
     "serve": "node server/serve.js",
     "test:obd": "node scripts/test-obd-parsers.cjs",
     "test:binding": "node scripts/test-vehicle-binding.cjs",
+    "test:notifications": "node scripts/test-notification-flow.cjs",
     "typecheck": "node scripts/generate-router-types.cjs && tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
