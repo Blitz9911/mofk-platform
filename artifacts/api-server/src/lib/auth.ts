@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { DEMO_ADMIN_ID, DEMO_USER_ID } from "./demo";
+import { verifySupabaseJwt } from "./supabase-jwt";
 
 declare global {
   namespace Express {
@@ -22,9 +23,6 @@ type AuthTokenPayload = {
   exp: number;
 };
 
-type SupabaseJwtPayload = {
-  sub?: string;
-};
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -82,26 +80,19 @@ export function verifyAuthToken(token: string): AuthTokenPayload | null {
   }
 }
 
-function decodeSupabaseJwt(token: string): SupabaseJwtPayload | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  try {
-    return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as SupabaseJwtPayload;
-  } catch {
-    return null;
-  }
+function isUatEnvironment() {
+  return process.env.MFK_ENV === "uat" || process.env.EXPO_PUBLIC_MFK_ENV === "uat";
 }
 
 function demoAuthEnabled() {
-  return process.env.NODE_ENV !== "production" || process.env.ENABLE_DEMO_AUTH === "true";
+  return !isUatEnvironment() && (process.env.NODE_ENV !== "production" || process.env.ENABLE_DEMO_AUTH === "true");
 }
 
 function isPublicApiPath(path: string) {
   return path === "/healthz" || path === "/auth/login" || path === "/auth/register";
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (isPublicApiPath(req.path)) {
     next();
     return;
@@ -123,7 +114,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       next();
       return;
     }
-    const supabasePayload = decodeSupabaseJwt(token);
+    const supabasePayload = await verifySupabaseJwt(token);
     if (supabasePayload?.sub) {
       req.userId = supabasePayload.sub;
       req.userRole = "user";
