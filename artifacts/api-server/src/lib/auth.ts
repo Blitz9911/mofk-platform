@@ -4,6 +4,7 @@ import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { DEMO_ADMIN_ID, DEMO_USER_ID } from "./demo";
 import { verifySupabaseJwt } from "./supabase-jwt";
+import { authTokenSecret, isUatEnvironment } from "./auth-config";
 
 declare global {
   namespace Express {
@@ -45,14 +46,6 @@ function base64Url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
 }
 
-function tokenSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.AUTH_TOKEN_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET or AUTH_TOKEN_SECRET must be set in production.");
-  }
-  return secret || "mofk-dev-secret-change-me";
-}
-
 export function issueAuthToken(userId: string, role: "user" | "admin" | "fleet" = "user"): string {
   const payload: AuthTokenPayload = {
     sub: userId,
@@ -60,14 +53,19 @@ export function issueAuthToken(userId: string, role: "user" | "admin" | "fleet" 
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
   };
   const body = base64Url(JSON.stringify(payload));
-  const sig = createHmac("sha256", tokenSecret()).update(body).digest("base64url");
+  const sig = createHmac("sha256", authTokenSecret()).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 
 export function verifyAuthToken(token: string): AuthTokenPayload | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
-  const expected = createHmac("sha256", tokenSecret()).update(body).digest("base64url");
+  let expected: string;
+  try {
+    expected = createHmac("sha256", authTokenSecret()).update(body).digest("base64url");
+  } catch {
+    return null;
+  }
   const sigBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expected);
   if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null;
@@ -78,10 +76,6 @@ export function verifyAuthToken(token: string): AuthTokenPayload | null {
   } catch {
     return null;
   }
-}
-
-function isUatEnvironment() {
-  return process.env.MFK_ENV === "uat" || process.env.EXPO_PUBLIC_MFK_ENV === "uat";
 }
 
 function demoAuthEnabled() {

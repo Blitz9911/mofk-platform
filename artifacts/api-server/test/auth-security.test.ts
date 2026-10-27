@@ -35,7 +35,9 @@ test("accepts a correctly signed UAT Supabase JWT", async () => {
 });
 
 test("rejects a JWT with a forged signature", async () => {
-  const token = makeToken().replace(/.$/, "x");
+  const parts = makeToken().split(".");
+  parts[2] = `${parts[2].slice(0, -1)}${parts[2].endsWith("A") ? "B" : "A"}`;
+  const token = parts.join(".");
   assert.equal(await verifySupabaseJwt(token), null);
 });
 

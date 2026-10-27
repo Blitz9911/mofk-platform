@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { assertAuthConfiguration } from "./lib/auth-config";
 
 const rawPort = process.env["PORT"];
 
@@ -8,6 +9,8 @@ if (!rawPort) {
     "PORT environment variable is required but was not provided.",
   );
 }
+
+assertAuthConfiguration();
 
 const port = Number(rawPort);
 
