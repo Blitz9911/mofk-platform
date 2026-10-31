@@ -3,10 +3,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const SESSION_STORAGE_KEY = "mfk-supabase-session";
 const SUPABASE_REQUEST_TIMEOUT_MS = 15_000;
 const SUPABASE_RETRY_DELAY_MS = 650;
-export const DEV_PHONE_OTP_CODE = process.env.EXPO_PUBLIC_DEV_OTP_CODE || "123456";
-let phoneOtpFallbackToMock = false;
 
 type JsonRecord = Record<string, unknown>;
+
+export function formatPhoneAuthError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  if (/unsupported phone provider|sms provider|phone provider|provider is not configured/i.test(message)) {
+    return "تسجيل الدخول بالجوال غير مفعّل في بيئة الاختبار حاليًا. يرجى تفعيل مزود الرسائل أولًا.";
+  }
+  if (/network|fetch|timeout|timed out|abort/i.test(message)) {
+    return "تعذر الاتصال بخدمة التحقق. تحقق من الإنترنت وحاول مرة أخرى.";
+  }
+  if (/invalid|expired|otp|token/i.test(message)) {
+    return "رمز التحقق غير صحيح أو انتهت صلاحيته.";
+  }
+  return "تعذر إكمال التحقق من رقم الجوال. حاول مرة أخرى.";
+}
 
 export type SupabaseAuthUser = {
   id: string;
@@ -81,20 +93,6 @@ export function getSupabaseConfig() {
 function buildSupabaseUrl(baseUrl: string, path: string): string {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${baseUrl}${cleanPath.replace(/^\/rest\/v1\/auth\/v1\//, "/auth/v1/")}`;
-}
-
-export function isMockPhoneOtpEnabled(): boolean {
-  return process.env.EXPO_PUBLIC_AUTH_OTP_MODE !== "sms" || phoneOtpFallbackToMock;
-}
-
-function shouldUseMockOtpFallback(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-
-  return (
-    message.includes("Unsupported phone provider") ||
-    message.includes("unsupported phone provider") ||
-    message.includes("SMS provider")
-  );
 }
 
 function getErrorMessage(data: unknown, fallback: string): string {
@@ -417,16 +415,6 @@ function toAuthUser(
   };
 }
 
-function phoneAuthEmail(phone: string): string {
-  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
-  return `${digits}@phone.mofk.local`;
-}
-
-function phoneAuthPassword(phone: string): string {
-  const digits = normalizeSaudiPhone(phone).replace(/\D/g, "");
-  return `MofkPhoneOtp@${digits}`;
-}
-
 async function upsertUserRow(
   user: SupabaseAuthUser,
   accessToken: string,
@@ -514,12 +502,7 @@ export const authApi = {
   async startPhoneLogin(phone: string): Promise<string> {
     const normalizedPhone = normalizeSaudiPhone(phone);
 
-    if (isMockPhoneOtpEnabled()) {
-      return normalizedPhone;
-    }
-
-    try {
-      await supabaseRequest(
+    await supabaseRequest(
         "/auth/v1/otp",
         {
           method: "POST",
@@ -532,13 +515,6 @@ export const authApi = {
           }),
         },
       );
-    } catch (error) {
-      if (!shouldUseMockOtpFallback(error)) {
-        throw error;
-      }
-
-      phoneOtpFallbackToMock = true;
-    }
 
     return normalizedPhone;
   },
@@ -546,12 +522,7 @@ export const authApi = {
   async startPhoneRegistration(phone: string): Promise<string> {
     const normalizedPhone = normalizeSaudiPhone(phone);
 
-    if (isMockPhoneOtpEnabled()) {
-      return normalizedPhone;
-    }
-
-    try {
-      await supabaseRequest(
+    await supabaseRequest(
         "/auth/v1/otp",
         {
           method: "POST",
@@ -564,78 +535,12 @@ export const authApi = {
           }),
         },
       );
-    } catch (error) {
-      if (!shouldUseMockOtpFallback(error)) {
-        throw error;
-      }
-
-      phoneOtpFallbackToMock = true;
-    }
 
     return normalizedPhone;
   },
 
   async verifyPhoneOtp(phone: string, token: string, mode: "login" | "register" = "login"): Promise<AuthUser> {
     const normalizedPhone = normalizeSaudiPhone(phone);
-
-    if (isMockPhoneOtpEnabled()) {
-      if (token !== DEV_PHONE_OTP_CODE) {
-        throw new Error("رمز التحقق غير صحيح. استخدم رمز الاختبار 123456.");
-      }
-
-      const email = phoneAuthEmail(normalizedPhone);
-      const password = phoneAuthPassword(normalizedPhone);
-
-      let payload: SupabaseAuthResponse;
-
-      try {
-        payload = await supabaseRequest<SupabaseAuthResponse>(
-          "/auth/v1/token?grant_type=password",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email,
-              password,
-            }),
-          },
-        );
-      } catch {
-        payload = await supabaseRequest<SupabaseAuthResponse>(
-          "/auth/v1/signup",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email,
-              password,
-              data: {
-                name: "مستخدم مفك",
-                full_name: "مستخدم مفك",
-                phone: normalizedPhone,
-              },
-            }),
-          },
-        );
-      }
-
-      const session = normalizeSession(payload);
-
-      if (!session) {
-        throw new Error("تعذر إنشاء جلسة الاختبار. تحقق من إعدادات Supabase Auth.");
-      }
-
-      await saveSupabaseSession(session);
-
-      const row = await getProfileRow(session.user, session.access_token);
-      await touchLastActiveAt(session.user.id, session.access_token);
-
-      return toAuthUser(session.user, row);
-    }
 
     const payload = await supabaseRequest<SupabaseAuthResponse>(
       "/auth/v1/verify",

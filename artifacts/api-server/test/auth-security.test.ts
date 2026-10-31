@@ -29,22 +29,23 @@ test.before(() => {
   globalThis.fetch = async () => new Response(JSON.stringify({ keys: [{ ...jwk, kid: "uat-test-key", kty: "RSA", alg: "RS256", use: "sig" }] }), { status: 200 });
 });
 
-test("accepts a correctly signed UAT Supabase JWT", async () => {
+test("accepts a correctly signed UAT Supabase JWT", { concurrency: false }, async () => {
   const payload = await verifySupabaseJwt(makeToken());
   assert.equal(payload?.sub, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 });
 
-test("rejects a JWT with a forged signature", async () => {
+test("rejects a JWT with a forged signature", { concurrency: false }, async () => {
   const parts = makeToken().split(".");
-  parts[2] = `${parts[2].slice(0, -1)}${parts[2].endsWith("A") ? "B" : "A"}`;
+  const replacement = parts[2][0] === "A" ? "B" : "A";
+  parts[2] = `${replacement}${parts[2].slice(1)}`;
   const token = parts.join(".");
   assert.equal(await verifySupabaseJwt(token), null);
 });
 
-test("rejects an expired JWT", async () => {
+test("rejects an expired JWT", { concurrency: false }, async () => {
   assert.equal(await verifySupabaseJwt(makeToken({ exp: Math.floor(Date.now() / 1000) - 1 })), null);
 });
 
-test("rejects a token issued for Production", async () => {
+test("rejects a token issued for Production", { concurrency: false }, async () => {
   assert.equal(await verifySupabaseJwt(makeToken({ iss: "https://tnkcmoqzcvtsaqwsghet.supabase.co/auth/v1" })), null);
 });

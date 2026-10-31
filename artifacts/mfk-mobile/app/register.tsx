@@ -15,6 +15,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { PhoneNumberInput, isValidSaudiMobileDigits } from "@/components/PhoneNumberInput";
 import { ArabicText } from "@/components/ArabicText";
 import { authApi } from "@/context/AuthContext";
+import { formatPhoneAuthError } from "@/lib/supabase";
 import { useColors } from "@/hooks/useColors";
 import { smoothBack } from "@/lib/navigation";
 
@@ -48,7 +49,7 @@ export default function RegisterScreen() {
         },
       });
     } catch (err: any) {
-      setError(err.message || "تعذر إرسال رمز التحقق. حاول مرة أخرى.");
+      setError(formatPhoneAuthError(err));
     } finally {
       setIsLoading(false);
     }

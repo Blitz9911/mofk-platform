@@ -19,7 +19,7 @@ import { authApi, useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { rowDir } from "@/lib/layout";
 import { smoothBack } from "@/lib/navigation";
-import { DEV_PHONE_OTP_CODE, isMockPhoneOtpEnabled } from "@/lib/supabase";
+import { formatPhoneAuthError } from "@/lib/supabase";
 
 const OTP_LENGTH = 6;
 
@@ -38,7 +38,6 @@ export default function VerifyScreen() {
 
   const phone = typeof params.phone === "string" ? params.phone : "";
   const mode = params.mode === "register" ? "register" : "login";
-  const isMockOtp = isMockPhoneOtpEnabled();
 
   const [code, setCode] = useState("");
   const [seconds, setSeconds] = useState(45);
@@ -92,7 +91,7 @@ export default function VerifyScreen() {
       await login(user);
       router.replace(mode === "register" ? "/complete-profile" : "/");
     } catch (err: any) {
-      setError(err.message || "رمز التحقق غير صحيح أو انتهت صلاحيته.");
+      setError(formatPhoneAuthError(err));
       verifyingRef.current = false;
       setIsVerifying(false);
     }
@@ -125,7 +124,7 @@ export default function VerifyScreen() {
       verifyingRef.current = false;
       setTimeout(() => hiddenInput.current?.focus(), 50);
     } catch (err: any) {
-      setError(err.message || "تعذر إعادة إرسال الرمز. حاول مرة أخرى.");
+      setError(formatPhoneAuthError(err));
     } finally {
       setIsResending(false);
     }
@@ -152,9 +151,7 @@ export default function VerifyScreen() {
         <View style={styles.hero}>
           <ArabicText style={styles.title}>أدخل رمز التحقق</ArabicText>
           <ArabicText style={styles.description}>
-            {isMockOtp
-              ? `وضع الاختبار مفعل. استخدم الرمز ${DEV_PHONE_OTP_CODE} للمتابعة.`
-              : "أرسلنا رمزًا مكونًا من 6 أرقام إلى"}
+            أرسلنا رمزًا مكونًا من 6 أرقام إلى
           </ArabicText>
           <Text style={styles.phoneLine}>{maskedPhone}</Text>
         </View>

@@ -31,7 +31,7 @@
       "env": {
         "EXPO_PUBLIC_MFK_ENV": "uat",
         "EXPO_PUBLIC_MFK_UAT_SUPABASE_REF": "nbuqxtasvqdnallukbyx",
-        "EXPO_PUBLIC_AUTH_OTP_MODE": "mock",
+        "EXPO_PUBLIC_AUTH_OTP_MODE": "sms",
         "MFK_PUSH_SEND_ENABLED": "false"
       },
       "ios": {
@@ -47,7 +47,7 @@
         "EXPO_PUBLIC_MFK_ENV": "uat",
         "EXPO_PUBLIC_API_BASE_URL": "https://mofk-uat-api.onrender.com",
         "EXPO_PUBLIC_MFK_UAT_SUPABASE_REF": "nbuqxtasvqdnallukbyx",
-        "EXPO_PUBLIC_AUTH_OTP_MODE": "mock",
+        "EXPO_PUBLIC_AUTH_OTP_MODE": "sms",
         "MFK_PUSH_SEND_ENABLED": "false"
       }
     },
