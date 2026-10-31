@@ -42,7 +42,7 @@
       "distribution": "store",
       "channel": "uat",
       "environment": "preview",
-      "autoIncrement": true,
+      "autoIncrement": false,
       "env": {
         "EXPO_PUBLIC_MFK_ENV": "uat",
         "EXPO_PUBLIC_API_BASE_URL": "https://mofk-uat-api.onrender.com",

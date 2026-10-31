@@ -19,6 +19,7 @@ module.exports = {
   ios: {
     ...expo.ios,
     bundleIdentifier: isUat ? "com.mfk.diagnostics.uat" : expo.ios.bundleIdentifier,
+    buildNumber: isUat ? "9" : expo.ios.buildNumber,
     // CarPlay belongs to the published app. The isolated UAT app only requests
     // capabilities required by its own config plugins, including notifications.
     entitlements: isUat ? { "aps-environment": "production" } : expo.ios.entitlements,
